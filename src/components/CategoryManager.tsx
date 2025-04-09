@@ -107,7 +107,7 @@ const CategoryManager = () => {
                 {categories.map(category => (
                   <TableRow key={category.id}>
                     <TableCell className="font-medium">{category.name}</TableCell>
-                    <TableCell>{category.pointValue}</TableCell>
+                    <TableCell>{category.pointValue > 0 ? '+' : ''}{category.pointValue}</TableCell>
                     <TableCell className="max-w-xs truncate">{category.description}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -155,11 +155,13 @@ const CategoryManager = () => {
               <Input
                 id="points"
                 type="number"
-                min="1"
                 value={pointValue}
-                onChange={e => setPointValue(parseInt(e.target.value, 10) || 1)}
+                onChange={e => setPointValue(parseInt(e.target.value, 10) || 0)}
                 required
               />
+              <p className="text-sm text-muted-foreground">
+                Use positive values for rewards and negative values for deductions
+              </p>
             </div>
             
             <div className="space-y-2">
