@@ -15,7 +15,6 @@ const RewardTracker = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [pointValue, setPointValue] = useState<number | null>(null);
   const [description, setDescription] = useState('');
-  const [isPositive, setIsPositive] = useState(true);
 
   const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
 
@@ -24,7 +23,6 @@ const RewardTracker = () => {
     const category = categories.find(cat => cat.id === categoryId);
     if (category) {
       setPointValue(category.pointValue);
-      setIsPositive(true);
     }
   };
 
@@ -33,10 +31,8 @@ const RewardTracker = () => {
     
     if (!selectedCategoryId) return;
     
-    // Calculate final points value based on positive/negative toggle
-    const finalPoints = isPositive 
-      ? (pointValue || selectedCategory?.pointValue || 0)
-      : -(pointValue || selectedCategory?.pointValue || 0);
+    // Use the point value directly (can be positive or negative)
+    const finalPoints = pointValue || selectedCategory?.pointValue || 0;
     
     addEntry({
       categoryId: selectedCategoryId,
@@ -70,7 +66,7 @@ const RewardTracker = () => {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Add Points</CardTitle>
+          <CardTitle>Record Points</CardTitle>
           <CardDescription>Track reward points for achievements or behavior</CardDescription>
         </CardHeader>
         <CardContent>
@@ -84,7 +80,7 @@ const RewardTracker = () => {
                 <SelectContent>
                   {categories.map(category => (
                     <SelectItem key={category.id} value={category.id}>
-                      {category.name} ({category.pointValue} points)
+                      {category.name} ({category.pointValue > 0 ? '+' : ''}{category.pointValue} points)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -111,28 +107,15 @@ const RewardTracker = () => {
                   onChange={e => setPointValue(e.target.value ? parseInt(e.target.value, 10) : null)}
                   className="flex-1"
                 />
-                <Button 
-                  type="button" 
-                  variant={isPositive ? "default" : "outline"}
-                  onClick={() => setIsPositive(true)}
-                >
-                  <ThumbsUp className="mr-2 h-4 w-4" />
-                  Add
-                </Button>
-                <Button 
-                  type="button" 
-                  variant={!isPositive ? "default" : "outline"}
-                  onClick={() => setIsPositive(false)}
-                >
-                  <ThumbsDown className="mr-2 h-4 w-4" />
-                  Deduct
-                </Button>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Enter positive values for rewards or negative values for deductions
+              </p>
             </div>
 
             <Button type="submit" disabled={!selectedCategoryId} className="w-full">
               <Star className="mr-2 h-4 w-4" />
-              {isPositive ? 'Add Points' : 'Deduct Points'}
+              Record Points
             </Button>
           </form>
         </CardContent>
