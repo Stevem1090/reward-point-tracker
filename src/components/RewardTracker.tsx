@@ -8,11 +8,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import { Star, ThumbsUp, ThumbsDown, Award } from 'lucide-react';
+import { Star, ThumbsUp, ThumbsDown, Award, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { format } from 'date-fns';
 
 const RewardTracker = () => {
-  const { categories, addEntry, entries, isLoading } = useReward();
+  const { 
+    categories, 
+    addEntry, 
+    entries, 
+    isLoading, 
+    selectedDate, 
+    goToPreviousDay, 
+    goToNextDay, 
+    goToToday 
+  } = useReward();
+  
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [pointValue, setPointValue] = useState<number | null>(null);
   const [description, setDescription] = useState('');
@@ -45,22 +56,25 @@ const RewardTracker = () => {
     setDescription('');
   };
 
-  // Filter only today's entries
-  const todayEntries = entries.filter(entry => {
-    const entryDate = new Date(entry.timestamp);
+  const isToday = (date: Date) => {
     const today = new Date();
-    return entryDate.getDate() === today.getDate() &&
-           entryDate.getMonth() === today.getMonth() &&
-           entryDate.getFullYear() === today.getFullYear();
-  });
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
 
   // Sort entries by most recent first
-  const sortedEntries = [...todayEntries].sort((a, b) => 
+  const sortedEntries = [...entries].sort((a, b) => 
     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 
   const getTotalPoints = () => {
     return sortedEntries.reduce((total, entry) => total + entry.points, 0);
+  };
+
+  const getFormattedDate = () => {
+    const isCurrentDay = isToday(selectedDate);
+    return isCurrentDay ? 'Today' : format(selectedDate, 'EEEE, MMMM d, yyyy');
   };
 
   if (isLoading) {
@@ -161,17 +175,41 @@ const RewardTracker = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex justify-between items-center">
-            <span>Today's Points</span>
-            <span className="text-2xl font-bold">{getTotalPoints()}</span>
-          </CardTitle>
-          <CardDescription>Recent point entries</CardDescription>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <span>{getFormattedDate()} Points</span>
+                <span className="text-2xl font-bold">{getTotalPoints()}</span>
+              </div>
+            </CardTitle>
+            
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="icon" onClick={goToPreviousDay}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <Button variant="outline" size="sm" onClick={goToToday} disabled={isToday(selectedDate)}>
+                <Calendar className="h-4 w-4 mr-1" />
+                Today
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={goToNextDay} 
+                disabled={isToday(selectedDate)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <CardDescription>Point entries for {format(selectedDate, 'MMMM d, yyyy')}</CardDescription>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[350px] pr-4">
             {sortedEntries.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                No points recorded today
+                No points recorded for this day
               </div>
             ) : (
               <div className="space-y-4">

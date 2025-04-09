@@ -4,6 +4,7 @@ import { RewardCategory, PointEntry, DailySummary } from '@/types/reward';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { format, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
 
 interface RewardContextType {
   categories: RewardCategory[];
@@ -13,7 +14,7 @@ interface RewardContextType {
   deleteCategory: (id: string) => void;
   addEntry: (entry: Omit<PointEntry, 'id' | 'timestamp'>) => void;
   deleteEntry: (id: string) => void;
-  getDailySummary: () => DailySummary;
+  getDailySummary: (date?: Date) => DailySummary;
   sendSummary: (method: 'email' | 'whatsapp') => void;
   contactInfo: { email: string; whatsapp: string };
   setContactInfo: (info: { email: string; whatsapp: string }) => void;
@@ -22,6 +23,11 @@ interface RewardContextType {
   autoSendTime: string;
   setAutoSendTime: (time: string) => void;
   isLoading: boolean;
+  selectedDate: Date;
+  goToPreviousDay: () => void;
+  goToNextDay: () => void;
+  goToToday: () => void;
+  fetchEntriesForDate: (date: Date) => void;
 }
 
 const RewardContext = createContext<RewardContextType | undefined>(undefined);
@@ -30,6 +36,7 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [categories, setCategories] = useState<RewardCategory[]>([]);
   const [entries, setEntries] = useState<PointEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
   const [contactInfo, setContactInfo] = useState<{ email: string; whatsapp: string }>(() => {
     const saved = localStorage.getItem('contactInfo');
@@ -98,43 +105,51 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [toast]);
 
-  // Fetch entries from Supabase
-  useEffect(() => {
-    const fetchEntries = async () => {
-      try {
-        setIsLoading(true);
-        const { data, error } = await supabase
-          .from('point_entries')
-          .select('*')
-          .order('timestamp', { ascending: false });
-        
-        if (error) {
-          throw error;
-        }
-        
-        if (data) {
-          const mappedEntries: PointEntry[] = data.map(entry => ({
-            id: entry.id,
-            categoryId: entry.category_id,
-            description: entry.description || '',
-            points: entry.points,
-            timestamp: new Date(entry.timestamp)
-          }));
-          setEntries(mappedEntries);
-        }
-      } catch (error) {
-        console.error('Error fetching entries:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load point entries",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+  // Fetch entries for selected date from Supabase
+  const fetchEntriesForDate = async (date: Date) => {
+    try {
+      setIsLoading(true);
+      
+      // Calculate start and end of the selected date
+      const startTime = startOfDay(date).toISOString();
+      const endTime = endOfDay(date).toISOString();
+      
+      const { data, error } = await supabase
+        .from('point_entries')
+        .select('*')
+        .gte('timestamp', startTime)
+        .lte('timestamp', endTime)
+        .order('timestamp', { ascending: false });
+      
+      if (error) {
+        throw error;
       }
-    };
-    
-    fetchEntries();
+      
+      if (data) {
+        const mappedEntries: PointEntry[] = data.map(entry => ({
+          id: entry.id,
+          categoryId: entry.category_id,
+          description: entry.description || '',
+          points: entry.points,
+          timestamp: new Date(entry.timestamp)
+        }));
+        setEntries(mappedEntries);
+      }
+    } catch (error) {
+      console.error('Error fetching entries:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load point entries",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch entries on initial load and when selected date changes
+  useEffect(() => {
+    fetchEntriesForDate(selectedDate);
     
     // Subscribe to realtime updates on entries
     const entrySubscription = supabase
@@ -144,14 +159,14 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         schema: 'public',
         table: 'point_entries'
       }, () => {
-        fetchEntries();
+        fetchEntriesForDate(selectedDate);
       })
       .subscribe();
     
     return () => {
       supabase.removeChannel(entrySubscription);
     };
-  }, [toast]);
+  }, [selectedDate, toast]);
 
   useEffect(() => {
     localStorage.setItem('contactInfo', JSON.stringify(contactInfo));
@@ -192,6 +207,18 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     return () => clearInterval(intervalId);
   }, [autoSendEnabled, autoSendTime, contactInfo.email]);
+
+  const goToPreviousDay = () => {
+    setSelectedDate(prev => subDays(prev, 1));
+  };
+
+  const goToNextDay = () => {
+    setSelectedDate(prev => addDays(prev, 1));
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date());
+  };
 
   const addCategory = async (category: Omit<RewardCategory, 'id'>) => {
     try {
@@ -302,7 +329,8 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         .insert({
           category_id: entry.categoryId,
           description: entry.description,
-          points: finalPoints
+          points: finalPoints,
+          timestamp: new Date().toISOString() // Use the current time for new entries
         });
       
       if (error) {
@@ -344,20 +372,19 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const isToday = (date: Date) => {
-    const today = new Date();
-    return date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear();
+  const isDateMatching = (entryDate: Date, targetDate: Date) => {
+    return entryDate.getDate() === targetDate.getDate() &&
+      entryDate.getMonth() === targetDate.getMonth() &&
+      entryDate.getFullYear() === targetDate.getFullYear();
   };
 
-  const getDailySummary = (): DailySummary => {
-    const todayEntries = entries.filter(entry => isToday(new Date(entry.timestamp)));
+  const getDailySummary = (date: Date = selectedDate): DailySummary => {
+    const dateEntries = entries.filter(entry => isDateMatching(new Date(entry.timestamp), date));
     
-    const totalPoints = todayEntries.reduce((sum, entry) => sum + entry.points, 0);
+    const totalPoints = dateEntries.reduce((sum, entry) => sum + entry.points, 0);
     
     const entriesByCategory = categories.map(category => {
-      const categoryEntries = todayEntries.filter(entry => entry.categoryId === category.id);
+      const categoryEntries = dateEntries.filter(entry => entry.categoryId === category.id);
       return {
         categoryId: category.id,
         categoryName: category.name,
@@ -367,7 +394,7 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }).filter(cat => cat.entries.length > 0);
     
     return {
-      date: new Date().toLocaleDateString(),
+      date: date.toLocaleDateString(),
       totalPoints,
       entriesByCategory
     };
@@ -450,7 +477,12 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setAutoSendEnabled,
       autoSendTime,
       setAutoSendTime,
-      isLoading
+      isLoading,
+      selectedDate,
+      goToPreviousDay,
+      goToNextDay,
+      goToToday,
+      fetchEntriesForDate
     }}>
       {children}
     </RewardContext.Provider>
