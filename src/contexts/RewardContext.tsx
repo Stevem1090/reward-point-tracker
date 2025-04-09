@@ -1,7 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { RewardCategory, PointEntry, DailySummary } from '@/types/reward';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface RewardContextType {
   categories: RewardCategory[];
@@ -19,35 +21,16 @@ interface RewardContextType {
   setAutoSendEnabled: (enabled: boolean) => void;
   autoSendTime: string;
   setAutoSendTime: (time: string) => void;
+  isLoading: boolean;
 }
-
-const defaultCategories: RewardCategory[] = [
-  { id: uuidv4(), name: 'Completing Homework', pointValue: 10, description: 'Finishing all homework assignments' },
-  { id: uuidv4(), name: 'Cleaning Room', pointValue: 5, description: 'Keeping the bedroom tidy' },
-  { id: uuidv4(), name: 'Good Behavior', pointValue: 3, description: 'Being polite and following instructions' },
-  { id: uuidv4(), name: 'Reading', pointValue: 5, description: 'Reading for at least 30 minutes' },
-];
 
 const RewardContext = createContext<RewardContextType | undefined>(undefined);
 
 export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [categories, setCategories] = useState<RewardCategory[]>(() => {
-    const saved = localStorage.getItem('rewardCategories');
-    return saved ? JSON.parse(saved) : defaultCategories;
-  });
+  const [categories, setCategories] = useState<RewardCategory[]>([]);
+  const [entries, setEntries] = useState<PointEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  const [entries, setEntries] = useState<PointEntry[]>(() => {
-    const saved = localStorage.getItem('pointEntries');
-    if (saved) {
-      const parsedEntries = JSON.parse(saved);
-      return parsedEntries.map((entry: any) => ({
-        ...entry,
-        timestamp: new Date(entry.timestamp)
-      }));
-    }
-    return [];
-  });
-
   const [contactInfo, setContactInfo] = useState<{ email: string; whatsapp: string }>(() => {
     const saved = localStorage.getItem('contactInfo');
     return saved ? JSON.parse(saved) : { email: '', whatsapp: '' };
@@ -65,13 +48,110 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   
   const { toast } = useToast();
 
+  // Fetch categories from Supabase
   useEffect(() => {
-    localStorage.setItem('rewardCategories', JSON.stringify(categories));
-  }, [categories]);
+    const fetchCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('reward_categories')
+          .select('*');
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (data) {
+          const mappedCategories: RewardCategory[] = data.map(cat => ({
+            id: cat.id,
+            name: cat.name,
+            pointValue: cat.point_value,
+            description: cat.description || ''
+          }));
+          setCategories(mappedCategories);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load categories",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    fetchCategories();
+    
+    // Subscribe to realtime updates on categories
+    const categorySubscription = supabase
+      .channel('public:reward_categories')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'reward_categories'
+      }, () => {
+        fetchCategories();
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(categorySubscription);
+    };
+  }, [toast]);
 
+  // Fetch entries from Supabase
   useEffect(() => {
-    localStorage.setItem('pointEntries', JSON.stringify(entries));
-  }, [entries]);
+    const fetchEntries = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('point_entries')
+          .select('*')
+          .order('timestamp', { ascending: false });
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (data) {
+          const mappedEntries: PointEntry[] = data.map(entry => ({
+            id: entry.id,
+            categoryId: entry.category_id,
+            description: entry.description || '',
+            points: entry.points,
+            timestamp: new Date(entry.timestamp)
+          }));
+          setEntries(mappedEntries);
+        }
+      } catch (error) {
+        console.error('Error fetching entries:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load point entries",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchEntries();
+    
+    // Subscribe to realtime updates on entries
+    const entrySubscription = supabase
+      .channel('public:point_entries')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'point_entries'
+      }, () => {
+        fetchEntries();
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(entrySubscription);
+    };
+  }, [toast]);
 
   useEffect(() => {
     localStorage.setItem('contactInfo', JSON.stringify(contactInfo));
@@ -113,59 +193,155 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => clearInterval(intervalId);
   }, [autoSendEnabled, autoSendTime, contactInfo.email]);
 
-  const addCategory = (category: Omit<RewardCategory, 'id'>) => {
-    const newCategory = { ...category, id: uuidv4() };
-    setCategories([...categories, newCategory]);
-    toast({
-      title: "Category Added",
-      description: `${category.name} has been added as a new category`,
-    });
-  };
-
-  const updateCategory = (updatedCategory: RewardCategory) => {
-    setCategories(categories.map(cat => 
-      cat.id === updatedCategory.id ? updatedCategory : cat
-    ));
-    toast({
-      title: "Category Updated",
-      description: `${updatedCategory.name} has been updated`,
-    });
-  };
-
-  const deleteCategory = (id: string) => {
-    const categoryToDelete = categories.find(cat => cat.id === id);
-    if (categoryToDelete) {
-      setCategories(categories.filter(cat => cat.id !== id));
+  const addCategory = async (category: Omit<RewardCategory, 'id'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('reward_categories')
+        .insert({
+          name: category.name,
+          point_value: category.pointValue,
+          description: category.description
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        const newCategory: RewardCategory = {
+          id: data.id,
+          name: data.name,
+          pointValue: data.point_value,
+          description: data.description || ''
+        };
+        
+        toast({
+          title: "Category Added",
+          description: `${category.name} has been added as a new category`,
+        });
+      }
+    } catch (error) {
+      console.error('Error adding category:', error);
       toast({
-        title: "Category Deleted",
-        description: `${categoryToDelete.name} has been removed`,
+        title: "Error",
+        description: "Failed to add category",
         variant: "destructive",
       });
     }
   };
 
-  const addEntry = (entry: Omit<PointEntry, 'id' | 'timestamp'>) => {
-    const category = categories.find(cat => cat.id === entry.categoryId);
-    if (!category) return;
-    
-    const newEntry = { 
-      ...entry, 
-      id: uuidv4(), 
-      timestamp: new Date(),
-      points: entry.points || category.pointValue 
-    };
-    
-    setEntries([...entries, newEntry]);
-    
-    toast({
-      title: `${entry.points >= 0 ? 'Points Earned' : 'Points Lost'}`,
-      description: `${Math.abs(entry.points || category.pointValue)} points for ${category.name}`,
-      variant: entry.points >= 0 ? "default" : "destructive",
-    });
+  const updateCategory = async (updatedCategory: RewardCategory) => {
+    try {
+      const { error } = await supabase
+        .from('reward_categories')
+        .update({
+          name: updatedCategory.name,
+          point_value: updatedCategory.pointValue,
+          description: updatedCategory.description
+        })
+        .eq('id', updatedCategory.id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Category Updated",
+        description: `${updatedCategory.name} has been updated`,
+      });
+    } catch (error) {
+      console.error('Error updating category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update category",
+        variant: "destructive",
+      });
+    }
   };
 
-  const deleteEntry = (id: string) => {
-    setEntries(entries.filter(entry => entry.id !== id));
+  const deleteCategory = async (id: string) => {
+    try {
+      const categoryToDelete = categories.find(cat => cat.id === id);
+      if (!categoryToDelete) return;
+      
+      const { error } = await supabase
+        .from('reward_categories')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Category Deleted",
+        description: `${categoryToDelete.name} has been removed`,
+        variant: "destructive",
+      });
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete category",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const addEntry = async (entry: Omit<PointEntry, 'id' | 'timestamp'>) => {
+    try {
+      const category = categories.find(cat => cat.id === entry.categoryId);
+      if (!category) return;
+      
+      const finalPoints = entry.points || category.pointValue;
+      
+      const { error } = await supabase
+        .from('point_entries')
+        .insert({
+          category_id: entry.categoryId,
+          description: entry.description,
+          points: finalPoints
+        });
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: `${finalPoints >= 0 ? 'Points Earned' : 'Points Lost'}`,
+        description: `${Math.abs(finalPoints)} points for ${category.name}`,
+        variant: finalPoints >= 0 ? "default" : "destructive",
+      });
+    } catch (error) {
+      console.error('Error adding entry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add point entry",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteEntry = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('point_entries')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete entry",
+        variant: "destructive",
+      });
+    }
   };
 
   const isToday = (date: Date) => {
@@ -273,7 +449,8 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       autoSendEnabled,
       setAutoSendEnabled,
       autoSendTime,
-      setAutoSendTime
+      setAutoSendTime,
+      isLoading
     }}>
       {children}
     </RewardContext.Provider>

@@ -9,7 +9,65 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      point_entries: {
+        Row: {
+          category_id: string
+          created_at: string
+          description: string | null
+          id: string
+          points: number
+          timestamp: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          points: number
+          timestamp?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          points?: number
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "point_entries_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "reward_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reward_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          point_value: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          point_value: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          point_value?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -9,9 +9,10 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Star, ThumbsUp, ThumbsDown, Award } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const RewardTracker = () => {
-  const { categories, addEntry, entries } = useReward();
+  const { categories, addEntry, entries, isLoading } = useReward();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [pointValue, setPointValue] = useState<number | null>(null);
   const [description, setDescription] = useState('');
@@ -61,6 +62,43 @@ const RewardTracker = () => {
   const getTotalPoints = () => {
     return sortedEntries.reduce((total, entry) => total + entry.points, 0);
   };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Skeleton className="h-6 w-full" />
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
