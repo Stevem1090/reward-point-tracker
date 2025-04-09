@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { RewardCategory, PointEntry, DailySummary } from '@/types/reward';
 import { v4 as uuidv4 } from 'uuid';
