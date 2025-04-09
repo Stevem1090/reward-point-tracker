@@ -15,6 +15,10 @@ interface RewardContextType {
   sendSummary: (method: 'email' | 'whatsapp') => void;
   contactInfo: { email: string; whatsapp: string };
   setContactInfo: (info: { email: string; whatsapp: string }) => void;
+  autoSendEnabled: boolean;
+  setAutoSendEnabled: (enabled: boolean) => void;
+  autoSendTime: string;
+  setAutoSendTime: (time: string) => void;
 }
 
 const defaultCategories: RewardCategory[] = [
@@ -48,6 +52,16 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const saved = localStorage.getItem('contactInfo');
     return saved ? JSON.parse(saved) : { email: '', whatsapp: '' };
   });
+
+  const [autoSendEnabled, setAutoSendEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('autoSendEnabled');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  const [autoSendTime, setAutoSendTime] = useState<string>(() => {
+    const saved = localStorage.getItem('autoSendTime');
+    return saved ? JSON.parse(saved) : '19:00'; // Default to 7:00 PM
+  });
   
   const { toast } = useToast();
 
@@ -62,6 +76,42 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     localStorage.setItem('contactInfo', JSON.stringify(contactInfo));
   }, [contactInfo]);
+
+  useEffect(() => {
+    localStorage.setItem('autoSendEnabled', JSON.stringify(autoSendEnabled));
+  }, [autoSendEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('autoSendTime', JSON.stringify(autoSendTime));
+  }, [autoSendTime]);
+
+  useEffect(() => {
+    if (!autoSendEnabled || !contactInfo.email) return;
+
+    const checkAndSendSummary = () => {
+      const now = new Date();
+      const [hours, minutes] = autoSendTime.split(':').map(Number);
+      
+      if (now.getHours() === hours && now.getMinutes() === minutes) {
+        // Check if we have already sent today's summary
+        const lastSentDate = localStorage.getItem('lastAutoSentDate');
+        const today = now.toDateString();
+        
+        if (lastSentDate !== today) {
+          sendSummary('email');
+          localStorage.setItem('lastAutoSentDate', today);
+        }
+      }
+    };
+
+    // Check every minute
+    const intervalId = setInterval(checkAndSendSummary, 60000);
+    
+    // Run once immediately to check if we need to send right now
+    checkAndSendSummary();
+    
+    return () => clearInterval(intervalId);
+  }, [autoSendEnabled, autoSendTime, contactInfo.email]);
 
   const addCategory = (category: Omit<RewardCategory, 'id'>) => {
     const newCategory = { ...category, id: uuidv4() };
@@ -219,7 +269,11 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       getDailySummary,
       sendSummary,
       contactInfo,
-      setContactInfo
+      setContactInfo,
+      autoSendEnabled,
+      setAutoSendEnabled,
+      autoSendTime,
+      setAutoSendTime
     }}>
       {children}
     </RewardContext.Provider>

@@ -5,14 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Mail, MessageSquare, Save } from 'lucide-react';
+import { Mail, MessageSquare, Save, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 
 const Settings = () => {
-  const { contactInfo, setContactInfo } = useReward();
+  const { contactInfo, setContactInfo, autoSendEnabled, setAutoSendEnabled, autoSendTime, setAutoSendTime } = useReward();
   const { toast } = useToast();
   const [email, setEmail] = useState(contactInfo.email);
   const [whatsapp, setWhatsapp] = useState(contactInfo.whatsapp);
+  const [isAutoSend, setIsAutoSend] = useState(autoSendEnabled);
+  const [timeValue, setTimeValue] = useState(autoSendTime);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,9 +25,12 @@ const Settings = () => {
       whatsapp
     });
     
+    setAutoSendEnabled(isAutoSend);
+    setAutoSendTime(timeValue);
+    
     toast({
       title: "Settings Saved",
-      description: "Your contact information has been updated",
+      description: "Your contact information and preferences have been updated",
     });
   };
 
@@ -67,6 +73,34 @@ const Settings = () => {
               />
               <p className="text-sm text-muted-foreground">
                 Include country code (e.g., +1 for US). This will open WhatsApp with the summary text.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="autoSend" className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Auto-send daily summary via email
+                </Label>
+                <Switch
+                  id="autoSend"
+                  checked={isAutoSend}
+                  onCheckedChange={setIsAutoSend}
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Label htmlFor="autoSendTime">Send time:</Label>
+                <Input
+                  id="autoSendTime"
+                  type="time"
+                  value={timeValue}
+                  onChange={e => setTimeValue(e.target.value)}
+                  disabled={!isAutoSend}
+                  className="w-auto"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                When enabled, a summary will be automatically sent to your email address at the specified time every day.
               </p>
             </div>
             
