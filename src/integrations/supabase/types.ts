@@ -9,6 +9,30 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      auto_email_settings: {
+        Row: {
+          auto_send_enabled: boolean
+          auto_send_time: string
+          email: string
+          id: string
+          last_sent_date: string | null
+        }
+        Insert: {
+          auto_send_enabled?: boolean
+          auto_send_time?: string
+          email: string
+          id?: string
+          last_sent_date?: string | null
+        }
+        Update: {
+          auto_send_enabled?: boolean
+          auto_send_time?: string
+          email?: string
+          id?: string
+          last_sent_date?: string | null
+        }
+        Relationships: []
+      }
       point_entries: {
         Row: {
           category_id: string
@@ -73,7 +97,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_points_summary_html: {
+        Args: { summary_date: string }
+        Returns: string
+      }
+      send_scheduled_emails: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

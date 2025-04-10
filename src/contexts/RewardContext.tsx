@@ -26,6 +26,8 @@ interface RewardContextType {
   goToNextDay: () => void;
   goToToday: () => void;
   fetchEntriesForDate: (date: Date) => void;
+  savingSettings: boolean;
+  saveSettingsToDatabase: (email: string, autoSendEnabled: boolean, autoSendTime: string) => Promise<void>;
 }
 
 const RewardContext = createContext<RewardContextType | undefined>(undefined);
@@ -35,6 +37,7 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [entries, setEntries] = useState<PointEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [savingSettings, setSavingSettings] = useState(false);
   
   const [contactInfo, setContactInfo] = useState<{ email: string; whatsapp: string }>(() => {
     const saved = localStorage.getItem('contactInfo');
@@ -53,53 +56,101 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   
   const { toast } = useToast();
 
+  const saveSettingsToDatabase = async (email: string, isAutoSend: boolean, timeValue: string) => {
+    try {
+      setSavingSettings(true);
+      
+      const { data: existingSettings } = await supabase
+        .from('auto_email_settings')
+        .select()
+        .eq('email', email)
+        .maybeSingle();
+      
+      if (existingSettings) {
+        await supabase
+          .from('auto_email_settings')
+          .update({
+            auto_send_enabled: isAutoSend,
+            auto_send_time: timeValue
+          })
+          .eq('id', existingSettings.id);
+      } else {
+        await supabase
+          .from('auto_email_settings')
+          .insert({
+            email: email,
+            auto_send_enabled: isAutoSend,
+            auto_send_time: timeValue
+          });
+      }
+      
+      console.log(`Email settings saved to database: ${email}, auto-send: ${isAutoSend}, time: ${timeValue}`);
+    } catch (error) {
+      console.error('Error saving email settings to database:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save email settings to the database",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchCategories = async () => {
+    const loadEmailSettings = async () => {
       try {
-        const { data, error } = await supabase
-          .from('reward_categories')
-          .select('*');
-        
-        if (error) {
-          throw error;
-        }
-        
-        if (data) {
-          const mappedCategories: RewardCategory[] = data.map(cat => ({
-            id: cat.id,
-            name: cat.name,
-            pointValue: cat.point_value,
-            description: cat.description || ''
-          }));
-          setCategories(mappedCategories);
+        if (contactInfo.email) {
+          const { data } = await supabase
+            .from('auto_email_settings')
+            .select()
+            .eq('email', contactInfo.email)
+            .maybeSingle();
+          
+          if (data) {
+            setAutoSendEnabled(data.auto_send_enabled);
+            setAutoSendTime(data.auto_send_time);
+            
+            localStorage.setItem('autoSendEnabled', JSON.stringify(data.auto_send_enabled));
+            localStorage.setItem('autoSendTime', JSON.stringify(data.auto_send_time));
+            
+            console.log(`Loaded email settings from database for ${contactInfo.email}`);
+          }
         }
       } catch (error) {
-        console.error('Error fetching categories:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load categories",
-          variant: "destructive",
-        });
+        console.error('Error loading email settings from database:', error);
       }
     };
     
-    fetchCategories();
+    loadEmailSettings();
+  }, [contactInfo.email]);
+
+  useEffect(() => {
+    localStorage.setItem('contactInfo', JSON.stringify(contactInfo));
     
-    const categorySubscription = supabase
-      .channel('public:reward_categories')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'reward_categories'
-      }, () => {
-        fetchCategories();
-      })
-      .subscribe();
+    if (contactInfo.email) {
+      saveSettingsToDatabase(contactInfo.email, autoSendEnabled, autoSendTime)
+        .catch(console.error);
+    }
+  }, [contactInfo]);
+
+  useEffect(() => {
+    localStorage.setItem('autoSendEnabled', JSON.stringify(autoSendEnabled));
     
-    return () => {
-      supabase.removeChannel(categorySubscription);
-    };
-  }, [toast]);
+    if (contactInfo.email) {
+      saveSettingsToDatabase(contactInfo.email, autoSendEnabled, autoSendTime)
+        .catch(console.error);
+    }
+  }, [autoSendEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('autoSendTime', JSON.stringify(autoSendTime));
+    
+    if (contactInfo.email && autoSendEnabled) {
+      saveSettingsToDatabase(contactInfo.email, autoSendEnabled, autoSendTime)
+        .catch(console.error);
+    }
+  }, [autoSendTime]);
 
   const fetchEntriesForDate = async (date: Date) => {
     try {
@@ -159,45 +210,6 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       supabase.removeChannel(entrySubscription);
     };
   }, [selectedDate, toast]);
-
-  useEffect(() => {
-    localStorage.setItem('contactInfo', JSON.stringify(contactInfo));
-  }, [contactInfo]);
-
-  useEffect(() => {
-    localStorage.setItem('autoSendEnabled', JSON.stringify(autoSendEnabled));
-  }, [autoSendEnabled]);
-
-  useEffect(() => {
-    localStorage.setItem('autoSendTime', JSON.stringify(autoSendTime));
-  }, [autoSendTime]);
-
-  useEffect(() => {
-    if (!autoSendEnabled || !contactInfo.email) return;
-
-    const checkAndSendSummary = () => {
-      const now = new Date();
-      const [hours, minutes] = autoSendTime.split(':').map(Number);
-      
-      if (now.getHours() === hours && now.getMinutes() === minutes) {
-        const lastSentDate = localStorage.getItem('lastAutoSentDate');
-        const today = now.toDateString();
-        
-        if (lastSentDate !== today) {
-          sendSummary('email');
-          localStorage.setItem('lastAutoSentDate', today);
-          
-          console.log(`Auto-sent email at ${now.toLocaleTimeString()}`);
-        }
-      }
-    };
-
-    const intervalId = setInterval(checkAndSendSummary, 60000);
-    
-    checkAndSendSummary();
-    
-    return () => clearInterval(intervalId);
-  }, [autoSendEnabled, autoSendTime, contactInfo.email]);
 
   const goToPreviousDay = () => {
     setSelectedDate(prev => subDays(prev, 1));
@@ -480,7 +492,9 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       goToPreviousDay,
       goToNextDay,
       goToToday,
-      fetchEntriesForDate
+      fetchEntriesForDate,
+      savingSettings,
+      saveSettingsToDatabase
     }}>
       {children}
     </RewardContext.Provider>

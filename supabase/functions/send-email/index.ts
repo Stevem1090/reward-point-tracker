@@ -37,7 +37,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Attempting to send email to ${email}`);
     console.log(`Subject: ${subject}`);
-    console.log(`Content: ${content}`);
+    console.log(`Content length: ${content.length} characters`);
+
+    // Add this log to help debug the source of the request (client or server)
+    const isServerRequest = req.headers.get("X-Source") === "server";
+    console.log(`Request source: ${isServerRequest ? "Server-side schedule" : "Client-side action"}`);
 
     const emailResponse = await resend.emails.send({
       from: "Reward Points <onboarding@resend.dev>",
