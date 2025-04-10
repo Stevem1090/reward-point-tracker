@@ -30,6 +30,14 @@ interface RewardContextType {
   saveSettingsToDatabase: (email: string, autoSendEnabled: boolean, autoSendTime: string) => Promise<void>;
 }
 
+interface EmailSettings {
+  id: string;
+  email: string;
+  auto_send_enabled: boolean;
+  auto_send_time: string;
+  last_sent_date: string | null;
+}
+
 const RewardContext = createContext<RewardContextType | undefined>(undefined);
 
 export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -60,28 +68,40 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       setSavingSettings(true);
       
-      const { data: existingSettings } = await supabase
+      const { data: existingSettings, error: fetchError } = await supabase
         .from('auto_email_settings')
-        .select()
+        .select('*')
         .eq('email', email)
         .maybeSingle();
       
+      if (fetchError) {
+        throw fetchError;
+      }
+      
       if (existingSettings) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('auto_email_settings')
           .update({
             auto_send_enabled: isAutoSend,
             auto_send_time: timeValue
           })
           .eq('id', existingSettings.id);
+          
+        if (updateError) {
+          throw updateError;
+        }
       } else {
-        await supabase
+        const { error: insertError } = await supabase
           .from('auto_email_settings')
           .insert({
             email: email,
             auto_send_enabled: isAutoSend,
             auto_send_time: timeValue
           });
+          
+        if (insertError) {
+          throw insertError;
+        }
       }
       
       console.log(`Email settings saved to database: ${email}, auto-send: ${isAutoSend}, time: ${timeValue}`);
@@ -101,18 +121,24 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const loadEmailSettings = async () => {
       try {
         if (contactInfo.email) {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('auto_email_settings')
-            .select()
+            .select('*')
             .eq('email', contactInfo.email)
             .maybeSingle();
           
+          if (error) {
+            throw error;
+          }
+          
           if (data) {
-            setAutoSendEnabled(data.auto_send_enabled);
-            setAutoSendTime(data.auto_send_time);
+            const settings = data as unknown as EmailSettings;
             
-            localStorage.setItem('autoSendEnabled', JSON.stringify(data.auto_send_enabled));
-            localStorage.setItem('autoSendTime', JSON.stringify(data.auto_send_time));
+            setAutoSendEnabled(settings.auto_send_enabled);
+            setAutoSendTime(settings.auto_send_time);
+            
+            localStorage.setItem('autoSendEnabled', JSON.stringify(settings.auto_send_enabled));
+            localStorage.setItem('autoSendTime', JSON.stringify(settings.auto_send_time));
             
             console.log(`Loaded email settings from database for ${contactInfo.email}`);
           }
