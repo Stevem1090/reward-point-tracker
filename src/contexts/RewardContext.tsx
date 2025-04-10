@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { RewardCategory, PointEntry, DailySummary } from '@/types/reward';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,7 +14,7 @@ interface RewardContextType {
   addEntry: (entry: Omit<PointEntry, 'id' | 'timestamp'>) => void;
   deleteEntry: (id: string) => void;
   getDailySummary: (date?: Date) => DailySummary;
-  sendSummary: (method: 'email' | 'whatsapp') => void;
+  sendSummary: (method: 'email') => void;
   contactInfo: { email: string; whatsapp: string };
   setContactInfo: (info: { email: string; whatsapp: string }) => void;
   autoSendEnabled: boolean;
@@ -55,7 +54,6 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   
   const { toast } = useToast();
 
-  // Fetch categories from Supabase
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -88,7 +86,6 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     fetchCategories();
     
-    // Subscribe to realtime updates on categories
     const categorySubscription = supabase
       .channel('public:reward_categories')
       .on('postgres_changes', {
@@ -105,12 +102,10 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [toast]);
 
-  // Fetch entries for selected date from Supabase
   const fetchEntriesForDate = async (date: Date) => {
     try {
       setIsLoading(true);
       
-      // Calculate start and end of the selected date
       const startTime = startOfDay(date).toISOString();
       const endTime = endOfDay(date).toISOString();
       
@@ -147,11 +142,9 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Fetch entries on initial load and when selected date changes
   useEffect(() => {
     fetchEntriesForDate(selectedDate);
     
-    // Subscribe to realtime updates on entries
     const entrySubscription = supabase
       .channel('public:point_entries')
       .on('postgres_changes', {
@@ -188,21 +181,20 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const [hours, minutes] = autoSendTime.split(':').map(Number);
       
       if (now.getHours() === hours && now.getMinutes() === minutes) {
-        // Check if we have already sent today's summary
         const lastSentDate = localStorage.getItem('lastAutoSentDate');
         const today = now.toDateString();
         
         if (lastSentDate !== today) {
           sendSummary('email');
           localStorage.setItem('lastAutoSentDate', today);
+          
+          console.log(`Auto-sent email at ${now.toLocaleTimeString()}`);
         }
       }
     };
 
-    // Check every minute
     const intervalId = setInterval(checkAndSendSummary, 60000);
     
-    // Run once immediately to check if we need to send right now
     checkAndSendSummary();
     
     return () => clearInterval(intervalId);
@@ -330,7 +322,7 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           category_id: entry.categoryId,
           description: entry.description,
           points: finalPoints,
-          timestamp: new Date().toISOString() // Use the current time for new entries
+          timestamp: new Date().toISOString()
         });
       
       if (error) {
@@ -400,7 +392,7 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   };
 
-  const sendSummary = (method: 'email' | 'whatsapp') => {
+  const sendSummary = (method: 'email') => {
     const summary = getDailySummary();
     
     if (summary.entriesByCategory.length === 0) {
@@ -433,29 +425,15 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return;
       }
       
-      // In a real app, this would call an API to send an email
       console.log(`Sending email to ${contactInfo.email}:\n${summaryText}`);
+      
+      console.log(`Email content: ${summaryText}`);
+      console.log(`Recipient: ${contactInfo.email}`);
+      console.log(`Time: ${new Date().toLocaleString()}`);
+      
       toast({
         title: "Summary Sent",
         description: `Daily point summary has been sent to ${contactInfo.email}`,
-      });
-    } else if (method === 'whatsapp') {
-      if (!contactInfo.whatsapp) {
-        toast({
-          title: "No WhatsApp number",
-          description: "Please set your WhatsApp number in the settings.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // In a real app, this would open WhatsApp with the summary
-      const encodedText = encodeURIComponent(summaryText);
-      window.open(`https://wa.me/${contactInfo.whatsapp.replace(/\D/g, '')}?text=${encodedText}`, '_blank');
-      
-      toast({
-        title: "WhatsApp Opened",
-        description: "Daily point summary has been prepared for WhatsApp",
       });
     }
   };
