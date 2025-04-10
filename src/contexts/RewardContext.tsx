@@ -68,40 +68,25 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       setSavingSettings(true);
       
-      const { data: existingSettings, error: fetchError } = await supabase
+      const { error: deleteError } = await supabase
         .from('auto_email_settings')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle();
+        .delete()
+        .eq('email', email);
       
-      if (fetchError) {
-        throw fetchError;
+      if (deleteError) {
+        console.error('Error cleaning up duplicate settings:', deleteError);
       }
       
-      if (existingSettings) {
-        const { error: updateError } = await supabase
-          .from('auto_email_settings')
-          .update({
-            auto_send_enabled: isAutoSend,
-            auto_send_time: timeValue
-          })
-          .eq('id', existingSettings.id);
+      const { error: insertError } = await supabase
+        .from('auto_email_settings')
+        .insert({
+          email: email,
+          auto_send_enabled: isAutoSend,
+          auto_send_time: timeValue
+        });
           
-        if (updateError) {
-          throw updateError;
-        }
-      } else {
-        const { error: insertError } = await supabase
-          .from('auto_email_settings')
-          .insert({
-            email: email,
-            auto_send_enabled: isAutoSend,
-            auto_send_time: timeValue
-          });
-          
-        if (insertError) {
-          throw insertError;
-        }
+      if (insertError) {
+        throw insertError;
       }
       
       console.log(`Email settings saved to database: ${email}, auto-send: ${isAutoSend}, time: ${timeValue}`);
@@ -121,18 +106,45 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const loadEmailSettings = async () => {
       try {
         if (contactInfo.email) {
-          const { data, error } = await supabase
+          const { data: allSettings, error: fetchAllError } = await supabase
             .from('auto_email_settings')
             .select('*')
-            .eq('email', contactInfo.email)
-            .maybeSingle();
+            .eq('email', contactInfo.email);
           
-          if (error) {
-            throw error;
+          if (fetchAllError) {
+            throw fetchAllError;
           }
           
-          if (data) {
-            const settings = data as unknown as EmailSettings;
+          if (allSettings && allSettings.length > 1) {
+            console.log(`Found ${allSettings.length} settings for ${contactInfo.email}, cleaning up...`);
+            
+            const sortedSettings = [...allSettings].sort((a, b) => 
+              a.id.localeCompare(b.id)
+            );
+            
+            const mostRecent = sortedSettings[sortedSettings.length - 1];
+            
+            for (const setting of sortedSettings) {
+              if (setting.id !== mostRecent.id) {
+                await supabase
+                  .from('auto_email_settings')
+                  .delete()
+                  .eq('id', setting.id);
+              }
+            }
+            
+            const settings = mostRecent as unknown as EmailSettings;
+            
+            setAutoSendEnabled(settings.auto_send_enabled);
+            setAutoSendTime(settings.auto_send_time);
+            
+            localStorage.setItem('autoSendEnabled', JSON.stringify(settings.auto_send_enabled));
+            localStorage.setItem('autoSendTime', JSON.stringify(settings.auto_send_time));
+            
+            console.log(`Loaded email settings from database for ${contactInfo.email}`);
+          } 
+          else if (allSettings && allSettings.length === 1) {
+            const settings = allSettings[0] as unknown as EmailSettings;
             
             setAutoSendEnabled(settings.auto_send_enabled);
             setAutoSendTime(settings.auto_send_time);
