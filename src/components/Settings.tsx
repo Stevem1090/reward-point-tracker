@@ -21,7 +21,7 @@ const Settings = () => {
     
     setContactInfo({
       email,
-      whatsapp: '' // Keeping the structure but emptying WhatsApp
+      whatsapp: '' // Keeping the structure but not using WhatsApp
     });
     
     setAutoSendEnabled(isAutoSend);

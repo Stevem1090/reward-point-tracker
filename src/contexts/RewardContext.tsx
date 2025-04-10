@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { RewardCategory, PointEntry, DailySummary } from '@/types/reward';
-import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
@@ -392,7 +391,7 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   };
 
-  const sendSummary = (method: 'email') => {
+  const sendSummary = async (method: 'email') => {
     const summary = getDailySummary();
     
     if (summary.entriesByCategory.length === 0) {
@@ -404,15 +403,16 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     
-    let summaryText = `Daily Point Summary for ${summary.date}\n\n`;
-    summaryText += `Total Points: ${summary.totalPoints}\n\n`;
+    let summaryHTML = `<h1>Daily Point Summary for ${summary.date}</h1>`;
+    summaryHTML += `<h2>Total Points: ${summary.totalPoints}</h2>`;
     
     summary.entriesByCategory.forEach(category => {
-      summaryText += `${category.categoryName}: ${category.totalPoints} points\n`;
+      summaryHTML += `<h3>${category.categoryName}: ${category.totalPoints} points</h3>`;
+      summaryHTML += `<ul>`;
       category.entries.forEach(entry => {
-        summaryText += `- ${entry.description || category.categoryName}: ${entry.points} points\n`;
+        summaryHTML += `<li><strong>${entry.description || category.categoryName}:</strong> ${entry.points} points</li>`;
       });
-      summaryText += '\n';
+      summaryHTML += `</ul>`;
     });
     
     if (method === 'email') {
@@ -425,16 +425,36 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return;
       }
       
-      console.log(`Sending email to ${contactInfo.email}:\n${summaryText}`);
-      
-      console.log(`Email content: ${summaryText}`);
-      console.log(`Recipient: ${contactInfo.email}`);
-      console.log(`Time: ${new Date().toLocaleString()}`);
-      
-      toast({
-        title: "Summary Sent",
-        description: `Daily point summary has been sent to ${contactInfo.email}`,
-      });
+      try {
+        console.log(`Preparing to send email to ${contactInfo.email}`);
+        
+        const { data, error } = await supabase.functions.invoke('send-email', {
+          body: {
+            email: contactInfo.email,
+            subject: `Daily Points Summary for ${summary.date}`,
+            content: summaryHTML
+          },
+        });
+        
+        if (error) {
+          console.error('Error sending email:', error);
+          throw error;
+        }
+        
+        console.log('Email send response:', data);
+        
+        toast({
+          title: "Summary Sent",
+          description: `Daily point summary has been sent to ${contactInfo.email}`,
+        });
+      } catch (error) {
+        console.error('Error sending email:', error);
+        toast({
+          title: "Email Sending Failed",
+          description: "There was an error sending the email. Please try again later.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
