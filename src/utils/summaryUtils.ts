@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { DailySummary } from '@/types/reward';
+import { DailySummary, PointEntry } from '@/types/reward';
+import { startOfWeek, endOfWeek } from 'date-fns';
 
 export const isDateMatching = (entryDate: Date, targetDate: Date): boolean => {
   return entryDate.getDate() === targetDate.getDate() &&
@@ -44,4 +45,32 @@ export const sendSummaryEmail = async (
   }
   
   console.log('Email send response:', data);
+};
+
+export const getWeeklyPoints = async (currentDate: Date): Promise<number> => {
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday as start of week
+  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 }); // Sunday as end of week
+  
+  // Format to ISO string for database query
+  const startTime = weekStart.toISOString();
+  const endTime = weekEnd.toISOString();
+  
+  try {
+    const { data, error } = await supabase
+      .from('point_entries')
+      .select('points')
+      .gte('timestamp', startTime)
+      .lte('timestamp', endTime);
+    
+    if (error) {
+      console.error('Error fetching weekly points:', error);
+      throw error;
+    }
+    
+    // Calculate total points
+    return data?.reduce((total, entry) => total + entry.points, 0) || 0;
+  } catch (error) {
+    console.error('Error in getWeeklyPoints:', error);
+    return 0;
+  }
 };

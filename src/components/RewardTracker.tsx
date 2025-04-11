@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import { Star, ThumbsUp, ThumbsDown, Award, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Star, ThumbsUp, ThumbsDown, Award, ChevronLeft, ChevronRight, Calendar, BarChart3 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { useWeeklyPoints } from '@/hooks/useWeeklyPoints';
 
 const RewardTracker = () => {
   const { 
@@ -27,6 +28,9 @@ const RewardTracker = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [pointValue, setPointValue] = useState<number | null>(null);
   const [description, setDescription] = useState('');
+
+  // Use the new weekly points hook
+  const { weeklyPoints, isLoadingWeekly } = useWeeklyPoints(selectedDate, entries);
 
   const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
 
@@ -243,12 +247,32 @@ const RewardTracker = () => {
             )}
           </ScrollArea>
         </CardContent>
-        <CardFooter className="flex justify-between">
-          <div className="flex items-center gap-1">
-            <Award className="h-5 w-5 text-amber-500" />
-            <span className="text-lg font-semibold">Total:</span>
+        <CardFooter className="flex flex-col space-y-4">
+          <div className="flex justify-between items-center w-full">
+            <div className="flex items-center gap-1">
+              <Award className="h-5 w-5 text-amber-500" />
+              <span className="text-lg font-semibold">Today's Total:</span>
+            </div>
+            <span className="text-xl font-bold">{getTotalPoints()} points</span>
           </div>
-          <span className="text-xl font-bold">{getTotalPoints()} points</span>
+          
+          {/* Weekly Points Summary */}
+          <div className="border-t pt-4 w-full">
+            <div className="flex justify-between items-center w-full">
+              <div className="flex items-center gap-1">
+                <BarChart3 className="h-5 w-5 text-blue-500" />
+                <span className="text-lg font-semibold">This Week:</span>
+              </div>
+              {isLoadingWeekly ? (
+                <Skeleton className="h-6 w-16" />
+              ) : (
+                <span className="text-xl font-bold">{weeklyPoints} points</span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Total points earned from Monday to Sunday
+            </p>
+          </div>
         </CardFooter>
       </Card>
     </div>
