@@ -4,10 +4,10 @@ import { useReward } from '@/contexts/RewardContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Award, Send, Star, Mail } from 'lucide-react';
+import { Award, Star, Mail } from 'lucide-react';
 
 const DailySummary = () => {
-  const { getDailySummary, sendSummary, contactInfo } = useReward();
+  const { getDailySummary, sendSummary } = useReward();
   const summary = getDailySummary();
 
   const handleSendEmail = () => {
@@ -70,17 +70,11 @@ const DailySummary = () => {
           <Button 
             onClick={handleSendEmail} 
             className="w-full"
-            disabled={!contactInfo.email || summary.entriesByCategory.length === 0}
+            disabled={summary.entriesByCategory.length === 0}
           >
             <Mail className="mr-2 h-4 w-4" />
             Send via Email
           </Button>
-          
-          {!contactInfo.email && (
-            <p className="text-sm text-center text-muted-foreground">
-              Email address not set. Please add your email in the Settings tab.
-            </p>
-          )}
         </CardFooter>
       </Card>
       

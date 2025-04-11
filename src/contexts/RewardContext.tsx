@@ -55,11 +55,11 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     
-    // This function still exists but will not be accessible from the UI
+    // Show message about email functionality
     if (method === 'email') {
       toast({
-        title: "Email Functionality Removed",
-        description: "Email functionality has been removed from the application.",
+        title: "Email Sending Disabled",
+        description: "The email sending feature has been disabled in the UI but remains functional on the backend.",
         variant: "destructive",
       });
     }
