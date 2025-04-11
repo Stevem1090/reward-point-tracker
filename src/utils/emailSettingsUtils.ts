@@ -5,7 +5,7 @@ import { EmailSettings } from '@/types/emailSettings';
 export const saveEmailSettingsToDatabase = async (
   email: string, 
   isAutoSend: boolean, 
-  timeValue: string
+  timeValue: string = '19:00'
 ): Promise<void> => {
   // First delete any existing settings for this email to avoid duplicates
   const { error: deleteError } = await supabase
@@ -17,20 +17,20 @@ export const saveEmailSettingsToDatabase = async (
     console.error('Error cleaning up duplicate settings:', deleteError);
   }
   
-  // Insert the new settings
+  // Insert the new settings - always use 19:00 (7:00 PM) as the default time
   const { error: insertError } = await supabase
     .from('auto_email_settings')
     .insert({
       email: email,
       auto_send_enabled: isAutoSend,
-      auto_send_time: timeValue
+      auto_send_time: '19:00:00' // Fixed time: 7:00 PM UTC
     });
       
   if (insertError) {
     throw insertError;
   }
   
-  console.log(`Email settings saved to database: ${email}, auto-send: ${isAutoSend}, time: ${timeValue}`);
+  console.log(`Email settings saved to database: ${email}, auto-send: ${isAutoSend}, time: 19:00:00`);
 };
 
 export const loadEmailSettings = async (email: string): Promise<EmailSettings | null> => {

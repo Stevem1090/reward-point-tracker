@@ -8,14 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Mail, Save, Clock, Server } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
-import { supabase } from '@/integrations/supabase/client';
 
 const Settings = () => {
-  const { contactInfo, setContactInfo, autoSendEnabled, setAutoSendEnabled, autoSendTime, setAutoSendTime, savingSettings, saveSettingsToDatabase } = useReward();
+  const { contactInfo, setContactInfo, autoSendEnabled, setAutoSendEnabled, savingSettings, saveSettingsToDatabase } = useReward();
   const { toast } = useToast();
   const [email, setEmail] = useState(contactInfo.email);
   const [isAutoSend, setIsAutoSend] = useState(autoSendEnabled);
-  const [timeValue, setTimeValue] = useState(autoSendTime);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,10 +25,9 @@ const Settings = () => {
     });
     
     setAutoSendEnabled(isAutoSend);
-    setAutoSendTime(timeValue);
     
     // Save settings to the database for server-side processing
-    await saveSettingsToDatabase(email, isAutoSend, timeValue);
+    await saveSettingsToDatabase(email, isAutoSend);
     
     toast({
       title: "Settings Saved",
@@ -82,19 +79,8 @@ const Settings = () => {
                   onCheckedChange={setIsAutoSend}
                 />
               </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Label htmlFor="autoSendTime">Send time:</Label>
-                <Input
-                  id="autoSendTime"
-                  type="time"
-                  value={timeValue}
-                  onChange={e => setTimeValue(e.target.value)}
-                  disabled={!isAutoSend}
-                  className="w-auto"
-                />
-              </div>
               <p className="text-sm text-muted-foreground">
-                When enabled, a summary will be automatically sent to your email address at the specified time every day, 
+                When enabled, a summary will be automatically sent to your email address at 7:00 PM UTC every day, 
                 even when you're not using the app.
               </p>
             </div>
@@ -118,7 +104,7 @@ const Settings = () => {
           </p>
           <p className="text-muted-foreground mt-4">
             All data is stored securely in the cloud. The auto-send feature uses a server-side scheduler that will 
-            send emails at the specified time each day, even when you're not using the app.
+            send emails at 7:00 PM UTC each day, even when you're not using the app.
           </p>
         </CardContent>
       </Card>

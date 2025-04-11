@@ -13,20 +13,15 @@ export const useEmailSettings = () => {
     const saved = localStorage.getItem('autoSendEnabled');
     return saved ? JSON.parse(saved) : false;
   });
-
-  const [autoSendTime, setAutoSendTime] = useState<string>(() => {
-    const saved = localStorage.getItem('autoSendTime');
-    return saved ? JSON.parse(saved) : '19:00'; // Default to 7:00 PM
-  });
   
   const [savingSettings, setSavingSettings] = useState(false);
   const { toast } = useToast();
 
   // Save email settings to the database
-  const saveSettings = async (email: string, isAutoSend: boolean, timeValue: string) => {
+  const saveSettings = async (email: string, isAutoSend: boolean) => {
     try {
       setSavingSettings(true);
-      await saveEmailSettingsToDatabase(email, isAutoSend, timeValue);
+      await saveEmailSettingsToDatabase(email, isAutoSend);
     } catch (error) {
       console.error('Error saving email settings to database:', error);
       toast({
@@ -48,10 +43,7 @@ export const useEmailSettings = () => {
           
           if (settings) {
             setAutoSendEnabled(settings.auto_send_enabled);
-            setAutoSendTime(settings.auto_send_time);
-            
             localStorage.setItem('autoSendEnabled', JSON.stringify(settings.auto_send_enabled));
-            localStorage.setItem('autoSendTime', JSON.stringify(settings.auto_send_time));
           }
         }
       } catch (error) {
@@ -67,7 +59,7 @@ export const useEmailSettings = () => {
     localStorage.setItem('contactInfo', JSON.stringify(contactInfo));
     
     if (contactInfo.email) {
-      saveSettings(contactInfo.email, autoSendEnabled, autoSendTime)
+      saveSettings(contactInfo.email, autoSendEnabled)
         .catch(console.error);
     }
   }, [contactInfo]);
@@ -77,28 +69,16 @@ export const useEmailSettings = () => {
     localStorage.setItem('autoSendEnabled', JSON.stringify(autoSendEnabled));
     
     if (contactInfo.email) {
-      saveSettings(contactInfo.email, autoSendEnabled, autoSendTime)
+      saveSettings(contactInfo.email, autoSendEnabled)
         .catch(console.error);
     }
   }, [autoSendEnabled]);
-
-  // Save auto-send time to localStorage
-  useEffect(() => {
-    localStorage.setItem('autoSendTime', JSON.stringify(autoSendTime));
-    
-    if (contactInfo.email && autoSendEnabled) {
-      saveSettings(contactInfo.email, autoSendEnabled, autoSendTime)
-        .catch(console.error);
-    }
-  }, [autoSendTime]);
 
   return {
     contactInfo,
     setContactInfo,
     autoSendEnabled,
     setAutoSendEnabled,
-    autoSendTime,
-    setAutoSendTime,
     savingSettings,
     saveSettingsToDatabase: saveSettings
   };

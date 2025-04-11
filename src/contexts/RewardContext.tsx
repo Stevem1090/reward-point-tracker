@@ -22,8 +22,6 @@ interface RewardContextType {
   setContactInfo: (info: { email: string; whatsapp: string }) => void;
   autoSendEnabled: boolean;
   setAutoSendEnabled: (enabled: boolean) => void;
-  autoSendTime: string;
-  setAutoSendTime: (time: string) => void;
   isLoading: boolean;
   selectedDate: Date;
   goToPreviousDay: () => void;
@@ -31,7 +29,7 @@ interface RewardContextType {
   goToToday: () => void;
   fetchEntriesForDate: (date: Date) => void;
   savingSettings: boolean;
-  saveSettingsToDatabase: (email: string, autoSendEnabled: boolean, autoSendTime: string) => Promise<void>;
+  saveSettingsToDatabase: (email: string, autoSendEnabled: boolean) => Promise<void>;
 }
 
 const RewardContext = createContext<RewardContextType | undefined>(undefined);
@@ -55,9 +53,7 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     contactInfo, 
     setContactInfo, 
     autoSendEnabled, 
-    setAutoSendEnabled, 
-    autoSendTime, 
-    setAutoSendTime,
+    setAutoSendEnabled,
     savingSettings,
     saveSettingsToDatabase
   } = useEmailSettings();
@@ -117,8 +113,6 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setContactInfo,
       autoSendEnabled,
       setAutoSendEnabled,
-      autoSendTime,
-      setAutoSendTime,
       isLoading,
       selectedDate,
       goToPreviousDay,
