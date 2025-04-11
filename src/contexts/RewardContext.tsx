@@ -5,7 +5,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useCategories } from '@/hooks/useCategories';
 import { usePointEntries } from '@/hooks/usePointEntries';
 import { useDailySummary } from '@/hooks/useDailySummary';
-import { useEmailSettings } from '@/hooks/useEmailSettings';
 import { sendSummaryEmail } from '@/utils/summaryUtils';
 
 interface RewardContextType {
@@ -18,18 +17,12 @@ interface RewardContextType {
   deleteEntry: (id: string) => void;
   getDailySummary: (date?: Date) => DailySummary;
   sendSummary: (method: 'email') => void;
-  contactInfo: { email: string; whatsapp: string };
-  setContactInfo: (info: { email: string; whatsapp: string }) => void;
-  autoSendEnabled: boolean;
-  setAutoSendEnabled: (enabled: boolean) => void;
   isLoading: boolean;
   selectedDate: Date;
   goToPreviousDay: () => void;
   goToNextDay: () => void;
   goToToday: () => void;
   fetchEntriesForDate: (date: Date) => void;
-  savingSettings: boolean;
-  saveSettingsToDatabase: (email: string, autoSendEnabled: boolean) => Promise<void>;
 }
 
 const RewardContext = createContext<RewardContextType | undefined>(undefined);
@@ -49,14 +42,6 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     deleteEntry 
   } = usePointEntries(categories);
   const { getDailySummary } = useDailySummary(entries, categories, selectedDate);
-  const { 
-    contactInfo, 
-    setContactInfo, 
-    autoSendEnabled, 
-    setAutoSendEnabled,
-    savingSettings,
-    saveSettingsToDatabase
-  } = useEmailSettings();
 
   const sendSummary = async (method: 'email') => {
     const summary = getDailySummary();
@@ -70,31 +55,13 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     
+    // This function still exists but will not be accessible from the UI
     if (method === 'email') {
-      if (!contactInfo.email) {
-        toast({
-          title: "No email address",
-          description: "Please set your email address in the settings.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      try {
-        await sendSummaryEmail(contactInfo.email, summary);
-        
-        toast({
-          title: "Summary Sent",
-          description: `Daily point summary has been sent to ${contactInfo.email}`,
-        });
-      } catch (error) {
-        console.error('Error sending email:', error);
-        toast({
-          title: "Email Sending Failed",
-          description: "There was an error sending the email. Please try again later.",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Email Functionality Removed",
+        description: "Email functionality has been removed from the application.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -109,18 +76,12 @@ export const RewardProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       deleteEntry,
       getDailySummary,
       sendSummary,
-      contactInfo,
-      setContactInfo,
-      autoSendEnabled,
-      setAutoSendEnabled,
       isLoading,
       selectedDate,
       goToPreviousDay,
       goToNextDay,
       goToToday,
-      fetchEntriesForDate,
-      savingSettings,
-      saveSettingsToDatabase
+      fetchEntriesForDate
     }}>
       {children}
     </RewardContext.Provider>
