@@ -13,7 +13,7 @@ interface RewardContextType {
   addCategory: (category: Omit<RewardCategory, 'id'>) => void;
   updateCategory: (category: RewardCategory) => void;
   deleteCategory: (id: string) => void;
-  addEntry: (entry: Omit<PointEntry, 'id' | 'timestamp'>) => void;
+  addEntry: (entry: Omit<PointEntry, 'id' | 'timestamp'>, date?: Date) => void;
   deleteEntry: (id: string) => void;
   getDailySummary: (date?: Date) => DailySummary;
   sendSummary: (method: 'email') => void;

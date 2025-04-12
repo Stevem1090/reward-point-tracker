@@ -60,12 +60,15 @@ export const usePointEntries = (categories: any[]) => {
     setSelectedDate(new Date());
   };
 
-  const handleAddEntry = async (entry: Omit<PointEntry, 'id' | 'timestamp'>) => {
+  const handleAddEntry = async (entry: Omit<PointEntry, 'id' | 'timestamp'>, entryDate?: Date) => {
     try {
       const category = categories.find(cat => cat.id === entry.categoryId);
       if (!category) return;
       
-      await addEntry(entry, categories);
+      // Use the provided date or default to the current date
+      const timestamp = entryDate || new Date();
+      
+      await addEntry({ ...entry, customDate: timestamp }, categories);
       
       toast({
         title: `${entry.points >= 0 ? 'Points Earned' : 'Points Lost'}`,

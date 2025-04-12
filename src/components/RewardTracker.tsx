@@ -8,10 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import { Star, ThumbsUp, ThumbsDown, Award, ChevronLeft, ChevronRight, Calendar, BarChart3 } from 'lucide-react';
+import { Star, ThumbsUp, ThumbsDown, Award, ChevronLeft, ChevronRight, Calendar, BarChart3, CalendarIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { useWeeklyPoints } from '@/hooks/useWeeklyPoints';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Switch } from '@/components/ui/switch';
 
 const RewardTracker = () => {
   const { 
@@ -28,8 +31,10 @@ const RewardTracker = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [pointValue, setPointValue] = useState<number | null>(null);
   const [description, setDescription] = useState('');
+  const [entryDate, setEntryDate] = useState<Date>(new Date());
+  const [useCustomDate, setUseCustomDate] = useState(false);
 
-  // Use the new weekly points hook
+  // Use the weekly points hook
   const { weeklyPoints, isLoadingWeekly } = useWeeklyPoints(selectedDate, entries);
 
   const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
@@ -54,7 +59,7 @@ const RewardTracker = () => {
       categoryId: selectedCategoryId,
       description,
       points: finalPoints
-    });
+    }, useCustomDate ? entryDate : undefined);
     
     // Reset form
     setDescription('');
@@ -62,9 +67,7 @@ const RewardTracker = () => {
 
   const isToday = (date: Date) => {
     const today = new Date();
-    return date.getDate() === today.getDate() &&
-           date.getMonth() === today.getMonth() &&
-           date.getFullYear() === today.getFullYear();
+    return isSameDay(date, today);
   };
 
   // Sort entries by most recent first
@@ -167,6 +170,50 @@ const RewardTracker = () => {
               <p className="text-sm text-muted-foreground">
                 Enter positive values for rewards or negative values for deductions
               </p>
+            </div>
+
+            {/* Date Selection for Entry */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="custom-date">Use Custom Date</Label>
+                <Switch 
+                  id="custom-date" 
+                  checked={useCustomDate} 
+                  onCheckedChange={setUseCustomDate}
+                />
+              </div>
+              
+              {useCustomDate && (
+                <div className="mt-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {entryDate ? format(entryDate, 'PPP') : 'Select date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={entryDate}
+                        onSelect={(date) => date && setEntryDate(date)}
+                        disabled={(date) => date > new Date()}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+              
+              {useCustomDate && (
+                <p className="text-sm text-muted-foreground">
+                  Points will be recorded for {format(entryDate, 'MMMM d, yyyy')}
+                </p>
+              )}
             </div>
 
             <Button type="submit" disabled={!selectedCategoryId} className="w-full">

@@ -4,13 +4,14 @@ import { PointEntry, RewardCategory } from '@/types/reward';
 import { startOfDay, endOfDay } from 'date-fns';
 
 export const addEntry = async (
-  entry: Omit<PointEntry, 'id' | 'timestamp'>, 
+  entry: Omit<PointEntry, 'id' | 'timestamp'> & { customDate?: Date }, 
   categories: RewardCategory[]
 ): Promise<void> => {
   const category = categories.find(cat => cat.id === entry.categoryId);
   if (!category) return;
   
   const finalPoints = entry.points || category.pointValue;
+  const timestamp = entry.customDate ? entry.customDate.toISOString() : new Date().toISOString();
   
   const { error } = await supabase
     .from('point_entries')
@@ -18,7 +19,7 @@ export const addEntry = async (
       category_id: entry.categoryId,
       description: entry.description,
       points: finalPoints,
-      timestamp: new Date().toISOString()
+      timestamp: timestamp
     });
   
   if (error) {
