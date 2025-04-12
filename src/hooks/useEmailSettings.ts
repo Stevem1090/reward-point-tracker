@@ -1,26 +1,45 @@
 
 import { useState } from 'react';
+import { useToast } from './use-toast';
+import { saveEmailSettingsToDatabase } from '@/utils/emailSettingsUtils';
 
-// This hook now contains stub functions that don't do anything
-// It's kept to avoid breaking any imports, but the functionality is removed
-
+// This hook provides email settings functionality
 export const useEmailSettings = () => {
-  const [contactInfo] = useState<{ email: string; whatsapp: string }>({ email: '', whatsapp: '' });
-  const [autoSendEnabled] = useState<boolean>(false);
-  const [savingSettings] = useState(false);
+  const [contactInfo, setContactInfo] = useState<{ email: string; whatsapp: string }>({ email: '', whatsapp: '' });
+  const [autoSendEnabled, setAutoSendEnabled] = useState<boolean>(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const { toast } = useToast();
 
-  // Empty function stubs
-  const saveSettings = async () => {
-    console.log('Email settings functionality has been removed');
+  // Function to save settings
+  const saveSettingsToDatabase = async () => {
+    setSavingSettings(true);
+    try {
+      // This is a stub function that doesn't actually save to the database
+      console.log('Email settings functionality has been removed');
+      toast({
+        title: "Feature Disabled",
+        description: "Email configuration has been disabled in this version.",
+        variant: "destructive",
+      });
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast({
+        title: "Error",
+        description: "There was a problem saving your settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSettings(false);
+    }
     return Promise.resolve();
   };
 
   return {
     contactInfo,
-    setContactInfo: () => {}, // Stub function
+    setContactInfo,
     autoSendEnabled,
-    setAutoSendEnabled: () => {}, // Stub function
+    setAutoSendEnabled,
     savingSettings,
-    saveSettingsToDatabase: saveSettings
+    saveSettingsToDatabase
   };
 };

@@ -1,6 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
-import { useReward } from '@/contexts/RewardContext';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Mail, Save, Clock, Server } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
+import { useEmailSettings } from '@/hooks/useEmailSettings';
 
 const Settings = () => {
-  const { contactInfo, setContactInfo, autoSendEnabled, setAutoSendEnabled, savingSettings, saveSettingsToDatabase } = useReward();
+  const { contactInfo, setContactInfo, autoSendEnabled, setAutoSendEnabled, savingSettings, saveSettingsToDatabase } = useEmailSettings();
   const { toast } = useToast();
   const [email, setEmail] = useState(contactInfo.email);
   const [isAutoSend, setIsAutoSend] = useState(autoSendEnabled);
@@ -27,7 +27,7 @@ const Settings = () => {
     setAutoSendEnabled(isAutoSend);
     
     // Save settings to the database for server-side processing
-    await saveSettingsToDatabase(email, isAutoSend);
+    await saveSettingsToDatabase();
     
     toast({
       title: "Settings Saved",
