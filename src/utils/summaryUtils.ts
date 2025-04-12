@@ -29,22 +29,28 @@ export const sendSummaryEmail = async (
     summaryHTML += `</ul>`;
   });
   
-  console.log(`Preparing to send email to ${email}`);
+  console.log(`Preparing to send email to ${email} (domain: ${email.split('@')[1]})`);
   
-  const { data, error } = await supabase.functions.invoke('send-email', {
-    body: {
-      email: email,
-      subject: `Daily Points Summary for ${summary.date}`,
-      content: summaryHTML
-    },
-  });
-  
-  if (error) {
-    console.error('Error sending email:', error);
+  try {
+    const { data, error } = await supabase.functions.invoke('send-email', {
+      body: {
+        email: email,
+        subject: `Daily Points Summary for ${summary.date}`,
+        content: summaryHTML
+      },
+    });
+    
+    if (error) {
+      console.error('Error invoking send-email function:', error);
+      throw error;
+    }
+    
+    console.log('Email send response:', data);
+    return;
+  } catch (error) {
+    console.error(`Failed to send email to ${email} (domain: ${email.split('@')[1]})`, error);
     throw error;
   }
-  
-  console.log('Email send response:', data);
 };
 
 export const getWeeklyPoints = async (currentDate: Date): Promise<number> => {
