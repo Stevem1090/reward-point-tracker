@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import { Star, ThumbsUp, ThumbsDown, Award, ChevronLeft, ChevronRight, Calendar, BarChart3, CalendarIcon } from 'lucide-react';
+import { Star, ThumbsUp, ThumbsDown, Award, ChevronLeft, ChevronRight, Calendar, BarChart3, CalendarIcon, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, isSameDay } from 'date-fns';
 import { useWeeklyPoints } from '@/hooks/useWeeklyPoints';
@@ -20,6 +20,7 @@ const RewardTracker = () => {
   const { 
     categories, 
     addEntry, 
+    deleteEntry,
     entries, 
     isLoading, 
     selectedDate, 
@@ -63,6 +64,10 @@ const RewardTracker = () => {
     
     // Reset form
     setDescription('');
+  };
+
+  const handleDeleteEntry = (id: string) => {
+    deleteEntry(id);
   };
 
   const isToday = (date: Date) => {
@@ -267,7 +272,7 @@ const RewardTracker = () => {
                 {sortedEntries.map(entry => {
                   const category = categories.find(cat => cat.id === entry.categoryId);
                   return (
-                    <div key={entry.id} className="flex items-start gap-2 p-3 border rounded-lg">
+                    <div key={entry.id} className="flex items-start gap-2 p-3 border rounded-lg group">
                       <div className={`p-2 rounded-full ${entry.points >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
                         {entry.points >= 0 ? (
                           <ThumbsUp className="h-5 w-5 text-green-600" />
@@ -287,6 +292,13 @@ const RewardTracker = () => {
                       <div className={`font-bold ${entry.points >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {entry.points >= 0 ? '+' : ''}{entry.points}
                       </div>
+                      <button 
+                        onClick={() => handleDeleteEntry(entry.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-gray-100"
+                        aria-label="Delete entry"
+                      >
+                        <X className="h-4 w-4 text-gray-500 hover:text-red-500" />
+                      </button>
                     </div>
                   );
                 })}
