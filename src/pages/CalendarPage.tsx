@@ -75,7 +75,7 @@ const CalendarPage = () => {
     return {
       top: `${topPosition}px`,
       height: `${duration}px`,
-      position: 'absolute',
+      position: 'absolute' as const,  // Type assertion to make TypeScript happy
       width: 'calc(100% - 16px)',
       left: '8px'
     };
