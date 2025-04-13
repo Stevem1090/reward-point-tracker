@@ -1,13 +1,13 @@
 
 import React from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RewardProvider } from '@/contexts/RewardContext';
 import RewardTracker from '@/components/RewardTracker';
 import CategoryManager from '@/components/CategoryManager';
 import DailySummary from '@/components/DailySummary';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Star, Award, BarChart3 } from 'lucide-react';
 
-const Index = () => {
+const RewardsPage = () => {
   return (
     <RewardProvider>
       <div className="container mx-auto max-w-4xl p-4">
@@ -49,4 +49,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default RewardsPage;
