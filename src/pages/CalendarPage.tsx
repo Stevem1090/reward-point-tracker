@@ -82,14 +82,14 @@ const CalendarPage = () => {
   };
 
   return (
-    <div className="container mx-auto max-w-7xl">
+    <div className="container mx-auto max-w-full px-0 md:px-4">
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-kid-blue via-kid-purple to-kid-green bg-clip-text text-transparent">
         Family Calendar
       </h1>
       <p className="text-center mb-4 text-muted-foreground">Keep track of all your family events!</p>
       
       {/* Week navigation */}
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 px-4">
         <Button variant="outline" onClick={goToPreviousWeek}>
           <ChevronLeft className="h-4 w-4 mr-1" />
           Previous Week
@@ -111,27 +111,29 @@ const CalendarPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {/* Day headers */}
-          <div className="grid grid-cols-8 border-b text-center py-2 sticky top-0 bg-white z-10">
-            <div className="col-span-1 border-r px-2 font-semibold text-muted-foreground">
+          {/* Day headers - now wider with overflow scroll */}
+          <div className="flex border-b sticky top-0 bg-white z-20">
+            <div className="min-w-[80px] shrink-0 border-r px-2 font-semibold text-muted-foreground text-center py-2 flex flex-col justify-center">
               Time
             </div>
-            {weekDays.map((day, index) => (
-              <div 
-                key={index} 
-                className={`px-2 font-semibold ${isSameDay(day, new Date()) ? 'bg-soft-purple text-kid-purple' : ''}`}
-              >
-                <div>{format(day, 'EEE')}</div>
-                <div>{format(day, 'd')}</div>
-              </div>
-            ))}
+            <div className="flex overflow-x-auto">
+              {weekDays.map((day, index) => (
+                <div 
+                  key={index} 
+                  className={`min-w-[200px] shrink-0 px-2 py-2 text-center font-semibold ${isSameDay(day, new Date()) ? 'bg-soft-purple text-kid-purple' : ''}`}
+                >
+                  <div>{format(day, 'EEE')}</div>
+                  <div>{format(day, 'd')}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Calendar body with scrolling */}
-          <ScrollArea className="h-[600px]">
-            <div className="grid grid-cols-8 relative">
-              {/* Time slots */}
-              <div className="col-span-1 border-r">
+          {/* Calendar body with horizontal and vertical scrolling */}
+          <div className="relative overflow-x-auto" style={{ height: '800px' }}>
+            <div className="flex">
+              {/* Time slots - sticky left column */}
+              <div className="min-w-[80px] shrink-0 border-r sticky left-0 bg-white z-10">
                 {timeSlots.map((hour) => (
                   <div 
                     key={hour} 
@@ -142,43 +144,45 @@ const CalendarPage = () => {
                 ))}
               </div>
 
-              {/* Days columns */}
-              {weekDays.map((day, dayIndex) => (
-                <div key={dayIndex} className="relative">
-                  {/* Time grid for this day */}
-                  {timeSlots.map((hour) => (
-                    <div 
-                      key={hour} 
-                      className="h-[60px] border-b border-r last:border-r-0 px-1"
-                    />
-                  ))}
-                  
-                  {/* Events for this day */}
-                  {events.map((event) => {
-                    const position = getEventPosition(event, day);
-                    if (!position) return null;
-                    
-                    return (
+              {/* Days columns with overflow */}
+              <div className="flex">
+                {weekDays.map((day, dayIndex) => (
+                  <div key={dayIndex} className="min-w-[200px] shrink-0 relative">
+                    {/* Time grid for this day */}
+                    {timeSlots.map((hour) => (
                       <div 
-                        key={event.id}
-                        className={`rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
-                        style={position}
-                      >
-                        <div className="font-bold truncate">{event.title}</div>
-                        <div className="text-xs opacity-90">
-                          {format(event.startTime, 'h:mm a')} - {format(event.endTime, 'h:mm a')}
+                        key={hour} 
+                        className="h-[60px] border-b border-r last:border-r-0 px-1"
+                      />
+                    ))}
+                    
+                    {/* Events for this day */}
+                    {events.map((event) => {
+                      const position = getEventPosition(event, day);
+                      if (!position) return null;
+                      
+                      return (
+                        <div 
+                          key={event.id}
+                          className={`rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
+                          style={position}
+                        >
+                          <div className="font-bold truncate">{event.title}</div>
+                          <div className="text-xs opacity-90">
+                            {format(event.startTime, 'h:mm a')} - {format(event.endTime, 'h:mm a')}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
             </div>
-          </ScrollArea>
+          </div>
         </CardContent>
       </Card>
       
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex justify-end px-4">
         <Button className="bg-kid-purple hover:bg-purple-600">
           Add Event
         </Button>
