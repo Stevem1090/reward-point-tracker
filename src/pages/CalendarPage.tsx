@@ -113,7 +113,7 @@ const CalendarPage = () => {
         <CardContent className="p-0">
           <div className="flex flex-col h-[800px]">
             <div className="overflow-x-auto">
-              <div className="w-[1400px]">
+              <div className="w-fit min-w-[880px]">
                 {/* Day headers - sticky at the top */}
                 <div className="flex border-b sticky top-0 bg-white z-20">
                   {/* Time column header - empty space for alignment */}
