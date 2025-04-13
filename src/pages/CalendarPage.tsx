@@ -111,14 +111,16 @@ const CalendarPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {/* Fixed container for calendar with proper overflow handling */}
-          <div className="overflow-hidden">
-            {/* Day headers - now wider with overflow scroll */}
+          {/* Fixed-width container that doesn't stretch the page */}
+          <div className="w-full max-w-full overflow-hidden">
+            {/* Day headers - sticky at the top */}
             <div className="flex border-b sticky top-0 bg-white z-20">
-              <div className="w-[80px] min-w-[80px] shrink-0 border-r px-2 font-semibold text-muted-foreground text-center py-2 flex flex-col justify-center sticky left-0 z-20 bg-white">
+              {/* Time column header - sticky left */}
+              <div className="w-[80px] min-w-[80px] shrink-0 border-r px-2 font-semibold text-muted-foreground text-center py-2 flex flex-col justify-center sticky left-0 z-30 bg-white">
                 Time
               </div>
-              <div className="flex">
+              {/* Scrollable day headers */}
+              <div className="flex-1 flex overflow-hidden">
                 {weekDays.map((day, index) => (
                   <div 
                     key={index} 
@@ -131,11 +133,11 @@ const CalendarPage = () => {
               </div>
             </div>
 
-            {/* Calendar body with horizontal scrolling and fixed height */}
-            <div className="relative overflow-x-auto" style={{ height: '800px' }}>
-              <div className="flex">
+            {/* Calendar body with horizontal scrolling for the days */}
+            <div className="relative" style={{ height: '800px', overflowY: 'auto', overflowX: 'hidden' }}>
+              <div className="flex w-full">
                 {/* Time slots - sticky left column */}
-                <div className="w-[80px] min-w-[80px] shrink-0 border-r sticky left-0 bg-white z-10">
+                <div className="w-[80px] min-w-[80px] shrink-0 border-r sticky left-0 bg-white z-20 h-full">
                   {timeSlots.map((hour) => (
                     <div 
                       key={hour} 
@@ -146,38 +148,40 @@ const CalendarPage = () => {
                   ))}
                 </div>
 
-                {/* Days columns with overflow */}
-                <div className="flex">
-                  {weekDays.map((day, dayIndex) => (
-                    <div key={dayIndex} className="min-w-[200px] w-[200px] shrink-0 relative">
-                      {/* Time grid for this day */}
-                      {timeSlots.map((hour) => (
-                        <div 
-                          key={hour} 
-                          className="h-[60px] border-b border-r last:border-r-0 px-1"
-                        />
-                      ))}
-                      
-                      {/* Events for this day */}
-                      {events.map((event) => {
-                        const position = getEventPosition(event, day);
-                        if (!position) return null;
-                        
-                        return (
+                {/* Days columns with events - horizontally scrollable */}
+                <div className="flex-1 overflow-x-auto">
+                  <div className="flex" style={{ width: 'max-content' }}>
+                    {weekDays.map((day, dayIndex) => (
+                      <div key={dayIndex} className="min-w-[200px] w-[200px] shrink-0 relative">
+                        {/* Time grid for this day */}
+                        {timeSlots.map((hour) => (
                           <div 
-                            key={event.id}
-                            className={`rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
-                            style={position}
-                          >
-                            <div className="font-bold truncate">{event.title}</div>
-                            <div className="text-xs opacity-90">
-                              {format(event.startTime, 'h:mm a')} - {format(event.endTime, 'h:mm a')}
+                            key={hour} 
+                            className="h-[60px] border-b border-r last:border-r-0 px-1"
+                          />
+                        ))}
+                        
+                        {/* Events for this day */}
+                        {events.map((event) => {
+                          const position = getEventPosition(event, day);
+                          if (!position) return null;
+                          
+                          return (
+                            <div 
+                              key={event.id}
+                              className={`rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
+                              style={position}
+                            >
+                              <div className="font-bold truncate">{event.title}</div>
+                              <div className="text-xs opacity-90">
+                                {format(event.startTime, 'h:mm a')} - {format(event.endTime, 'h:mm a')}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
