@@ -1,29 +1,49 @@
 
-import React from 'react';
-import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState } from 'react';
+import { format, startOfWeek, addDays, isSameDay, parseISO, addHours } from 'date-fns';
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarClock, CalendarDays } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+
+// Time slots for the day view (from 6 AM to 9 PM)
+const timeSlots = Array.from({ length: 16 }, (_, i) => i + 6);
 
 const CalendarPage = () => {
-  const [date, setDate] = React.useState<Date | undefined>(new Date());
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   
   // Sample events - in a real app, these would come from a database
   const events = [
-    { id: 1, title: "School Play", date: new Date(2025, 3, 15), type: "school" },
-    { id: 2, title: "Dentist Appointment", date: new Date(2025, 3, 17), type: "appointment" },
-    { id: 3, title: "Soccer Practice", date: new Date(2025, 3, 18), type: "sport" },
-    { id: 4, title: "Family Dinner", date: new Date(2025, 3, 20), type: "family" },
+    { id: 1, title: "School Play", startTime: new Date(2025, 3, 15, 14, 0), endTime: new Date(2025, 3, 15, 16, 0), type: "school" },
+    { id: 2, title: "Dentist Appointment", startTime: new Date(2025, 3, 17, 10, 30), endTime: new Date(2025, 3, 17, 11, 30), type: "appointment" },
+    { id: 3, title: "Soccer Practice", startTime: new Date(2025, 3, 18, 16, 0), endTime: new Date(2025, 3, 18, 17, 30), type: "sport" },
+    { id: 4, title: "Family Dinner", startTime: new Date(2025, 3, 20, 18, 0), endTime: new Date(2025, 3, 20, 19, 30), type: "family" },
+    { id: 5, title: "Piano Lesson", startTime: new Date(2025, 3, 16, 15, 0), endTime: new Date(2025, 3, 16, 16, 0), type: "lesson" },
+    // Adding events for the current week to ensure we see something
+    { id: 6, title: "Team Meeting", startTime: addHours(new Date(), 2), endTime: addHours(new Date(), 3), type: "work" },
+    { id: 7, title: "Gym Session", startTime: addHours(addDays(new Date(), 1), 18), endTime: addHours(addDays(new Date(), 1), 19), type: "sport" },
+    { id: 8, title: "Doctor Visit", startTime: addHours(addDays(new Date(), 2), 9), endTime: addHours(addDays(new Date(), 2), 10), type: "appointment" },
+    { id: 9, title: "Movie Night", startTime: addHours(addDays(new Date(), 3), 19), endTime: addHours(addDays(new Date(), 3), 21), type: "family" },
   ];
-  
-  // Filter events for the selected date
-  const selectedDateEvents = date 
-    ? events.filter(event => 
-        event.date.getDate() === date.getDate() && 
-        event.date.getMonth() === date.getMonth() && 
-        event.date.getFullYear() === date.getFullYear()
-      )
-    : [];
+
+  // Generate an array of dates for the current week
+  const getWeekDays = (date: Date) => {
+    const start = startOfWeek(date, { weekStartsOn: 1 }); // Start from Monday
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  };
+
+  const weekDays = getWeekDays(currentDate);
+
+  // Navigate to the previous/next week
+  const goToPreviousWeek = () => {
+    setCurrentDate(addDays(currentDate, -7));
+  };
+
+  const goToNextWeek = () => {
+    setCurrentDate(addDays(currentDate, 7));
+  };
 
   const getEventBadgeColor = (type: string) => {
     switch(type) {
@@ -31,77 +51,137 @@ const CalendarPage = () => {
       case "appointment": return "bg-kid-purple text-white";
       case "sport": return "bg-kid-green text-white";
       case "family": return "bg-kid-orange text-white";
-      default: return "bg-kid-yellow text-black";
+      case "lesson": return "bg-kid-yellow text-black";
+      case "work": return "bg-blue-500 text-white";
+      default: return "bg-gray-500 text-white";
     }
   };
-  
+
+  // Function to position events in the grid based on their time
+  const getEventPosition = (event: any, day: Date) => {
+    if (!isSameDay(event.startTime, day)) return null;
+    
+    const startHour = event.startTime.getHours();
+    const startMinutes = event.startTime.getMinutes();
+    const endHour = event.endTime.getHours();
+    const endMinutes = event.endTime.getMinutes();
+    
+    // Calculate top position based on start time (relative to 6 AM)
+    const topPosition = (startHour - 6) * 60 + startMinutes;
+    
+    // Calculate height based on duration
+    const duration = ((endHour - startHour) * 60 + (endMinutes - startMinutes));
+    
+    return {
+      top: `${topPosition}px`,
+      height: `${duration}px`,
+      position: 'absolute',
+      width: 'calc(100% - 16px)',
+      left: '8px'
+    };
+  };
+
   return (
-    <div className="container mx-auto max-w-5xl">
+    <div className="container mx-auto max-w-7xl">
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-kid-blue via-kid-purple to-kid-green bg-clip-text text-transparent">
         Family Calendar
       </h1>
-      <p className="text-center mb-8 text-muted-foreground">Keep track of all your family events!</p>
+      <p className="text-center mb-4 text-muted-foreground">Keep track of all your family events!</p>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2">
-          <Card className="kid-card bg-white/80 backdrop-blur-sm shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center text-kid-purple">
-                <CalendarDays className="mr-2 h-5 w-5" />
-                Calendar
-              </CardTitle>
-              <CardDescription>Select a date to view events</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                className="rounded-md border"
-              />
-            </CardContent>
-          </Card>
-        </div>
-        
-        <div>
-          <Card className="kid-card bg-white/80 backdrop-blur-sm h-full shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center text-kid-purple">
-                <CalendarClock className="mr-2 h-5 w-5" />
-                Events for {date?.toLocaleDateString()}
-              </CardTitle>
-              <CardDescription>
-                {selectedDateEvents.length 
-                  ? `${selectedDateEvents.length} events scheduled` 
-                  : "No events for this date"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {selectedDateEvents.length > 0 ? (
-                <div className="space-y-3">
-                  {selectedDateEvents.map(event => (
-                    <div key={event.id} className="p-3 rounded-lg bg-white shadow-sm border hover:shadow-md transition-all">
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-medium">{event.title}</h3>
-                        <Badge className={getEventBadgeColor(event.type)}>
-                          {event.type}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {event.date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </p>
-                    </div>
+      {/* Week navigation */}
+      <div className="flex justify-between items-center mb-4">
+        <Button variant="outline" onClick={goToPreviousWeek}>
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Previous Week
+        </Button>
+        <h2 className="text-xl font-semibold">
+          {format(weekDays[0], 'MMM d')} - {format(weekDays[6], 'MMM d, yyyy')}
+        </h2>
+        <Button variant="outline" onClick={goToNextWeek}>
+          Next Week
+          <ChevronRight className="h-4 w-4 ml-1" />
+        </Button>
+      </div>
+      
+      <Card className="kid-card bg-white/80 backdrop-blur-sm shadow-md overflow-hidden">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center text-kid-purple">
+            <CalendarDays className="mr-2 h-5 w-5" />
+            Week View
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {/* Day headers */}
+          <div className="grid grid-cols-8 border-b text-center py-2 sticky top-0 bg-white z-10">
+            <div className="col-span-1 border-r px-2 font-semibold text-muted-foreground">
+              Time
+            </div>
+            {weekDays.map((day, index) => (
+              <div 
+                key={index} 
+                className={`px-2 font-semibold ${isSameDay(day, new Date()) ? 'bg-soft-purple text-kid-purple' : ''}`}
+              >
+                <div>{format(day, 'EEE')}</div>
+                <div>{format(day, 'd')}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar body with scrolling */}
+          <ScrollArea className="h-[600px]">
+            <div className="grid grid-cols-8 relative">
+              {/* Time slots */}
+              <div className="col-span-1 border-r">
+                {timeSlots.map((hour) => (
+                  <div 
+                    key={hour} 
+                    className="h-[60px] border-b px-2 text-sm text-muted-foreground flex items-start pt-1"
+                  >
+                    {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                  </div>
+                ))}
+              </div>
+
+              {/* Days columns */}
+              {weekDays.map((day, dayIndex) => (
+                <div key={dayIndex} className="relative">
+                  {/* Time grid for this day */}
+                  {timeSlots.map((hour) => (
+                    <div 
+                      key={hour} 
+                      className="h-[60px] border-b border-r last:border-r-0 px-1"
+                    />
                   ))}
+                  
+                  {/* Events for this day */}
+                  {events.map((event) => {
+                    const position = getEventPosition(event, day);
+                    if (!position) return null;
+                    
+                    return (
+                      <div 
+                        key={event.id}
+                        className={`rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
+                        style={position}
+                      >
+                        <div className="font-bold truncate">{event.title}</div>
+                        <div className="text-xs opacity-90">
+                          {format(event.startTime, 'h:mm a')} - {format(event.endTime, 'h:mm a')}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : (
-                <div className="py-8 text-center text-muted-foreground">
-                  <p>No events scheduled for this day.</p>
-                  <p className="mt-2 text-sm">Click the + button to add a new event!</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+      
+      <div className="mt-4 flex justify-end">
+        <Button className="bg-kid-purple hover:bg-purple-600">
+          Add Event
+        </Button>
       </div>
     </div>
   );
