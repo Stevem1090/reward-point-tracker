@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Menu, X, Calendar, ListTodo, Award, Bell } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, Outlet } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -26,12 +26,12 @@ const menuLinks: MenuLink[] = [
   { name: 'Reminders', path: '/reminders', icon: <Bell className="h-5 w-5" /> },
 ];
 
-const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const AppLayout = () => {
   const { user } = useAuth();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
 
-  if (!user) return <>{children}</>;
+  if (!user) return <Outlet />;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -94,7 +94,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         
         {/* Main content */}
         <main className="flex-1 p-4">
-          {children}
+          <Outlet />
         </main>
       </div>
     </div>
