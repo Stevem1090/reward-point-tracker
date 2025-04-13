@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format, startOfWeek, addDays, isSameDay, parseISO, addHours } from 'date-fns';
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -81,7 +82,7 @@ const CalendarPage = () => {
   };
 
   return (
-    <div className="container mx-auto max-w-full">
+    <div className="w-full overflow-x-hidden px-4">
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-kid-blue via-kid-purple to-kid-green bg-clip-text text-transparent">
         Family Calendar
       </h1>
@@ -111,79 +112,75 @@ const CalendarPage = () => {
         </CardHeader>
         <CardContent className="p-0">
           <div className="flex flex-col h-[800px]">
-            {/* Day headers - sticky at the top */}
-            <div className="flex border-b sticky top-0 bg-white z-20">
-              {/* Time column header - empty space for alignment */}
-              <div className="w-[80px] min-w-[80px] shrink-0 border-r px-2 font-semibold text-muted-foreground text-center py-2 flex flex-col justify-center sticky left-0 z-30 bg-white">
-                Time
-              </div>
-              
-              {/* Scrollable day headers container */}
-              <div className="flex-1 overflow-x-auto">
-                <div className="flex w-[1400px]">
-                  {weekDays.map((day, index) => (
-                    <div 
-                      key={index} 
-                      className={`w-[200px] shrink-0 px-2 py-2 text-center font-semibold ${isSameDay(day, new Date()) ? 'bg-soft-purple text-kid-purple' : ''}`}
-                    >
-                      <div>{format(day, 'EEE')}</div>
-                      <div>{format(day, 'd')}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Calendar body - scrollable container */}
-            <div className="flex-1 relative">
-              <div className="flex absolute inset-0">
-                {/* Time slots - sticky left column */}
-                <div className="w-[80px] min-w-[80px] shrink-0 border-r sticky left-0 bg-white z-20 h-full">
-                  {timeSlots.map((hour) => (
-                    <div 
-                      key={hour} 
-                      className="h-[60px] border-b px-2 text-sm text-muted-foreground flex items-start pt-1"
-                    >
-                      {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
-                    </div>
-                  ))}
+            <div className="overflow-x-auto">
+              <div className="w-[1400px]">
+                {/* Day headers - sticky at the top */}
+                <div className="flex border-b sticky top-0 bg-white z-20">
+                  {/* Time column header - empty space for alignment */}
+                  <div className="w-[80px] min-w-[80px] shrink-0 border-r px-2 font-semibold text-muted-foreground text-center py-2 flex flex-col justify-center sticky left-0 z-30 bg-white">
+                    Time
+                  </div>
+                  
+                  {/* Day headers container */}
+                  <div className="flex flex-1">
+                    {weekDays.map((day, index) => (
+                      <div 
+                        key={index} 
+                        className={`w-[200px] shrink-0 px-2 py-2 text-center font-semibold ${isSameDay(day, new Date()) ? 'bg-soft-purple text-kid-purple' : ''}`}
+                      >
+                        <div>{format(day, 'EEE')}</div>
+                        <div>{format(day, 'd')}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Calendar grid with events - horizontally scrollable */}
-                <div className="flex-1 overflow-x-auto">
-                  <div className="w-[1400px]">
-                    <div className="flex">
-                      {weekDays.map((day, dayIndex) => (
-                        <div key={dayIndex} className="w-[200px] shrink-0 relative">
-                          {/* Time grid for this day */}
-                          {timeSlots.map((hour) => (
-                            <div 
-                              key={hour} 
-                              className="h-[60px] border-b border-r last:border-r-0 px-1"
-                            />
-                          ))}
+                {/* Calendar body */}
+                <div className="flex">
+                  {/* Time slots - sticky left column */}
+                  <div className="w-[80px] min-w-[80px] shrink-0 border-r sticky left-0 bg-white z-20 h-full">
+                    {timeSlots.map((hour) => (
+                      <div 
+                        key={hour} 
+                        className="h-[60px] border-b px-2 text-sm text-muted-foreground flex items-start pt-1"
+                      >
+                        {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Calendar grid with events */}
+                  <div className="flex flex-1">
+                    {weekDays.map((day, dayIndex) => (
+                      <div key={dayIndex} className="w-[200px] shrink-0 relative">
+                        {/* Time grid for this day */}
+                        {timeSlots.map((hour) => (
+                          <div 
+                            key={hour} 
+                            className="h-[60px] border-b border-r last:border-r-0 px-1"
+                          />
+                        ))}
+                        
+                        {/* Events for this day */}
+                        {events.map((event) => {
+                          const position = getEventPosition(event, day);
+                          if (!position) return null;
                           
-                          {/* Events for this day */}
-                          {events.map((event) => {
-                            const position = getEventPosition(event, day);
-                            if (!position) return null;
-                            
-                            return (
-                              <div 
-                                key={event.id}
-                                className={`rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
-                                style={position}
-                              >
-                                <div className="font-bold truncate">{event.title}</div>
-                                <div className="text-xs opacity-90">
-                                  {format(event.startTime, 'h:mm a')} - {format(event.endTime, 'h:mm a')}
-                                </div>
+                          return (
+                            <div 
+                              key={event.id}
+                              className={`rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
+                              style={position}
+                            >
+                              <div className="font-bold truncate">{event.title}</div>
+                              <div className="text-xs opacity-90">
+                                {format(event.startTime, 'h:mm a')} - {format(event.endTime, 'h:mm a')}
                               </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
