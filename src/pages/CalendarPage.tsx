@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format, startOfWeek, addDays, isSameDay, parseISO, addHours } from 'date-fns';
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -82,7 +81,7 @@ const CalendarPage = () => {
   };
 
   return (
-    <div className="container mx-auto overflow-x-hidden">
+    <div className="container mx-auto max-w-full">
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-kid-blue via-kid-purple to-kid-green bg-clip-text text-transparent">
         Family Calendar
       </h1>
@@ -120,25 +119,23 @@ const CalendarPage = () => {
               </div>
               
               {/* Scrollable day headers container */}
-              <div className="flex-1 overflow-hidden">
-                <ScrollArea className="w-full">
-                  <div className="flex" style={{ width: "1400px" }}>
-                    {weekDays.map((day, index) => (
-                      <div 
-                        key={index} 
-                        className={`w-[200px] shrink-0 px-2 py-2 text-center font-semibold ${isSameDay(day, new Date()) ? 'bg-soft-purple text-kid-purple' : ''}`}
-                      >
-                        <div>{format(day, 'EEE')}</div>
-                        <div>{format(day, 'd')}</div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
+              <div className="flex-1 overflow-x-auto">
+                <div className="flex w-[1400px]">
+                  {weekDays.map((day, index) => (
+                    <div 
+                      key={index} 
+                      className={`w-[200px] shrink-0 px-2 py-2 text-center font-semibold ${isSameDay(day, new Date()) ? 'bg-soft-purple text-kid-purple' : ''}`}
+                    >
+                      <div>{format(day, 'EEE')}</div>
+                      <div>{format(day, 'd')}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Calendar body - scrollable container */}
-            <div className="flex-1 overflow-hidden relative">
+            <div className="flex-1 relative">
               <div className="flex absolute inset-0">
                 {/* Time slots - sticky left column */}
                 <div className="w-[80px] min-w-[80px] shrink-0 border-r sticky left-0 bg-white z-20 h-full">
@@ -153,9 +150,9 @@ const CalendarPage = () => {
                 </div>
 
                 {/* Calendar grid with events - horizontally scrollable */}
-                <div className="flex-1 overflow-auto">
-                  <ScrollArea className="h-full w-full">
-                    <div className="flex" style={{ width: "1400px" }}>
+                <div className="flex-1 overflow-x-auto">
+                  <div className="w-[1400px]">
+                    <div className="flex">
                       {weekDays.map((day, dayIndex) => (
                         <div key={dayIndex} className="w-[200px] shrink-0 relative">
                           {/* Time grid for this day */}
@@ -187,7 +184,7 @@ const CalendarPage = () => {
                         </div>
                       ))}
                     </div>
-                  </ScrollArea>
+                  </div>
                 </div>
               </div>
             </div>
