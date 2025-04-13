@@ -82,7 +82,7 @@ const CalendarPage = () => {
   };
 
   return (
-    <div className="w-full">
+    <div className="container mx-auto overflow-x-hidden">
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-kid-blue via-kid-purple to-kid-green bg-clip-text text-transparent">
         Family Calendar
       </h1>
@@ -119,19 +119,21 @@ const CalendarPage = () => {
                 Time
               </div>
               
-              {/* Day headers wrapper - scroll container */}
+              {/* Scrollable day headers container */}
               <div className="flex-1 overflow-hidden">
-                <div className="flex" style={{ width: "1400px" }}>
-                  {weekDays.map((day, index) => (
-                    <div 
-                      key={index} 
-                      className={`w-[200px] shrink-0 px-2 py-2 text-center font-semibold ${isSameDay(day, new Date()) ? 'bg-soft-purple text-kid-purple' : ''}`}
-                    >
-                      <div>{format(day, 'EEE')}</div>
-                      <div>{format(day, 'd')}</div>
-                    </div>
-                  ))}
-                </div>
+                <ScrollArea className="w-full" orientation="horizontal">
+                  <div className="flex" style={{ width: "1400px" }}>
+                    {weekDays.map((day, index) => (
+                      <div 
+                        key={index} 
+                        className={`w-[200px] shrink-0 px-2 py-2 text-center font-semibold ${isSameDay(day, new Date()) ? 'bg-soft-purple text-kid-purple' : ''}`}
+                      >
+                        <div>{format(day, 'EEE')}</div>
+                        <div>{format(day, 'd')}</div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               </div>
             </div>
 
@@ -151,39 +153,41 @@ const CalendarPage = () => {
                 </div>
 
                 {/* Calendar grid with events - horizontally scrollable */}
-                <div className="flex-1 overflow-x-auto overflow-y-auto">
-                  <div className="flex" style={{ width: "1400px" }}>
-                    {weekDays.map((day, dayIndex) => (
-                      <div key={dayIndex} className="w-[200px] shrink-0 relative">
-                        {/* Time grid for this day */}
-                        {timeSlots.map((hour) => (
-                          <div 
-                            key={hour} 
-                            className="h-[60px] border-b border-r last:border-r-0 px-1"
-                          />
-                        ))}
-                        
-                        {/* Events for this day */}
-                        {events.map((event) => {
-                          const position = getEventPosition(event, day);
-                          if (!position) return null;
-                          
-                          return (
+                <div className="flex-1 overflow-auto">
+                  <ScrollArea className="h-full w-full" orientation="horizontal">
+                    <div className="flex" style={{ width: "1400px" }}>
+                      {weekDays.map((day, dayIndex) => (
+                        <div key={dayIndex} className="w-[200px] shrink-0 relative">
+                          {/* Time grid for this day */}
+                          {timeSlots.map((hour) => (
                             <div 
-                              key={event.id}
-                              className={`rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
-                              style={position}
-                            >
-                              <div className="font-bold truncate">{event.title}</div>
-                              <div className="text-xs opacity-90">
-                                {format(event.startTime, 'h:mm a')} - {format(event.endTime, 'h:mm a')}
+                              key={hour} 
+                              className="h-[60px] border-b border-r last:border-r-0 px-1"
+                            />
+                          ))}
+                          
+                          {/* Events for this day */}
+                          {events.map((event) => {
+                            const position = getEventPosition(event, day);
+                            if (!position) return null;
+                            
+                            return (
+                              <div 
+                                key={event.id}
+                                className={`rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
+                                style={position}
+                              >
+                                <div className="font-bold truncate">{event.title}</div>
+                                <div className="text-xs opacity-90">
+                                  {format(event.startTime, 'h:mm a')} - {format(event.endTime, 'h:mm a')}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </div>
               </div>
             </div>
