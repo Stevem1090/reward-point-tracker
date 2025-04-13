@@ -82,7 +82,7 @@ const CalendarPage = () => {
   };
 
   return (
-    <div className="w-full max-w-full">
+    <div className="w-full">
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-kid-blue via-kid-purple to-kid-green bg-clip-text text-transparent">
         Family Calendar
       </h1>
@@ -111,17 +111,17 @@ const CalendarPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {/* Container with fixed width */}
-          <div className="w-full overflow-hidden">
+          <div className="flex flex-col h-[800px]">
             {/* Day headers - sticky at the top */}
             <div className="flex border-b sticky top-0 bg-white z-20">
-              {/* Time column header - sticky left */}
+              {/* Time column header - empty space for alignment */}
               <div className="w-[80px] min-w-[80px] shrink-0 border-r px-2 font-semibold text-muted-foreground text-center py-2 flex flex-col justify-center sticky left-0 z-30 bg-white">
                 Time
               </div>
-              {/* Day headers - horizontally scrollable */}
-              <div className="flex-1 overflow-x-auto">
-                <div className="flex min-w-[1400px]">
+              
+              {/* Day headers wrapper - scroll container */}
+              <div className="flex-1 overflow-hidden">
+                <div className="flex" style={{ width: "1400px" }}>
                   {weekDays.map((day, index) => (
                     <div 
                       key={index} 
@@ -135,9 +135,9 @@ const CalendarPage = () => {
               </div>
             </div>
 
-            {/* Calendar body with horizontal scrolling for the days */}
-            <div className="relative" style={{ height: '800px', overflowY: 'auto' }}>
-              <div className="flex">
+            {/* Calendar body - scrollable container */}
+            <div className="flex-1 overflow-hidden relative">
+              <div className="flex absolute inset-0">
                 {/* Time slots - sticky left column */}
                 <div className="w-[80px] min-w-[80px] shrink-0 border-r sticky left-0 bg-white z-20 h-full">
                   {timeSlots.map((hour) => (
@@ -150,9 +150,9 @@ const CalendarPage = () => {
                   ))}
                 </div>
 
-                {/* Days columns with events - horizontally scrollable */}
-                <div className="flex-1 overflow-x-auto">
-                  <div className="flex min-w-[1400px]">
+                {/* Calendar grid with events - horizontally scrollable */}
+                <div className="flex-1 overflow-x-auto overflow-y-auto">
+                  <div className="flex" style={{ width: "1400px" }}>
                     {weekDays.map((day, dayIndex) => (
                       <div key={dayIndex} className="w-[200px] shrink-0 relative">
                         {/* Time grid for this day */}
