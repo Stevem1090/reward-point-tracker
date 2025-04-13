@@ -121,7 +121,7 @@ const CalendarPage = () => {
               
               {/* Scrollable day headers container */}
               <div className="flex-1 overflow-hidden">
-                <ScrollArea className="w-full" orientation="horizontal">
+                <ScrollArea className="w-full">
                   <div className="flex" style={{ width: "1400px" }}>
                     {weekDays.map((day, index) => (
                       <div 
@@ -154,7 +154,7 @@ const CalendarPage = () => {
 
                 {/* Calendar grid with events - horizontally scrollable */}
                 <div className="flex-1 overflow-auto">
-                  <ScrollArea className="h-full w-full" orientation="horizontal">
+                  <ScrollArea className="h-full w-full">
                     <div className="flex" style={{ width: "1400px" }}>
                       {weekDays.map((day, dayIndex) => (
                         <div key={dayIndex} className="w-[200px] shrink-0 relative">
