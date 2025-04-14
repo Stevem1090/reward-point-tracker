@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getVapidPublicKey } from '@/utils/vapidUtils';
 
 export const usePushNotifications = (familyMemberId: string) => {
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -36,9 +37,14 @@ export const usePushNotifications = (familyMemberId: string) => {
         throw new Error('Service Worker not ready');
       }
 
+      const publicKey = await getVapidPublicKey();
+      if (!publicKey) {
+        throw new Error('VAPID public key not available');
+      }
+
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: 'YOUR_VAPID_PUBLIC_KEY',
+        applicationServerKey: publicKey,
       });
 
       await supabase.from('push_subscriptions').insert({
