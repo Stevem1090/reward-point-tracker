@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, startOfWeek, addDays, isSameDay, parseISO, addHours } from 'date-fns';
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -73,7 +72,7 @@ const CalendarPage = () => {
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventFormOpen, setEventFormOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<EventType | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   
   const { toast } = useToast();
@@ -216,24 +215,42 @@ const CalendarPage = () => {
 
   const handleEditEvent = (event: Event) => {
     // Convert string dates to Date objects for the EventForm
-    const formattedEvent = {
-      ...event,
+    const formattedEvent: EventType = {
+      id: event.id,
+      title: event.title,
+      description: event.description,
       start_time: new Date(event.start_time),
       end_time: new Date(event.end_time),
+      type: event.type,
+      is_recurring: event.is_recurring,
+      recurrence_pattern: event.recurrence_pattern,
       members: event.members.map(member => member.id)
     };
     
-    setSelectedEvent(formattedEvent as EventType);
+    setSelectedEvent(formattedEvent);
     setEventFormOpen(true);
   };
 
   const confirmDeleteEvent = (event: Event) => {
-    setSelectedEvent(event);
+    // Create an EventType from Event for consistency
+    const eventToDelete: EventType = {
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      start_time: new Date(event.start_time),
+      end_time: new Date(event.end_time),
+      type: event.type,
+      is_recurring: event.is_recurring,
+      recurrence_pattern: event.recurrence_pattern,
+      members: event.members.map(member => member.id)
+    };
+    
+    setSelectedEvent(eventToDelete);
     setDeleteDialogOpen(true);
   };
 
   const handleDeleteEvent = async () => {
-    if (!selectedEvent) return;
+    if (!selectedEvent || !selectedEvent.id) return;
     
     try {
       setLoading(true);
