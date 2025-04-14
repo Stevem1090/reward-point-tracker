@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Bell, CalendarClock, Clock, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // Sample data - in a real app, this would come from a database
 const initialReminders = [
@@ -14,21 +14,24 @@ const initialReminders = [
     title: "Take medication", 
     time: "08:00", 
     days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-    active: true
+    active: true,
+    owner_ids: [] as string[]
   },
   { 
     id: "2", 
     title: "Soccer practice", 
     time: "16:30", 
     days: ["Tuesday", "Thursday"],
-    active: true
+    active: true,
+    owner_ids: [] as string[]
   },
   { 
     id: "3", 
     title: "Bedtime", 
     time: "21:00", 
     days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-    active: true
+    active: true,
+    owner_ids: [] as string[]
   }
 ];
 
@@ -42,7 +45,8 @@ const RemindersPage = () => {
     days: [] as string[]
   });
   const [isAddingReminder, setIsAddingReminder] = useState(false);
-
+  const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<string[]>([]);
+  
   const handleDayToggle = (day: string) => {
     setNewReminder(prev => {
       const days = prev.days.includes(day)
@@ -60,11 +64,13 @@ const RemindersPage = () => {
       title: newReminder.title,
       time: newReminder.time,
       days: newReminder.days,
-      active: true
+      active: true,
+      owner_ids: selectedFamilyMembers
     };
 
     setReminders([...reminders, reminder]);
     setNewReminder({ title: "", time: "12:00", days: [] });
+    setSelectedFamilyMembers([]);
     setIsAddingReminder(false);
   };
 
@@ -147,6 +153,27 @@ const RemindersPage = () => {
                             onClick={() => handleDayToggle(day)}
                           >
                             {day.substring(0, 3)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Assign to Family Members</label>
+                      <div className="flex flex-wrap gap-1">
+                        {familyMembers.map(member => (
+                          <Badge 
+                            key={member.id}
+                            variant={selectedFamilyMembers.includes(member.id) ? "default" : "outline"}
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setSelectedFamilyMembers(prev => 
+                                prev.includes(member.id) 
+                                  ? prev.filter(id => id !== member.id)
+                                  : [...prev, member.id]
+                              );
+                            }}
+                          >
+                            {member.name}
                           </Badge>
                         ))}
                       </div>

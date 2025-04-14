@@ -76,6 +76,7 @@ export type Database = {
           end_time: string
           id: string
           is_recurring: boolean
+          owner_ids: string[] | null
           recurrence_pattern: string | null
           start_time: string
           title: string
@@ -87,6 +88,7 @@ export type Database = {
           end_time: string
           id?: string
           is_recurring?: boolean
+          owner_ids?: string[] | null
           recurrence_pattern?: string | null
           start_time: string
           title: string
@@ -98,6 +100,7 @@ export type Database = {
           end_time?: string
           id?: string
           is_recurring?: boolean
+          owner_ids?: string[] | null
           recurrence_pattern?: string | null
           start_time?: string
           title?: string
@@ -157,6 +160,41 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "reward_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          family_member_id: string | null
+          id: string
+          p256dh: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          family_member_id?: string | null
+          id?: string
+          p256dh: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          family_member_id?: string | null
+          id?: string
+          p256dh?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_family_member_id_fkey"
+            columns: ["family_member_id"]
+            isOneToOne: false
+            referencedRelation: "family_members"
             referencedColumns: ["id"]
           },
         ]
