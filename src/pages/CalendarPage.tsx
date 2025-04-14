@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, startOfWeek, addDays, isSameDay, parseISO, addHours } from 'date-fns';
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -202,7 +201,7 @@ const CalendarPage = () => {
   };
 
   const handleEditEvent = (event: Event) => {
-    // Convert members array to array of member ids for the form
+    // Convert string dates to Date objects for the EventForm
     const formattedEvent = {
       ...event,
       start_time: new Date(event.start_time),
