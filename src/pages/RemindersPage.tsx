@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Bell, CalendarClock, Clock, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { supabase } from '@/integrations/supabase/client';
 
 // Sample data - in a real app, this would come from a database
 const initialReminders = [
@@ -37,6 +38,12 @@ const initialReminders = [
 
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+type FamilyMember = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 const RemindersPage = () => {
   const [reminders, setReminders] = useState(initialReminders);
   const [newReminder, setNewReminder] = useState({
@@ -46,7 +53,26 @@ const RemindersPage = () => {
   });
   const [isAddingReminder, setIsAddingReminder] = useState(false);
   const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<string[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   
+  useEffect(() => {
+    fetchFamilyMembers();
+  }, []);
+
+  const fetchFamilyMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('family_members')
+        .select('*')
+        .order('name');
+        
+      if (error) throw error;
+      setFamilyMembers(data || []);
+    } catch (error) {
+      console.error('Error fetching family members:', error);
+    }
+  };
+
   const handleDayToggle = (day: string) => {
     setNewReminder(prev => {
       const days = prev.days.includes(day)

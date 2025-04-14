@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format, startOfWeek, addDays, isSameDay, parseISO, addHours } from 'date-fns';
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -50,6 +51,19 @@ type Event = {
   is_recurring: boolean;
   recurrence_pattern: string | null;
   members: FamilyMember[];
+};
+
+// Type definition for the EventForm component
+type EventType = {
+  id?: string;
+  title: string;
+  description: string | null;
+  start_time: Date;
+  end_time: Date;
+  type: string;
+  is_recurring: boolean;
+  recurrence_pattern: string | null;
+  members: string[];
 };
 
 const CalendarPage = () => {
@@ -209,7 +223,7 @@ const CalendarPage = () => {
       members: event.members.map(member => member.id)
     };
     
-    setSelectedEvent(formattedEvent as any);
+    setSelectedEvent(formattedEvent as EventType);
     setEventFormOpen(true);
   };
 
