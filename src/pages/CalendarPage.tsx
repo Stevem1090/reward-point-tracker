@@ -1,33 +1,70 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, startOfWeek, addDays, isSameDay, parseISO, addHours } from 'date-fns';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { 
+  ChevronLeft, ChevronRight, CalendarDays, Plus, Edit2, Trash2, Settings 
+} from 'lucide-react';
+import { EventForm } from "@/components/EventForm";
+import { FamilyMemberManager } from "@/components/FamilyMemberManager";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // Time slots for the day view (from 6 AM to 9 PM)
 const timeSlots = Array.from({ length: 16 }, (_, i) => i + 6);
 
+type FamilyMember = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+type Event = {
+  id: string;
+  title: string;
+  description: string | null;
+  start_time: string;
+  end_time: string;
+  type: string;
+  is_recurring: boolean;
+  recurrence_pattern: string | null;
+  members: FamilyMember[];
+};
+
 const CalendarPage = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [events, setEvents] = useState<Event[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [eventFormOpen, setEventFormOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   
-  // Sample events - in a real app, these would come from a database
-  const events = [
-    { id: 1, title: "School Play", startTime: new Date(2025, 3, 15, 14, 0), endTime: new Date(2025, 3, 15, 16, 0), type: "school" },
-    { id: 2, title: "Dentist Appointment", startTime: new Date(2025, 3, 17, 10, 30), endTime: new Date(2025, 3, 17, 11, 30), type: "appointment" },
-    { id: 3, title: "Soccer Practice", startTime: new Date(2025, 3, 18, 16, 0), endTime: new Date(2025, 3, 18, 17, 30), type: "sport" },
-    { id: 4, title: "Family Dinner", startTime: new Date(2025, 3, 20, 18, 0), endTime: new Date(2025, 3, 20, 19, 30), type: "family" },
-    { id: 5, title: "Piano Lesson", startTime: new Date(2025, 3, 16, 15, 0), endTime: new Date(2025, 3, 16, 16, 0), type: "lesson" },
-    // Adding events for the current week to ensure we see something
-    { id: 6, title: "Team Meeting", startTime: addHours(new Date(), 2), endTime: addHours(new Date(), 3), type: "work" },
-    { id: 7, title: "Gym Session", startTime: addHours(addDays(new Date(), 1), 18), endTime: addHours(addDays(new Date(), 1), 19), type: "sport" },
-    { id: 8, title: "Doctor Visit", startTime: addHours(addDays(new Date(), 2), 9), endTime: addHours(addDays(new Date(), 2), 10), type: "appointment" },
-    { id: 9, title: "Movie Night", startTime: addHours(addDays(new Date(), 3), 19), endTime: addHours(addDays(new Date(), 3), 21), type: "family" },
-  ];
-
+  const { toast } = useToast();
+  
   // Generate an array of dates for the current week
   const getWeekDays = (date: Date) => {
     const start = startOfWeek(date, { weekStartsOn: 1 }); // Start from Monday
@@ -35,6 +72,81 @@ const CalendarPage = () => {
   };
 
   const weekDays = getWeekDays(currentDate);
+
+  useEffect(() => {
+    fetchEvents();
+    fetchFamilyMembers();
+  }, [currentDate]);
+
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+      
+      // Get the week's start and end dates for the query
+      const weekStart = weekDays[0];
+      const weekEnd = addDays(weekDays[6], 1); // Add 1 day to include the entire last day
+      
+      // Fetch events for the current week
+      let { data: eventsData, error: eventsError } = await supabase
+        .from('events')
+        .select('*')
+        .or(`start_time.gte.${weekStart.toISOString()},end_time.lte.${weekEnd.toISOString()}`)
+        .order('start_time');
+        
+      if (eventsError) throw eventsError;
+      
+      // Fetch family members for each event
+      const eventsWithMembers = await Promise.all((eventsData || []).map(async (event) => {
+        // Get members for this event
+        const { data: memberJoins, error: memberError } = await supabase
+          .from('event_members')
+          .select('family_member_id')
+          .eq('event_id', event.id);
+          
+        if (memberError) throw memberError;
+        
+        if (!memberJoins || memberJoins.length === 0) {
+          return { ...event, members: [] };
+        }
+        
+        // Get the details of each family member
+        const memberIds = memberJoins.map(join => join.family_member_id);
+        const { data: members, error: membersError } = await supabase
+          .from('family_members')
+          .select('*')
+          .in('id', memberIds);
+          
+        if (membersError) throw membersError;
+        
+        return { ...event, members: members || [] };
+      }));
+      
+      setEvents(eventsWithMembers);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load events",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchFamilyMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('family_members')
+        .select('*')
+        .order('name');
+        
+      if (error) throw error;
+      setFamilyMembers(data || []);
+    } catch (error) {
+      console.error('Error fetching family members:', error);
+    }
+  };
 
   // Navigate to the previous/next week
   const goToPreviousWeek = () => {
@@ -58,13 +170,13 @@ const CalendarPage = () => {
   };
 
   // Function to position events in the grid based on their time
-  const getEventPosition = (event: any, day: Date) => {
-    if (!isSameDay(event.startTime, day)) return null;
+  const getEventPosition = (event: Event, day: Date) => {
+    if (!isSameDay(new Date(event.start_time), day)) return null;
     
-    const startHour = event.startTime.getHours();
-    const startMinutes = event.startTime.getMinutes();
-    const endHour = event.endTime.getHours();
-    const endMinutes = event.endTime.getMinutes();
+    const startHour = new Date(event.start_time).getHours();
+    const startMinutes = new Date(event.start_time).getMinutes();
+    const endHour = new Date(event.end_time).getHours();
+    const endMinutes = new Date(event.end_time).getMinutes();
     
     // Calculate top position based on start time (relative to 6 AM)
     const topPosition = (startHour - 6) * 60 + startMinutes;
@@ -79,6 +191,80 @@ const CalendarPage = () => {
       width: 'calc(100% - 16px)',
       left: '8px'
     };
+  };
+
+  const handleAddEvent = (date?: Date) => {
+    setSelectedEvent(null);
+    setEventFormOpen(true);
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
+  const handleEditEvent = (event: Event) => {
+    // Convert members array to array of member ids for the form
+    const formattedEvent = {
+      ...event,
+      start_time: new Date(event.start_time),
+      end_time: new Date(event.end_time),
+      members: event.members.map(member => member.id)
+    };
+    
+    setSelectedEvent(formattedEvent as any);
+    setEventFormOpen(true);
+  };
+
+  const confirmDeleteEvent = (event: Event) => {
+    setSelectedEvent(event);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!selectedEvent) return;
+    
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', selectedEvent.id);
+        
+      if (error) throw error;
+      
+      setEvents(events.filter(e => e.id !== selectedEvent.id));
+      toast({
+        title: "Success",
+        description: "Event deleted successfully",
+      });
+      setDeleteDialogOpen(false);
+      setSelectedEvent(null);
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete event",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderEventMembers = (event: Event) => {
+    if (!event.members || event.members.length === 0) return null;
+    
+    return (
+      <div className="flex mt-1 flex-wrap gap-1">
+        {event.members.map(member => (
+          <div 
+            key={member.id} 
+            className="w-2 h-2 rounded-full" 
+            style={{ backgroundColor: member.color }}
+            title={member.name}
+          />
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -129,7 +315,17 @@ const CalendarPage = () => {
                         className={`w-[200px] shrink-0 px-2 py-2 text-center font-semibold ${isSameDay(day, new Date()) ? 'bg-soft-purple text-kid-purple' : ''}`}
                       >
                         <div>{format(day, 'EEE')}</div>
-                        <div>{format(day, 'd')}</div>
+                        <div className="flex items-center justify-center gap-1">
+                          <span>{format(day, 'd')}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-5 w-5 rounded-full"
+                            onClick={() => handleAddEvent(day)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -169,13 +365,37 @@ const CalendarPage = () => {
                           return (
                             <div 
                               key={event.id}
-                              className={`rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
+                              className={`group rounded-md p-1 text-xs shadow-sm hover:shadow-md transition-shadow cursor-pointer ${getEventBadgeColor(event.type)}`}
                               style={position}
+                              onClick={() => handleEditEvent(event)}
                             >
-                              <div className="font-bold truncate">{event.title}</div>
-                              <div className="text-xs opacity-90">
-                                {format(event.startTime, 'h:mm a')} - {format(event.endTime, 'h:mm a')}
+                              <div className="font-bold truncate flex justify-between items-start">
+                                <span className="truncate">{event.title}</span>
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button 
+                                    className="text-white hover:text-gray-200 p-0.5"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditEvent(event);
+                                    }}
+                                  >
+                                    <Edit2 className="h-3 w-3" />
+                                  </button>
+                                  <button 
+                                    className="text-white hover:text-gray-200 p-0.5"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      confirmDeleteEvent(event);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
                               </div>
+                              <div className="text-xs opacity-90">
+                                {format(new Date(event.start_time), 'h:mm a')} - {format(new Date(event.end_time), 'h:mm a')}
+                              </div>
+                              {renderEventMembers(event)}
                             </div>
                           );
                         })}
@@ -189,11 +409,59 @@ const CalendarPage = () => {
         </CardContent>
       </Card>
       
-      <div className="mt-4 flex justify-end px-4">
-        <Button className="bg-kid-purple hover:bg-purple-600">
+      <div className="mt-4 flex justify-between px-4">
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline">
+              <Settings className="h-4 w-4 mr-2" />
+              Family Members
+            </Button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Family Settings</SheetTitle>
+              <SheetDescription>
+                Manage your family members here.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-4">
+              <FamilyMemberManager />
+            </div>
+          </SheetContent>
+        </Sheet>
+        
+        <Button className="bg-kid-purple hover:bg-purple-600" onClick={() => handleAddEvent()}>
+          <Plus className="h-4 w-4 mr-2" />
           Add Event
         </Button>
       </div>
+      
+      {/* Event Form Dialog */}
+      <EventForm 
+        isOpen={eventFormOpen}
+        onClose={() => setEventFormOpen(false)}
+        initialDate={selectedDate || new Date()}
+        editEvent={selectedEvent}
+        onSave={fetchEvents}
+      />
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the event "{selectedEvent?.title}". This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteEvent} className="bg-red-500 hover:bg-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
