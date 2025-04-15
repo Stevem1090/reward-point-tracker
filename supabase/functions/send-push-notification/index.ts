@@ -38,14 +38,34 @@ serve(async (req) => {
       vapidKeys.private_key
     );
 
-    const { familyMemberIds, title, body } = await req.json();
-    console.log(`Sending push notification to ${familyMemberIds.length} family members`);
+    const { userId, userIds, title, body } = await req.json();
+    
+    // Determine target user IDs to send notifications to
+    let targetUserIds: string[] = [];
+    
+    if (userId) {
+      // Single user notification
+      targetUserIds = [userId];
+      console.log(`Sending push notification to user ${userId}`);
+    } else if (userIds && Array.isArray(userIds)) {
+      // Multiple users notification
+      targetUserIds = userIds;
+      console.log(`Sending push notification to ${targetUserIds.length} users`);
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Either userId or userIds must be provided' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
-    // Fetch subscriptions for specific family members
+    // Fetch subscriptions for specific users
     const { data: subscriptions, error } = await supabase
-      .from('push_subscriptions')
+      .from('user_push_subscriptions')
       .select('*')
-      .in('family_member_id', familyMemberIds);
+      .in('user_id', targetUserIds);
 
     if (error) {
       console.error('Error fetching subscriptions:', error);
@@ -53,7 +73,7 @@ serve(async (req) => {
     }
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log('No subscriptions found for these family members');
+      console.log('No subscriptions found for these users');
       return new Response(
         JSON.stringify({ message: 'No subscriptions found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -77,13 +97,17 @@ serve(async (req) => {
         
         await webpush.sendNotification(
           pushSubscription, 
-          JSON.stringify({ title, body })
+          JSON.stringify({ 
+            title, 
+            body,
+            userId: subscription.user_id 
+          })
         );
         
-        return { success: true, endpoint: subscription.endpoint };
+        return { success: true, endpoint: subscription.endpoint, userId: subscription.user_id };
       } catch (error) {
         console.error(`Error sending to ${subscription.endpoint}:`, error);
-        return { success: false, endpoint: subscription.endpoint, error: error.message };
+        return { success: false, endpoint: subscription.endpoint, userId: subscription.user_id, error: error.message };
       }
     });
 

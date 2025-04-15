@@ -1,3 +1,4 @@
+
 // Service Worker for Push Notifications
 
 // Cache name for offline content
@@ -55,7 +56,8 @@ self.addEventListener('push', function(event) {
           vibrate: [100, 50, 100],
           data: {
             dateOfArrival: Date.now(),
-            primaryKey: 1
+            primaryKey: 1,
+            userId: data.userId || null
           },
           actions: [
             {

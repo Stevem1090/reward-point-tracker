@@ -3,7 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
-import { User, LogOut, Award } from 'lucide-react';
+import { User, LogOut, Award, UserCircle, Bell } from 'lucide-react';
 
 const NavBar = () => {
   const { user, signOut } = useAuth();
@@ -18,9 +18,12 @@ const NavBar = () => {
         <div className="flex items-center gap-4">
           {user ? (
             <>
-              <div className="text-sm mr-2">
-                {user.email}
-              </div>
+              <Link to="/profile">
+                <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                  <UserCircle className="h-4 w-4" />
+                  Profile
+                </Button>
+              </Link>
               <Button variant="ghost" size="sm" onClick={signOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out

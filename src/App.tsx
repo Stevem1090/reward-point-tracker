@@ -12,6 +12,7 @@ import RewardsPage from "./pages/RewardsPage";
 import CalendarPage from "./pages/CalendarPage";
 import ListsPage from "./pages/ListsPage";
 import RemindersPage from "./pages/RemindersPage";
+import ProfilePage from "./pages/ProfilePage";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
@@ -50,6 +51,7 @@ const App = () => (
                   <Route path="/calendar" element={<CalendarPage />} />
                   <Route path="/lists" element={<ListsPage />} />
                   <Route path="/reminders" element={<RemindersPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
                 </Route>
                 
                 {/* Catch-all route */}
