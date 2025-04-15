@@ -3,11 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bell, CalendarClock, Clock, Plus, Trash2 } from 'lucide-react';
+import { Bell, BellOff, CalendarClock, Clock, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import PushNotificationToggle from '@/components/PushNotificationToggle';
+import { useToast } from '@/hooks/use-toast';
 
 const initialReminders = [
   { 
@@ -54,6 +55,7 @@ const RemindersPage = () => {
   const [isAddingReminder, setIsAddingReminder] = useState(false);
   const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<string[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const { toast } = useToast();
   
   useEffect(() => {
     fetchFamilyMembers();
@@ -118,23 +120,62 @@ const RemindersPage = () => {
     return format(date, 'h:mm a');
   };
 
-  const today = weekdays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
-  const todaysReminders = reminders.filter(r => r.active && r.days.includes(today));
-
   const handleSubscriptionChange = (memberId: string, isSubscribed: boolean) => {
     console.log(`Family member ${memberId} notification status: ${isSubscribed}`);
   };
+
+  const handleEnableReminders = async () => {
+    try {
+      let targetMembers = selectedFamilyMembers;
+      if (targetMembers.length === 0 && familyMembers.length > 0) {
+        targetMembers = familyMembers.map(member => member.id);
+        setSelectedFamilyMembers(targetMembers);
+      }
+
+      if (targetMembers.length === 0) {
+        toast({
+          title: "No family members available",
+          description: "Please add family members first to enable notifications",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Reminders Enabled",
+        description: "You'll receive notifications for your reminders",
+      });
+    } catch (error) {
+      console.error('Error enabling reminders:', error);
+      toast({
+        title: "Error",
+        description: "There was a problem enabling reminder notifications",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const today = weekdays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+  const todaysReminders = reminders.filter(r => r.active && r.days.includes(today));
 
   return (
     <div className="container mx-auto max-w-5xl">
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-kid-pink via-kid-purple to-kid-blue bg-clip-text text-transparent">
         Family Reminders
       </h1>
-      <div className="flex justify-center mb-6">
+      <div className="flex justify-center mb-6 gap-2">
         <PushNotificationToggle 
           familyMemberIds={selectedFamilyMembers} 
           onSubscriptionChange={handleSubscriptionChange}
         />
+        <Button 
+          variant="default" 
+          className="bg-kid-purple hover:bg-kid-purple/90 gap-2"
+          onClick={handleEnableReminders}
+        >
+          <Bell className="h-4 w-4" />
+          Enable Reminders
+        </Button>
       </div>
       
       <p className="text-center mb-8 text-muted-foreground">Never forget important tasks!</p>
