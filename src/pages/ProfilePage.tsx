@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,19 +9,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Bell, UserCircle, Loader2 } from "lucide-react";
-import { useNavigate } from 'react-router-dom';
 import { useUserNotifications } from '@/hooks/useUserNotifications';
-
-type UserProfile = {
-  id: string;
-  name: string | null;
-  created_at: string;
-}
+import { UserProfile } from '@/types/user';
 
 const ProfilePage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -41,33 +33,19 @@ const ProfilePage = () => {
       
       try {
         setIsLoading(true);
-        
-        // Check if user profile exists
         const { data, error } = await supabase
           .from('user_profiles')
           .select('*')
           .eq('id', user.id)
           .single();
         
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        if (error) {
           throw error;
         }
-        
+
         if (data) {
-          setProfile(data);
+          setProfile(data as UserProfile);
           setDisplayName(data.name || '');
-        } else {
-          // Create a default profile if none exists
-          const { data: newProfile, error: createError } = await supabase
-            .from('user_profiles')
-            .insert({ id: user.id, name: user.email?.split('@')[0] || 'User' })
-            .select()
-            .single();
-            
-          if (createError) throw createError;
-          
-          setProfile(newProfile);
-          setDisplayName(newProfile.name || '');
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -92,23 +70,24 @@ const ProfilePage = () => {
       
       const { error } = await supabase
         .from('user_profiles')
-        .update({ name: displayName })
-        .eq('id', user.id);
+        .upsert({ 
+          id: user.id,
+          name: displayName,
+        });
       
       if (error) throw error;
       
-      toast({
-        title: "Profile saved",
-        description: "Your profile has been updated successfully"
-      });
-      
-      // Update local state
       if (profile) {
         setProfile({
           ...profile,
           name: displayName
         });
       }
+      
+      toast({
+        title: "Profile saved",
+        description: "Your profile has been updated successfully"
+      });
     } catch (error) {
       console.error('Error saving profile:', error);
       toast({
@@ -231,21 +210,9 @@ const ProfilePage = () => {
                 </div>
                 <Switch 
                   checked={isSubscribed} 
-                  onCheckedChange={toggleNotifications}
+                  onCheckedChange={isSubscribed ? unsubscribe : subscribe}
                   disabled={notificationLoading}
                 />
-              </div>
-              <Separator />
-              <div>
-                <Button 
-                  variant="outline" 
-                  onClick={handleTestNotification}
-                  disabled={!isSubscribed || notificationLoading}
-                  className="gap-2"
-                >
-                  <Bell className="h-4 w-4" />
-                  Test Notifications
-                </Button>
               </div>
             </div>
           </CardContent>

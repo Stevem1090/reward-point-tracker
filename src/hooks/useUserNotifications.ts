@@ -13,7 +13,6 @@ export const useUserNotifications = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Check if the current user is subscribed
   const checkSubscriptionStatus = useCallback(async () => {
     if (!user?.id || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.log('Push notifications not supported or user not logged in');
@@ -21,18 +20,15 @@ export const useUserNotifications = () => {
     }
 
     try {
-      // Check for existing subscription in the database
       const { data } = await supabase
         .from('user_push_subscriptions')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      // Check if service worker is registered
       const reg = await navigator.serviceWorker.getRegistration();
       if (!reg) return false;
 
-      // Check if there's an active push subscription
       const existingSub = await reg.pushManager.getSubscription();
       
       return !!(data && existingSub);
@@ -50,7 +46,6 @@ export const useUserNotifications = () => {
       }
 
       try {
-        // Check if service worker is registered and ready
         const registration = await navigator.serviceWorker.getRegistration();
         if (!registration) {
           console.log('Service worker not registered yet');
@@ -59,12 +54,9 @@ export const useUserNotifications = () => {
         }
         
         setRegistration(registration);
-        
-        // Check for existing subscription in Push Manager
         const existingSubscription = await registration.pushManager.getSubscription();
         setSubscription(existingSubscription);
         
-        // Check if there's a record in the database for this user
         const isSubbed = await checkSubscriptionStatus();
         setIsSubscribed(isSubbed);
       } catch (error) {
@@ -89,7 +81,6 @@ export const useUserNotifications = () => {
     
     setIsLoading(true);
     try {
-      // Ensure service worker is registered and ready
       let reg = registration;
       if (!reg) {
         reg = await navigator.serviceWorker.register('/sw.js');
@@ -102,19 +93,16 @@ export const useUserNotifications = () => {
         throw new Error('VAPID public key not available');
       }
 
-      // Unsubscribe from any existing subscription first to ensure clean state
       const existingSub = await reg.pushManager.getSubscription();
       if (existingSub) {
         await existingSub.unsubscribe();
       }
 
-      // Create a new subscription
       const newSubscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
 
-      // Extract keys and convert to base64
       const p256dhKey = btoa(
         String.fromCharCode.apply(null, Array.from(new Uint8Array(newSubscription.getKey('p256dh')!)))
       );
@@ -123,15 +111,16 @@ export const useUserNotifications = () => {
         String.fromCharCode.apply(null, Array.from(new Uint8Array(newSubscription.getKey('auth')!)))
       );
 
-      // Store the subscription in Supabase
-      const { error } = await supabase.from('user_push_subscriptions').upsert({
-        user_id: user.id,
-        endpoint: newSubscription.endpoint,
-        p256dh: p256dhKey,
-        auth: authKey,
-      }, {
-        onConflict: 'user_id'
-      });
+      const { error } = await supabase
+        .from('user_push_subscriptions')
+        .upsert({
+          user_id: user.id,
+          endpoint: newSubscription.endpoint,
+          p256dh: p256dhKey,
+          auth: authKey,
+        }, {
+          onConflict: 'user_id'
+        });
 
       if (error) throw error;
 
@@ -164,7 +153,6 @@ export const useUserNotifications = () => {
     
     setIsLoading(true);
     try {
-      // Remove from database first
       await supabase
         .from('user_push_subscriptions')
         .delete()
@@ -172,7 +160,6 @@ export const useUserNotifications = () => {
       
       setIsSubscribed(false);
       
-      // Unsubscribe from push manager if we have a subscription
       if (subscription) {
         await subscription.unsubscribe();
         setSubscription(null);
