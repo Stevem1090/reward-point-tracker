@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Bell, BellOff } from 'lucide-react';
+import { Bell, BellOff, Loader2 } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from "@/components/ui/badge";
@@ -16,32 +16,34 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
   onSubscriptionChange 
 }) => {
   const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  
+  // Get subscription state for each family member
   const subscriptionStates = familyMemberIds.map(id => {
-    const { isSubscribed, subscribe, unsubscribe } = usePushNotifications(id);
-    return { id, isSubscribed, subscribe, unsubscribe };
+    const { isSubscribed, isLoading, subscribe, unsubscribe } = usePushNotifications(id);
+    return { id, isSubscribed, isLoading, subscribe, unsubscribe };
   });
 
-  const allSubscribed = subscriptionStates.every(state => state.isSubscribed);
+  const allSubscribed = subscriptionStates.length > 0 && subscriptionStates.every(state => state.isSubscribed);
   const someSubscribed = subscriptionStates.some(state => state.isSubscribed);
+  const isLoading = subscriptionStates.some(state => state.isLoading);
 
   const handleToggleAll = async () => {
+    if (isProcessing || isLoading) return;
+    
     try {
+      setIsProcessing(true);
       const operation = allSubscribed ? 'unsubscribe' : 'subscribe';
       
       for (const state of subscriptionStates) {
         if (operation === 'subscribe' && !state.isSubscribed) {
-          await state.subscribe();
-          onSubscriptionChange?.(state.id, true);
+          const success = await state.subscribe();
+          if (success) onSubscriptionChange?.(state.id, true);
         } else if (operation === 'unsubscribe' && state.isSubscribed) {
-          await state.unsubscribe();
-          onSubscriptionChange?.(state.id, false);
+          const success = await state.unsubscribe();
+          if (success) onSubscriptionChange?.(state.id, false);
         }
       }
-
-      toast({
-        title: `Notifications ${allSubscribed ? 'disabled' : 'enabled'}`,
-        description: `You will ${allSubscribed ? 'no longer' : 'now'} receive push notifications`,
-      });
     } catch (error) {
       console.error('Error toggling push notifications:', error);
       toast({
@@ -49,6 +51,8 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
         description: "There was a problem managing your notification settings",
         variant: "destructive",
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -65,9 +69,15 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
     <Button
       variant={allSubscribed ? "default" : someSubscribed ? "secondary" : "outline"}
       onClick={handleToggleAll}
+      disabled={isProcessing || isLoading}
       className="gap-2"
     >
-      {allSubscribed ? (
+      {isProcessing || isLoading ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {isProcessing ? "Processing..." : "Loading..."}
+        </>
+      ) : allSubscribed ? (
         <>
           <Bell className="h-4 w-4" />
           Notifications Enabled

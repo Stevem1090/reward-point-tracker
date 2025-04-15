@@ -3,12 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bell, BellOff, CalendarClock, Clock, Plus, Trash2 } from 'lucide-react';
+import { Bell, BellOff, CalendarClock, Clock, Loader2, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import PushNotificationToggle from '@/components/PushNotificationToggle';
 import { useToast } from '@/hooks/use-toast';
+import { sendPushNotification } from '@/utils/vapidUtils';
 
 const initialReminders = [
   { 
@@ -55,6 +55,7 @@ const RemindersPage = () => {
   const [isAddingReminder, setIsAddingReminder] = useState(false);
   const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<string[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [isEnablingReminders, setIsEnablingReminders] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -126,6 +127,8 @@ const RemindersPage = () => {
 
   const handleEnableReminders = async () => {
     try {
+      setIsEnablingReminders(true);
+      
       let targetMembers = selectedFamilyMembers;
       if (targetMembers.length === 0 && familyMembers.length > 0) {
         targetMembers = familyMembers.map(member => member.id);
@@ -141,6 +144,12 @@ const RemindersPage = () => {
         return;
       }
 
+      await sendPushNotification(
+        targetMembers,
+        "Reminders Enabled",
+        "You'll now receive notifications for your reminders!"
+      );
+
       toast({
         title: "Reminders Enabled",
         description: "You'll receive notifications for your reminders",
@@ -152,6 +161,8 @@ const RemindersPage = () => {
         description: "There was a problem enabling reminder notifications",
         variant: "destructive",
       });
+    } finally {
+      setIsEnablingReminders(false);
     }
   };
 
@@ -172,9 +183,19 @@ const RemindersPage = () => {
           variant="default" 
           className="bg-kid-purple hover:bg-kid-purple/90 gap-2"
           onClick={handleEnableReminders}
+          disabled={isEnablingReminders || selectedFamilyMembers.length === 0}
         >
-          <Bell className="h-4 w-4" />
-          Enable Reminders
+          {isEnablingReminders ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <Bell className="h-4 w-4" />
+              Test Reminders
+            </>
+          )}
         </Button>
       </div>
       
