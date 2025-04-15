@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bell, BellOff, CalendarClock, Clock, Loader2, Plus, Trash2 } from 'lucide-react';
+import { Bell, CalendarClock, Clock, Loader2, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import PushNotificationToggle from '@/components/PushNotificationToggle';

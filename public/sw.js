@@ -1,4 +1,3 @@
-
 // Service Worker for Push Notifications
 
 // Cache name for offline content
@@ -31,7 +30,10 @@ self.addEventListener('activate', event => {
         }).map(cacheName => {
           return caches.delete(cacheName);
         })
-      );
+      ).then(() => {
+        // Ensure service worker takes control of clients right away
+        return self.clients.claim();
+      });
     })
   );
 });
@@ -77,7 +79,7 @@ self.addEventListener('push', function(event) {
 
 // Notification click event - open app
 self.addEventListener('notificationclick', function(event) {
-  console.log('Notification click received');
+  console.log('Notification click received', event.action);
   
   event.notification.close();
   
@@ -87,6 +89,13 @@ self.addEventListener('notificationclick', function(event) {
   
   event.waitUntil(
     clients.matchAll({type: 'window'}).then(function(clientList) {
+      // If we have a client window already open, focus it
+      for (const client of clientList) {
+        if (client.url.includes('/reminders') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Otherwise open a new window/tab
       if (clients.openWindow) {
         return clients.openWindow('/reminders');
       }
