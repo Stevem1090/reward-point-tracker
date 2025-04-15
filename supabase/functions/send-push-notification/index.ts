@@ -18,28 +18,51 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Starting send-push-notification function");
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     // Fetch VAPID keys from the database
+    console.log("Fetching VAPID keys from the database");
     const { data: vapidKeys, error: vapidError } = await supabase
       .from('vapid_keys')
       .select('public_key, private_key')
       .single();
 
-    if (vapidError || !vapidKeys) {
+    if (vapidError) {
       console.error('Failed to fetch VAPID keys:', vapidError);
-      throw new Error('Failed to fetch VAPID keys');
+      throw new Error(`Failed to fetch VAPID keys: ${vapidError.message}`);
     }
 
+    if (!vapidKeys || !vapidKeys.public_key || !vapidKeys.private_key) {
+      console.error('VAPID keys are missing or incomplete:', vapidKeys);
+      throw new Error('VAPID keys are missing or incomplete');
+    }
+
+    console.log("VAPID keys retrieved successfully. Public key starts with:", vapidKeys.public_key.substring(0, 10));
+
     // Set up web push with the stored VAPID keys
-    webpush.setVapidDetails(
-      'mailto:your-email@example.com',
-      vapidKeys.public_key,
-      vapidKeys.private_key
-    );
+    try {
+      webpush.setVapidDetails(
+        'mailto:your-email@example.com',
+        vapidKeys.public_key,
+        vapidKeys.private_key
+      );
+      console.log("Web Push configured successfully with VAPID keys");
+    } catch (vapidSetupError) {
+      console.error('Error setting up Web Push with VAPID keys:', vapidSetupError);
+      throw new Error(`Error setting up Web Push: ${vapidSetupError.message}`);
+    }
 
     const requestBody = await req.json();
     const { userId, userIds, familyMemberIds, title, body } = requestBody;
+    
+    console.log("Request body:", JSON.stringify({
+      hasUserId: !!userId,
+      hasUserIds: !!userIds && Array.isArray(userIds),
+      hasFamilyMemberIds: !!familyMemberIds && Array.isArray(familyMemberIds),
+      title,
+      bodyLength: body?.length
+    }));
     
     // Determine target user IDs to send notifications to
     let targetUserIds: string[] = [];
@@ -67,6 +90,7 @@ serve(async (req) => {
     }
 
     // Fetch subscriptions for specific users
+    console.log(`Fetching subscriptions for ${targetUserIds.length} users`);
     const { data: subscriptions, error } = await supabase
       .from('user_push_subscriptions')
       .select('*')
@@ -154,7 +178,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in send-push-notification function:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to send push notification' }),
+      JSON.stringify({ 
+        error: error.message || 'Failed to send push notification',
+        stack: error.stack
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

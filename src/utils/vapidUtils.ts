@@ -4,19 +4,26 @@ import { supabase } from '@/integrations/supabase/client';
 // Function to get the public VAPID key for client-side subscription
 export async function getVapidPublicKey() {
   try {
+    console.log('Fetching VAPID public key');
     const { data, error } = await supabase
       .from('vapid_keys')
       .select('public_key')
       .single();
 
-    if (error || !data) {
+    if (error) {
       console.error('Error fetching VAPID public key:', error);
       return null;
     }
 
+    if (!data || !data.public_key) {
+      console.error('VAPID public key is missing or invalid in database');
+      return null;
+    }
+
+    console.log('Successfully retrieved VAPID public key');
     return data.public_key;
   } catch (error) {
-    console.error('Error in getVapidPublicKey:', error);
+    console.error('Exception in getVapidPublicKey:', error);
     return null;
   }
 }
@@ -45,6 +52,8 @@ export function urlBase64ToUint8Array(base64String: string) {
 // Send a push notification to selected family members
 export async function sendPushNotification(familyMemberIds: string[], title: string, body: string) {
   try {
+    console.log(`Sending push notification to ${familyMemberIds.length} recipients`);
+    
     // Use supabase.functions.invoke instead of direct URL access
     const { data, error } = await supabase.functions.invoke('send-push-notification', {
       body: {
@@ -55,9 +64,11 @@ export async function sendPushNotification(familyMemberIds: string[], title: str
     });
 
     if (error) {
+      console.error('Error invoking send-push-notification function:', error);
       throw new Error(`Failed to send push notification: ${error.message}`);
     }
 
+    console.log('Push notification response:', data);
     return data;
   } catch (error) {
     console.error('Error sending push notification:', error);
