@@ -53,8 +53,8 @@ serve(async (req) => {
         {
           endpoint: subscription.endpoint,
           keys: {
-            p256dh: atob(subscription.p256dh),
-            auth: atob(subscription.auth)
+            p256dh: subscription.p256dh,
+            auth: subscription.auth
           }
         }, 
         JSON.stringify({ title, body })

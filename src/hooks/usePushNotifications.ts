@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getVapidPublicKey } from '@/utils/vapidUtils';
+import { getVapidPublicKey, urlBase64ToUint8Array } from '@/utils/vapidUtils';
 
 export const usePushNotifications = (familyMemberId: string) => {
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -50,7 +50,7 @@ export const usePushNotifications = (familyMemberId: string) => {
 
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: publicKey,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
 
       // Store the subscription specifically for this family member
