@@ -40,12 +40,16 @@ const ProfilePage = () => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!user) return;
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
       
       try {
         setIsLoading(true);
         setError(null);
         
+        // First check if profile exists
         const { data, error } = await supabase
           .from('user_profiles')
           .select('*')
@@ -53,40 +57,42 @@ const ProfilePage = () => {
           .maybeSingle();
         
         if (error) {
-          throw error;
+          console.error('Error fetching profile:', error);
+          setError('Failed to load profile data');
+          return;
         }
 
+        // If profile exists, use it
         if (data) {
           setProfile(data as UserProfile);
           setDisplayName(data.name || '');
-        } else {
-          // Create a profile if one doesn't exist
-          const { data: newProfile, error: createError } = await supabase
-            .from('user_profiles')
-            .insert({ 
-              id: user.id,
-              name: user.email?.split('@')[0] || ''
-            })
-            .select('*')
-            .single();
-            
-          if (createError) {
-            throw createError;
-          }
-          
-          if (newProfile) {
-            setProfile(newProfile as UserProfile);
-            setDisplayName(newProfile.name || '');
-          }
+          setIsLoading(false);
+          return;
         }
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-        setError('Failed to load profile. Please try again later.');
-        toast({
-          title: "Error loading profile",
-          description: "Please try again later",
-          variant: "destructive"
-        });
+        
+        // Create a profile if one doesn't exist
+        console.log('Creating new profile for user:', user.id);
+        const { data: newProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert({ 
+            id: user.id,
+            name: user.email?.split('@')[0] || ''
+          })
+          .select('*')
+          .single();
+          
+        if (createError) {
+          console.error('Error creating profile:', createError);
+          setError('Failed to create user profile');
+          return;
+        }
+        
+        setProfile(newProfile as UserProfile);
+        setDisplayName(newProfile.name || '');
+        
+      } catch (err) {
+        console.error('Unexpected error:', err);
+        setError('An unexpected error occurred. Please try again later.');
       } finally {
         setIsLoading(false);
       }
@@ -109,7 +115,10 @@ const ProfilePage = () => {
           name: displayName,
         });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error saving profile:', error);
+        throw error;
+      }
       
       if (profile) {
         setProfile({

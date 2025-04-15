@@ -38,7 +38,8 @@ serve(async (req) => {
       vapidKeys.private_key
     );
 
-    const { userId, userIds, title, body } = await req.json();
+    const requestBody = await req.json();
+    const { userId, userIds, familyMemberIds, title, body } = requestBody;
     
     // Determine target user IDs to send notifications to
     let targetUserIds: string[] = [];
@@ -51,9 +52,13 @@ serve(async (req) => {
       // Multiple users notification
       targetUserIds = userIds;
       console.log(`Sending push notification to ${targetUserIds.length} users`);
+    } else if (familyMemberIds && Array.isArray(familyMemberIds)) {
+      // If family member IDs are provided instead of user IDs (for backward compatibility)
+      targetUserIds = familyMemberIds;
+      console.log(`Sending push notification to ${targetUserIds.length} family members`);
     } else {
       return new Response(
-        JSON.stringify({ error: 'Either userId or userIds must be provided' }),
+        JSON.stringify({ error: 'Either userId, userIds, or familyMemberIds must be provided' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

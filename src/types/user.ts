@@ -13,3 +13,9 @@ export type UserPushSubscription = {
   auth: string;
   created_at: string;
 };
+
+// Add a helper type for subscription responses
+export type SubscriptionResponse = {
+  success: boolean;
+  message: string;
+};

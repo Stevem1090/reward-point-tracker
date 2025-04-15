@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getVapidPublicKey, urlBase64ToUint8Array } from '@/utils/vapidUtils';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { SubscriptionResponse } from '@/types/user';
 
 export const useUserNotifications = () => {
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -16,6 +17,7 @@ export const useUserNotifications = () => {
   const checkSubscriptionStatus = useCallback(async () => {
     if (!user?.id || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.log('Push notifications not supported or user not logged in');
+      setIsLoading(false);
       return false;
     }
 
@@ -29,6 +31,7 @@ export const useUserNotifications = () => {
 
       if (error) {
         console.error('Error checking database subscription:', error);
+        setIsLoading(false);
         return false;
       }
 
@@ -36,68 +39,53 @@ export const useUserNotifications = () => {
       const reg = await navigator.serviceWorker.getRegistration();
       if (!reg) {
         console.log('No service worker registration found');
+        setIsLoading(false);
         return false;
       }
 
       const existingSub = await reg.pushManager.getSubscription();
       
       // User is considered subscribed if they have both a database entry and an active browser subscription
-      return !!(data && existingSub);
+      const isSubbed = !!(data && existingSub);
+      setIsSubscribed(isSubbed);
+      setRegistration(reg);
+      setSubscription(existingSub);
+      setIsLoading(false);
+      
+      return isSubbed;
     } catch (error) {
       console.error('Error checking subscription status:', error);
+      setIsLoading(false);
       return false;
     }
   }, [user?.id]);
 
   useEffect(() => {
-    const loadInitialData = async () => {
-      if (!user?.id) {
-        setIsLoading(false);
-        return;
-      }
+    // Don't try to load subscriptions if user is not logged in
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
 
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        console.log('Push notifications not supported in this browser');
-        setIsLoading(false);
-        return;
-      }
+    // Check for browser support
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.log('Push notifications not supported in this browser');
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        // Get service worker registration
-        const registration = await navigator.serviceWorker.getRegistration();
-        if (!registration) {
-          console.log('Service worker not registered yet');
-          setIsLoading(false);
-          return;
-        }
-        
-        setRegistration(registration);
-        
-        // Get existing push subscription from browser
-        const existingSubscription = await registration.pushManager.getSubscription();
-        setSubscription(existingSubscription);
-        
-        // Check if user is subscribed
-        const isSubbed = await checkSubscriptionStatus();
-        setIsSubscribed(isSubbed);
-      } catch (error) {
-        console.error('Error checking subscription:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadInitialData();
+    // Initialize subscription status
+    checkSubscriptionStatus();
   }, [user?.id, checkSubscriptionStatus]);
 
-  const subscribe = useCallback(async () => {
+  const subscribe = useCallback(async (): Promise<SubscriptionResponse> => {
     if (!user?.id) {
       toast({
         title: "Error",
         description: "You must be logged in to enable notifications",
         variant: "destructive"
       });
-      return false;
+      return { success: false, message: "User not logged in" };
     }
     
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -106,7 +94,7 @@ export const useUserNotifications = () => {
         description: "Your browser doesn't support push notifications",
         variant: "destructive"
       });
-      return false;
+      return { success: false, message: "Browser doesn't support notifications" };
     }
     
     setIsLoading(true);
@@ -146,6 +134,20 @@ export const useUserNotifications = () => {
         String.fromCharCode.apply(null, Array.from(new Uint8Array(newSubscription.getKey('auth')!)))
       );
 
+      // Check if user profile exists, create if it doesn't
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError || !profile) {
+        console.log('Creating user profile for:', user.id);
+        await supabase
+          .from('user_profiles')
+          .insert({ id: user.id, name: user.email?.split('@')[0] || null });
+      }
+
       // Save subscription to database
       const { error } = await supabase
         .from('user_push_subscriptions')
@@ -155,10 +157,13 @@ export const useUserNotifications = () => {
           p256dh: p256dhKey,
           auth: authKey,
         }, {
-          onConflict: 'user_id'
+          onConflict: 'user_id, endpoint'
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error saving subscription to database:', error);
+        throw error;
+      }
 
       setSubscription(newSubscription);
       setIsSubscribed(true);
@@ -168,24 +173,26 @@ export const useUserNotifications = () => {
         description: "You'll receive reminder notifications",
       });
       
-      return true;
-    } catch (error) {
+      return { success: true, message: "Notifications enabled" };
+    } catch (error: any) {
       console.error('Error subscribing to push notifications:', error);
       
       toast({
         title: "Notification Error",
-        description: "Failed to enable notifications. Please try again.",
+        description: error.message || "Failed to enable notifications. Please try again.",
         variant: "destructive"
       });
       
-      return false;
+      return { success: false, message: error.message || "Unknown error" };
     } finally {
       setIsLoading(false);
     }
-  }, [registration, user?.id, toast]);
+  }, [registration, user, toast]);
 
-  const unsubscribe = useCallback(async () => {
-    if (!user?.id) return false;
+  const unsubscribe = useCallback(async (): Promise<SubscriptionResponse> => {
+    if (!user?.id) {
+      return { success: false, message: "User not logged in" };
+    }
     
     setIsLoading(true);
     try {
@@ -195,9 +202,10 @@ export const useUserNotifications = () => {
         .delete()
         .eq('user_id', user.id);
       
-      if (error) throw error;
-      
-      setIsSubscribed(false);
+      if (error) {
+        console.error('Error removing subscription from database:', error);
+        throw error;
+      }
       
       // Unsubscribe from push manager
       if (subscription) {
@@ -205,22 +213,24 @@ export const useUserNotifications = () => {
         setSubscription(null);
       }
       
+      setIsSubscribed(false);
+      
       toast({
         title: "Notifications Disabled",
         description: "You won't receive reminder notifications",
       });
       
-      return true;
-    } catch (error) {
+      return { success: true, message: "Notifications disabled" };
+    } catch (error: any) {
       console.error('Error unsubscribing from push notifications:', error);
       
       toast({
         title: "Error",
-        description: "Failed to disable notifications. Please try again.",
+        description: error.message || "Failed to disable notifications. Please try again.",
         variant: "destructive"
       });
       
-      return false;
+      return { success: false, message: error.message || "Unknown error" };
     } finally {
       setIsLoading(false);
     }
@@ -230,6 +240,7 @@ export const useUserNotifications = () => {
     isSubscribed,
     isLoading,
     subscribe,
-    unsubscribe
+    unsubscribe,
+    checkSubscriptionStatus
   };
 };
