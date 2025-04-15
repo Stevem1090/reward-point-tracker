@@ -20,17 +20,28 @@ export const useUserNotifications = () => {
     }
 
     try {
-      const { data } = await supabase
+      // Check if there's a subscription in the database
+      const { data, error } = await supabase
         .from('user_push_subscriptions')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
+      if (error) {
+        console.error('Error checking database subscription:', error);
+        return false;
+      }
+
+      // Check if there's an active service worker subscription
       const reg = await navigator.serviceWorker.getRegistration();
-      if (!reg) return false;
+      if (!reg) {
+        console.log('No service worker registration found');
+        return false;
+      }
 
       const existingSub = await reg.pushManager.getSubscription();
       
+      // User is considered subscribed if they have both a database entry and an active browser subscription
       return !!(data && existingSub);
     } catch (error) {
       console.error('Error checking subscription status:', error);
@@ -45,7 +56,14 @@ export const useUserNotifications = () => {
         return;
       }
 
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        console.log('Push notifications not supported in this browser');
+        setIsLoading(false);
+        return;
+      }
+
       try {
+        // Get service worker registration
         const registration = await navigator.serviceWorker.getRegistration();
         if (!registration) {
           console.log('Service worker not registered yet');
@@ -54,9 +72,12 @@ export const useUserNotifications = () => {
         }
         
         setRegistration(registration);
+        
+        // Get existing push subscription from browser
         const existingSubscription = await registration.pushManager.getSubscription();
         setSubscription(existingSubscription);
         
+        // Check if user is subscribed
         const isSubbed = await checkSubscriptionStatus();
         setIsSubscribed(isSubbed);
       } catch (error) {
@@ -79,8 +100,18 @@ export const useUserNotifications = () => {
       return false;
     }
     
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      toast({
+        title: "Error",
+        description: "Your browser doesn't support push notifications",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
     setIsLoading(true);
     try {
+      // Get or register service worker
       let reg = registration;
       if (!reg) {
         reg = await navigator.serviceWorker.register('/sw.js');
@@ -88,21 +119,25 @@ export const useUserNotifications = () => {
         setRegistration(reg);
       }
       
+      // Get VAPID public key
       const publicKey = await getVapidPublicKey();
       if (!publicKey) {
         throw new Error('VAPID public key not available');
       }
 
+      // Unsubscribe from any existing subscription
       const existingSub = await reg.pushManager.getSubscription();
       if (existingSub) {
         await existingSub.unsubscribe();
       }
 
+      // Create new subscription
       const newSubscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
 
+      // Convert keys to base64
       const p256dhKey = btoa(
         String.fromCharCode.apply(null, Array.from(new Uint8Array(newSubscription.getKey('p256dh')!)))
       );
@@ -111,6 +146,7 @@ export const useUserNotifications = () => {
         String.fromCharCode.apply(null, Array.from(new Uint8Array(newSubscription.getKey('auth')!)))
       );
 
+      // Save subscription to database
       const { error } = await supabase
         .from('user_push_subscriptions')
         .upsert({
@@ -153,13 +189,17 @@ export const useUserNotifications = () => {
     
     setIsLoading(true);
     try {
-      await supabase
+      // Remove from database
+      const { error } = await supabase
         .from('user_push_subscriptions')
         .delete()
         .eq('user_id', user.id);
       
+      if (error) throw error;
+      
       setIsSubscribed(false);
       
+      // Unsubscribe from push manager
       if (subscription) {
         await subscription.unsubscribe();
         setSubscription(null);

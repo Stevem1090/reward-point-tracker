@@ -107,7 +107,28 @@ serve(async (req) => {
         return { success: true, endpoint: subscription.endpoint, userId: subscription.user_id };
       } catch (error) {
         console.error(`Error sending to ${subscription.endpoint}:`, error);
-        return { success: false, endpoint: subscription.endpoint, userId: subscription.user_id, error: error.message };
+        
+        // Check if the subscription might be expired or invalid
+        if (error.statusCode === 404 || error.statusCode === 410) {
+          console.log(`Subscription appears to be invalid, removing: ${subscription.endpoint}`);
+          try {
+            // Remove invalid subscription
+            await supabase
+              .from('user_push_subscriptions')
+              .delete()
+              .eq('endpoint', subscription.endpoint);
+          } catch (deleteError) {
+            console.error('Error removing invalid subscription:', deleteError);
+          }
+        }
+        
+        return { 
+          success: false, 
+          endpoint: subscription.endpoint, 
+          userId: subscription.user_id, 
+          error: error.message,
+          statusCode: error.statusCode
+        };
       }
     });
 

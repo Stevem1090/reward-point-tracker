@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Bell, UserCircle, Loader2 } from "lucide-react";
 import { useUserNotifications } from '@/hooks/useUserNotifications';
 import { UserProfile } from '@/types/user';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const ProfilePage = () => {
   const { user } = useAuth();
@@ -19,6 +21,8 @@ const ProfilePage = () => {
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [browserSupport, setBrowserSupport] = useState(true);
 
   const { 
     isSubscribed, 
@@ -28,16 +32,25 @@ const ProfilePage = () => {
   } = useUserNotifications();
 
   useEffect(() => {
+    // Check browser support for push notifications
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setBrowserSupport(false);
+    }
+  }, []);
+
+  useEffect(() => {
     const fetchProfile = async () => {
       if (!user) return;
       
       try {
         setIsLoading(true);
+        setError(null);
+        
         const { data, error } = await supabase
           .from('user_profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
         
         if (error) {
           throw error;
@@ -46,9 +59,29 @@ const ProfilePage = () => {
         if (data) {
           setProfile(data as UserProfile);
           setDisplayName(data.name || '');
+        } else {
+          // Create a profile if one doesn't exist
+          const { data: newProfile, error: createError } = await supabase
+            .from('user_profiles')
+            .insert({ 
+              id: user.id,
+              name: user.email?.split('@')[0] || ''
+            })
+            .select('*')
+            .single();
+            
+          if (createError) {
+            throw createError;
+          }
+          
+          if (newProfile) {
+            setProfile(newProfile as UserProfile);
+            setDisplayName(newProfile.name || '');
+          }
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
+        setError('Failed to load profile. Please try again later.');
         toast({
           title: "Error loading profile",
           description: "Please try again later",
@@ -67,6 +100,7 @@ const ProfilePage = () => {
     
     try {
       setIsSaving(true);
+      setError(null);
       
       const { error } = await supabase
         .from('user_profiles')
@@ -90,6 +124,7 @@ const ProfilePage = () => {
       });
     } catch (error) {
       console.error('Error saving profile:', error);
+      setError('Failed to save profile. Please try again later.');
       toast({
         title: "Error saving profile",
         description: "Please try again later",
@@ -100,7 +135,7 @@ const ProfilePage = () => {
     }
   };
 
-  const toggleNotifications = async () => {
+  const handleToggleNotifications = async () => {
     try {
       if (isSubscribed) {
         await unsubscribe();
@@ -113,10 +148,12 @@ const ProfilePage = () => {
   };
 
   const handleTestNotification = async () => {
+    if (!user?.id) return;
+    
     try {
       const { error } = await supabase.functions.invoke('send-push-notification', {
         body: {
-          userId: user?.id,
+          userId: user.id,
           title: "Test Notification",
           body: "This is a test notification from your profile page"
         }
@@ -154,6 +191,12 @@ const ProfilePage = () => {
         <UserCircle className="h-8 w-8" />
         Profile Settings
       </h1>
+      
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
       
       <div className="space-y-6">
         <Card>
@@ -201,19 +244,41 @@ const ProfilePage = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <div className="font-medium">Push Notifications</div>
-                  <div className="text-sm text-muted-foreground">
-                    Receive notifications on this device
+              {!browserSupport ? (
+                <Alert className="mb-4">
+                  <AlertDescription>
+                    Your browser doesn't support push notifications.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="font-medium">Push Notifications</div>
+                      <div className="text-sm text-muted-foreground">
+                        Receive notifications on this device
+                      </div>
+                    </div>
+                    <Switch 
+                      checked={isSubscribed} 
+                      onCheckedChange={handleToggleNotifications}
+                      disabled={notificationLoading || !browserSupport}
+                    />
                   </div>
-                </div>
-                <Switch 
-                  checked={isSubscribed} 
-                  onCheckedChange={isSubscribed ? unsubscribe : subscribe}
-                  disabled={notificationLoading}
-                />
-              </div>
+                  
+                  {isSubscribed && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleTestNotification}
+                      className="mt-2"
+                    >
+                      <Bell className="mr-2 h-4 w-4" />
+                      Send Test Notification
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
