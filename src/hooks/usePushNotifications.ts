@@ -18,9 +18,15 @@ export const usePushNotifications = (familyMemberId: string) => {
       try {
         const reg = await navigator.serviceWorker.ready;
         setRegistration(reg);
-        const existingSub = await reg.pushManager.getSubscription();
-        if (existingSub) {
-          setSubscription(existingSub);
+        
+        // Check if there's an existing subscription for this family member
+        const { data, error } = await supabase
+          .from('push_subscriptions')
+          .select('*')
+          .eq('family_member_id', familyMemberId)
+          .single();
+
+        if (data) {
           setIsSubscribed(true);
         }
       } catch (error) {
@@ -29,7 +35,7 @@ export const usePushNotifications = (familyMemberId: string) => {
     };
 
     checkSubscription();
-  }, []);
+  }, [familyMemberId]);
 
   const subscribe = async () => {
     try {
@@ -47,12 +53,17 @@ export const usePushNotifications = (familyMemberId: string) => {
         applicationServerKey: publicKey,
       });
 
-      await supabase.from('push_subscriptions').insert({
+      // Store the subscription specifically for this family member
+      const { error } = await supabase.from('push_subscriptions').upsert({
         family_member_id: familyMemberId,
         endpoint: sub.endpoint,
         p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh')!))),
         auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('auth')!))),
+      }, {
+        onConflict: 'family_member_id' // Update if exists
       });
+
+      if (error) throw error;
 
       setSubscription(sub);
       setIsSubscribed(true);
@@ -66,11 +77,14 @@ export const usePushNotifications = (familyMemberId: string) => {
     try {
       if (subscription) {
         await subscription.unsubscribe();
+        
+        // Remove the subscription for this specific family member
         await supabase
           .from('push_subscriptions')
           .delete()
           .eq('family_member_id', familyMemberId)
           .eq('endpoint', subscription.endpoint);
+        
         setSubscription(null);
         setIsSubscribed(false);
       }

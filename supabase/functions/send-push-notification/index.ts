@@ -37,15 +37,34 @@ serve(async (req) => {
       vapidKeys.private_key
     );
 
-    const { subscription, title, body } = await req.json();
+    const { familyMemberIds, title, body } = await req.json();
 
-    await webpush.sendNotification(subscription, JSON.stringify({
-      title,
-      body
-    }));
+    // Fetch subscriptions for specific family members
+    const { data: subscriptions, error } = await supabase
+      .from('push_subscriptions')
+      .select('*')
+      .in('family_member_id', familyMemberIds);
+
+    if (error) throw error;
+
+    // Send notification to each subscription
+    const sendPromises = subscriptions.map(async (subscription) => {
+      await webpush.sendNotification(
+        {
+          endpoint: subscription.endpoint,
+          keys: {
+            p256dh: atob(subscription.p256dh),
+            auth: atob(subscription.auth)
+          }
+        }, 
+        JSON.stringify({ title, body })
+      );
+    });
+
+    await Promise.all(sendPromises);
 
     return new Response(
-      JSON.stringify({ message: 'Push notification sent successfully' }),
+      JSON.stringify({ message: 'Push notifications sent successfully' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
