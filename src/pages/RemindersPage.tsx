@@ -121,13 +121,20 @@ const RemindersPage = () => {
   const today = weekdays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
   const todaysReminders = reminders.filter(r => r.active && r.days.includes(today));
 
+  const handleSubscriptionChange = (memberId: string, isSubscribed: boolean) => {
+    console.log(`Family member ${memberId} notification status: ${isSubscribed}`);
+  };
+
   return (
     <div className="container mx-auto max-w-5xl">
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-kid-pink via-kid-purple to-kid-blue bg-clip-text text-transparent">
         Family Reminders
       </h1>
       <div className="flex justify-center mb-6">
-        <PushNotificationToggle familyMemberId={selectedFamilyMembers[0] || ''} />
+        <PushNotificationToggle 
+          familyMemberIds={selectedFamilyMembers} 
+          onSubscriptionChange={handleSubscriptionChange}
+        />
       </div>
       
       <p className="text-center mb-8 text-muted-foreground">Never forget important tasks!</p>
