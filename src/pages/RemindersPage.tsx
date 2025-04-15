@@ -7,8 +7,8 @@ import { Bell, CalendarClock, Clock, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { supabase } from '@/integrations/supabase/client';
+import PushNotificationToggle from '@/components/PushNotificationToggle';
 
-// Sample data - in a real app, this would come from a database
 const initialReminders = [
   { 
     id: "1", 
@@ -126,6 +126,10 @@ const RemindersPage = () => {
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-kid-pink via-kid-purple to-kid-blue bg-clip-text text-transparent">
         Family Reminders
       </h1>
+      <div className="flex justify-center mb-6">
+        <PushNotificationToggle familyMemberId={selectedFamilyMembers[0] || ''} />
+      </div>
+      
       <p className="text-center mb-8 text-muted-foreground">Never forget important tasks!</p>
       
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
