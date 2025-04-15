@@ -153,6 +153,45 @@ export const useUserNotifications = () => {
       }
       console.log('VAPID public key retrieved successfully');
 
+      // Check if user profile exists before proceeding
+      console.log('Checking if user profile exists');
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('Error checking user profile:', profileError);
+        // Continue anyway as we'll try to create it if needed
+      }
+
+      if (!profile) {
+        console.log('Creating user profile for:', user.id);
+        try {
+          const { error: createProfileError } = await supabase
+            .from('user_profiles')
+            .insert({ id: user.id, name: user.email?.split('@')[0] || null });
+            
+          if (createProfileError) {
+            // If error is about duplicate key, that's actually okay - profile exists
+            if (!createProfileError.message.includes('duplicate key')) {
+              console.error('Error creating user profile:', createProfileError);
+              // Continue anyway as this is not critical
+            } else {
+              console.log('Profile already exists (caught duplicate key error)');
+            }
+          } else {
+            console.log('User profile created successfully');
+          }
+        } catch (createError) {
+          console.error('Exception creating profile:', createError);
+          // Continue anyway
+        }
+      } else {
+        console.log('User profile already exists');
+      }
+
       // Unsubscribe from any existing subscription
       const existingSub = await reg.pushManager.getSubscription();
       if (existingSub) {
@@ -196,34 +235,6 @@ export const useUserNotifications = () => {
       } catch (keyError) {
         console.error('Error processing subscription keys:', keyError);
         throw new Error(`Failed to process subscription keys: ${keyError.message}`);
-      }
-
-      // Check if user profile exists, create if it doesn't
-      console.log('Checking if user profile exists');
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('Error checking user profile:', profileError);
-      }
-
-      if (!profile) {
-        console.log('Creating user profile for:', user.id);
-        const { error: createProfileError } = await supabase
-          .from('user_profiles')
-          .insert({ id: user.id, name: user.email?.split('@')[0] || null });
-          
-        if (createProfileError) {
-          console.error('Error creating user profile:', createProfileError);
-          // Continue anyway as this is not critical
-        } else {
-          console.log('User profile created successfully');
-        }
-      } else {
-        console.log('User profile already exists');
       }
 
       // Save subscription to database

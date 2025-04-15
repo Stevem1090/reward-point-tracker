@@ -39,6 +39,20 @@ serve(async (req) => {
     }
 
     console.log("VAPID keys retrieved successfully. Public key starts with:", vapidKeys.public_key.substring(0, 10));
+    console.log("Public key length:", vapidKeys.public_key.length);
+    console.log("Private key length:", vapidKeys.private_key.length);
+
+    // Validate VAPID key format
+    try {
+      // Attempt to validate key formats before setting them
+      if (!/^[A-Za-z0-9_-]+$/.test(vapidKeys.public_key) || 
+          !/^[A-Za-z0-9_-]+$/.test(vapidKeys.private_key)) {
+        throw new Error('VAPID keys contain invalid characters');
+      }
+    } catch (validationError) {
+      console.error('VAPID key validation error:', validationError);
+      throw new Error(`Invalid VAPID key format: ${validationError.message}`);
+    }
 
     // Set up web push with the stored VAPID keys
     try {

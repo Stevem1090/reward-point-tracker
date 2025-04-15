@@ -20,6 +20,17 @@ export async function getVapidPublicKey() {
       return null;
     }
 
+    // Validate the key format to ensure it's in the correct format
+    try {
+      // Simple validation - at minimum a VAPID key should be able to be processed
+      // by the urlBase64ToUint8Array function without errors
+      urlBase64ToUint8Array(data.public_key);
+    } catch (validationError) {
+      console.error('VAPID key validation failed:', validationError);
+      console.error('Invalid VAPID key format:', data.public_key);
+      return null;
+    }
+
     console.log('Successfully retrieved VAPID public key');
     return data.public_key;
   } catch (error) {
@@ -31,14 +42,23 @@ export async function getVapidPublicKey() {
 // Convert base64 string to Uint8Array for applicationServerKey
 export function urlBase64ToUint8Array(base64String: string) {
   try {
+    // Ensure padding is correct
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding)
       .replace(/-/g, '+')
       .replace(/_/g, '/');
 
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
+    // Decode base64
+    let rawData;
+    try {
+      rawData = window.atob(base64);
+    } catch (error) {
+      console.error('Error decoding base64 string:', error);
+      throw new Error('Invalid base64 string format');
+    }
 
+    // Convert to Uint8Array
+    const outputArray = new Uint8Array(rawData.length);
     for (let i = 0; i < rawData.length; ++i) {
       outputArray[i] = rawData.charCodeAt(i);
     }

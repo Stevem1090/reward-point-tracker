@@ -72,23 +72,46 @@ const ProfilePage = () => {
         
         // Create a profile if one doesn't exist
         console.log('Creating new profile for user:', user.id);
-        const { data: newProfile, error: createError } = await supabase
-          .from('user_profiles')
-          .insert({ 
-            id: user.id,
-            name: user.email?.split('@')[0] || ''
-          })
-          .select('*')
-          .single();
+        try {
+          const { data: newProfile, error: createError } = await supabase
+            .from('user_profiles')
+            .insert({ 
+              id: user.id,
+              name: user.email?.split('@')[0] || ''
+            })
+            .select('*')
+            .single();
+            
+          if (createError) {
+            // If error is about duplicate key, that's actually okay - profile exists
+            if (createError.message.includes('duplicate key')) {
+              console.log('Profile already exists (caught duplicate key error)');
+              // Try fetching again
+              const { data: existingProfile } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('id', user.id)
+                .maybeSingle();
+                
+              if (existingProfile) {
+                setProfile(existingProfile as UserProfile);
+                setDisplayName(existingProfile.name || '');
+              } else {
+                setError('Failed to retrieve user profile after detection of existing profile');
+              }
+            } else {
+              console.error('Error creating profile:', createError);
+              setError('Failed to create user profile');
+            }
+            return;
+          }
           
-        if (createError) {
-          console.error('Error creating profile:', createError);
-          setError('Failed to create user profile');
-          return;
+          setProfile(newProfile as UserProfile);
+          setDisplayName(newProfile.name || '');
+        } catch (err) {
+          console.error('Error in profile creation:', err);
+          setError('Failed to create or fetch user profile');
         }
-        
-        setProfile(newProfile as UserProfile);
-        setDisplayName(newProfile.name || '');
         
       } catch (err) {
         console.error('Unexpected error:', err);
