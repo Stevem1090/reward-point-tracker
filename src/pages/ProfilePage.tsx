@@ -49,7 +49,7 @@ const ProfilePage = () => {
         setIsLoading(true);
         setError(null);
         
-        // First check if profile exists
+        // Check if profile exists
         const { data, error } = await supabase
           .from('user_profiles')
           .select('*')
@@ -70,14 +70,16 @@ const ProfilePage = () => {
           return;
         }
         
-        // Create a profile if one doesn't exist
-        console.log('Creating new profile for user:', user.id);
+        // If no profile exists, create one
+        const defaultName = user.email?.split('@')[0] || '';
+        console.log('No profile found, creating one with name:', defaultName);
+        
         try {
           const { data: newProfile, error: createError } = await supabase
             .from('user_profiles')
             .insert({ 
               id: user.id,
-              name: user.email?.split('@')[0] || ''
+              name: defaultName
             })
             .select('*')
             .single();
@@ -103,16 +105,14 @@ const ProfilePage = () => {
               console.error('Error creating profile:', createError);
               setError('Failed to create user profile');
             }
-            return;
+          } else if (newProfile) {
+            setProfile(newProfile as UserProfile);
+            setDisplayName(newProfile.name || '');
           }
-          
-          setProfile(newProfile as UserProfile);
-          setDisplayName(newProfile.name || '');
         } catch (err) {
           console.error('Error in profile creation:', err);
           setError('Failed to create or fetch user profile');
         }
-        
       } catch (err) {
         console.error('Unexpected error:', err);
         setError('An unexpected error occurred. Please try again later.');

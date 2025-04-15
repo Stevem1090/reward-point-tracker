@@ -153,7 +153,7 @@ export const useUserNotifications = () => {
       }
       console.log('VAPID public key retrieved successfully');
 
-      // Check if user profile exists before proceeding
+      // Check if user profile exists before proceeding - but don't create one
       console.log('Checking if user profile exists');
       const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
@@ -163,33 +163,13 @@ export const useUserNotifications = () => {
 
       if (profileError) {
         console.error('Error checking user profile:', profileError);
-        // Continue anyway as we'll try to create it if needed
       }
 
       if (!profile) {
-        console.log('Creating user profile for:', user.id);
-        try {
-          const { error: createProfileError } = await supabase
-            .from('user_profiles')
-            .insert({ id: user.id, name: user.email?.split('@')[0] || null });
-            
-          if (createProfileError) {
-            // If error is about duplicate key, that's actually okay - profile exists
-            if (!createProfileError.message.includes('duplicate key')) {
-              console.error('Error creating user profile:', createProfileError);
-              // Continue anyway as this is not critical
-            } else {
-              console.log('Profile already exists (caught duplicate key error)');
-            }
-          } else {
-            console.log('User profile created successfully');
-          }
-        } catch (createError) {
-          console.error('Exception creating profile:', createError);
-          // Continue anyway
-        }
+        console.log('User profile not found. Profile should be created during signup.');
+        // We no longer attempt to create a profile here - this should happen during signup
       } else {
-        console.log('User profile already exists');
+        console.log('User profile exists');
       }
 
       // Unsubscribe from any existing subscription
