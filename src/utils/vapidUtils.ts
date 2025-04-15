@@ -45,25 +45,20 @@ export function urlBase64ToUint8Array(base64String: string) {
 // Send a push notification to selected family members
 export async function sendPushNotification(familyMemberIds: string[], title: string, body: string) {
   try {
-    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/send-push-notification`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabase.supabaseKey}`
-      },
-      body: JSON.stringify({
+    // Use supabase.functions.invoke instead of direct URL access
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
+      body: {
         familyMemberIds,
         title,
         body
-      })
+      }
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Failed to send push notification: ${errorData.error || response.statusText}`);
+    if (error) {
+      throw new Error(`Failed to send push notification: ${error.message}`);
     }
 
-    return await response.json();
+    return data;
   } catch (error) {
     console.error('Error sending push notification:', error);
     throw error;
