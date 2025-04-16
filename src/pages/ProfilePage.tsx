@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,70 +49,31 @@ const ProfilePage = () => {
         setIsLoading(true);
         setError(null);
         
-        // Check if profile exists
+        console.log('Fetching profile for user:', user.id);
+        
+        // Only attempt to fetch the profile, not create one
         const { data, error: fetchError } = await supabase
           .from('user_profiles')
           .select('*')
           .eq('id', user.id)
-          .maybeSingle();
+          .single();
         
         if (fetchError) {
-          console.error('Error fetching profile:', fetchError);
-          setError('Failed to load profile data');
+          if (fetchError.code === 'PGRST116') {
+            // No profile found - this shouldn't happen as profile should be created during signup
+            console.error('No profile found for user. This suggests a signup issue:', fetchError);
+            setError('Your profile could not be found. Please contact support.');
+          } else {
+            console.error('Error fetching profile:', fetchError);
+            setError('Failed to load profile data. Please try refreshing the page.');
+          }
           setIsLoading(false);
           return;
         }
 
-        // If profile exists, use it
-        if (data) {
-          console.log('Profile found:', data);
-          setProfile(data as UserProfile);
-          setDisplayName(data.name || '');
-          setIsLoading(false);
-          return;
-        }
-        
-        // If no profile exists, create one with a default name
-        const defaultName = user.email?.split('@')[0] || '';
-        console.log('No profile found, creating one with name:', defaultName);
-        
-        const { data: newProfile, error: createError } = await supabase
-          .from('user_profiles')
-          .insert({ 
-            id: user.id,
-            name: defaultName
-          })
-          .select('*')
-          .single();
-        
-        if (createError) {
-          // Check if the error is due to a duplicate key (profile already exists)
-          if (createError.message.includes('duplicate key')) {
-            console.log('Profile already exists - fetching existing profile');
-            // Try fetching again in case there was a race condition
-            const { data: existingProfile, error: refetchError } = await supabase
-              .from('user_profiles')
-              .select('*')
-              .eq('id', user.id)
-              .single();
-              
-            if (refetchError) {
-              console.error('Error fetching existing profile:', refetchError);
-              setError('Failed to retrieve profile after detection of existing profile');
-            } else if (existingProfile) {
-              console.log('Retrieved existing profile:', existingProfile);
-              setProfile(existingProfile as UserProfile);
-              setDisplayName(existingProfile.name || '');
-            }
-          } else {
-            console.error('Error creating profile:', createError);
-            setError('Failed to create user profile');
-          }
-        } else if (newProfile) {
-          console.log('New profile created:', newProfile);
-          setProfile(newProfile as UserProfile);
-          setDisplayName(newProfile.name || '');
-        }
+        console.log('Profile retrieved successfully:', data);
+        setProfile(data as UserProfile);
+        setDisplayName(data.name || '');
       } catch (err) {
         console.error('Unexpected error in profile management:', err);
         setError('An unexpected error occurred. Please try again later.');
@@ -124,30 +86,27 @@ const ProfilePage = () => {
   }, [user]);
 
   const handleSaveProfile = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
     
     try {
       setIsSaving(true);
       setError(null);
       
+      console.log('Updating profile for user:', user.id);
       const { error } = await supabase
         .from('user_profiles')
-        .upsert({ 
-          id: user.id,
-          name: displayName,
-        });
+        .update({ name: displayName })
+        .eq('id', user.id);
       
       if (error) {
         console.error('Error saving profile:', error);
         throw error;
       }
       
-      if (profile) {
-        setProfile({
-          ...profile,
-          name: displayName
-        });
-      }
+      setProfile({
+        ...profile,
+        name: displayName
+      });
       
       toast({
         title: "Profile saved",
@@ -212,6 +171,19 @@ const ProfilePage = () => {
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      </div>
+    );
+  }
+
+  // If no profile was found, show an error message
+  if (!profile && !isLoading) {
+    return (
+      <div className="container mx-auto max-w-2xl py-8 px-4">
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>
+            {error || "Your profile could not be loaded. This may indicate an issue with your account setup. Please try signing out and back in, or contact support."}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
