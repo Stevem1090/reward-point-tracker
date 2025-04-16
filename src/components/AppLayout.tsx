@@ -72,7 +72,7 @@ const AppLayout = () => {
         </div>
       </div>
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-x-hidden">
         {/* Sidebar for larger screens */}
         <aside className="hidden md:block w-64 bg-soft-purple p-4 min-h-[calc(100vh-64px)]">
           <nav className="flex flex-col gap-2 mt-6">
@@ -93,7 +93,7 @@ const AppLayout = () => {
         </aside>
         
         {/* Main content */}
-        <main className="flex-1 p-4">
+        <main className="flex-1 pt-4">
           <Outlet />
         </main>
       </div>
