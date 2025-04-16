@@ -31,6 +31,12 @@ export async function getVapidPublicKey() {
 // Convert base64 string to Uint8Array for applicationServerKey
 export function urlBase64ToUint8Array(base64String: string) {
   try {
+    // Validate the input
+    if (!base64String || typeof base64String !== 'string') {
+      console.error('Invalid VAPID key format:', base64String);
+      throw new Error('Invalid VAPID key format');
+    }
+
     // Ensure padding is correct
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding)

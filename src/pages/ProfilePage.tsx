@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,71 +49,71 @@ const ProfilePage = () => {
         setError(null);
         
         // Check if profile exists
-        const { data, error } = await supabase
+        const { data, error: fetchError } = await supabase
           .from('user_profiles')
           .select('*')
           .eq('id', user.id)
           .maybeSingle();
         
-        if (error) {
-          console.error('Error fetching profile:', error);
+        if (fetchError) {
+          console.error('Error fetching profile:', fetchError);
           setError('Failed to load profile data');
+          setIsLoading(false);
           return;
         }
 
         // If profile exists, use it
         if (data) {
+          console.log('Profile found:', data);
           setProfile(data as UserProfile);
           setDisplayName(data.name || '');
           setIsLoading(false);
           return;
         }
         
-        // If no profile exists, create one
+        // If no profile exists, create one with a default name
         const defaultName = user.email?.split('@')[0] || '';
         console.log('No profile found, creating one with name:', defaultName);
         
-        try {
-          const { data: newProfile, error: createError } = await supabase
-            .from('user_profiles')
-            .insert({ 
-              id: user.id,
-              name: defaultName
-            })
-            .select('*')
-            .single();
-            
-          if (createError) {
-            // If error is about duplicate key, that's actually okay - profile exists
-            if (createError.message.includes('duplicate key')) {
-              console.log('Profile already exists (caught duplicate key error)');
-              // Try fetching again
-              const { data: existingProfile } = await supabase
-                .from('user_profiles')
-                .select('*')
-                .eq('id', user.id)
-                .maybeSingle();
-                
-              if (existingProfile) {
-                setProfile(existingProfile as UserProfile);
-                setDisplayName(existingProfile.name || '');
-              } else {
-                setError('Failed to retrieve user profile after detection of existing profile');
-              }
-            } else {
-              console.error('Error creating profile:', createError);
-              setError('Failed to create user profile');
+        const { data: newProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert({ 
+            id: user.id,
+            name: defaultName
+          })
+          .select('*')
+          .single();
+        
+        if (createError) {
+          // Check if the error is due to a duplicate key (profile already exists)
+          if (createError.message.includes('duplicate key')) {
+            console.log('Profile already exists - fetching existing profile');
+            // Try fetching again in case there was a race condition
+            const { data: existingProfile, error: refetchError } = await supabase
+              .from('user_profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+              
+            if (refetchError) {
+              console.error('Error fetching existing profile:', refetchError);
+              setError('Failed to retrieve profile after detection of existing profile');
+            } else if (existingProfile) {
+              console.log('Retrieved existing profile:', existingProfile);
+              setProfile(existingProfile as UserProfile);
+              setDisplayName(existingProfile.name || '');
             }
-          } else if (newProfile) {
-            setProfile(newProfile as UserProfile);
-            setDisplayName(newProfile.name || '');
+          } else {
+            console.error('Error creating profile:', createError);
+            setError('Failed to create user profile');
           }
-        } catch (err) {
-          console.error('Error in profile creation:', err);
-          setError('Failed to create or fetch user profile');
+        } else if (newProfile) {
+          console.log('New profile created:', newProfile);
+          setProfile(newProfile as UserProfile);
+          setDisplayName(newProfile.name || '');
         }
       } catch (err) {
-        console.error('Unexpected error:', err);
+        console.error('Unexpected error in profile management:', err);
         setError('An unexpected error occurred. Please try again later.');
       } finally {
         setIsLoading(false);
@@ -122,7 +121,7 @@ const ProfilePage = () => {
     };
     
     fetchProfile();
-  }, [user, toast]);
+  }, [user]);
 
   const handleSaveProfile = async () => {
     if (!user) return;
