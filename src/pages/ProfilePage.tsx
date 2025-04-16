@@ -5,12 +5,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, UserCircle, Loader2 } from "lucide-react";
-import { useUserNotifications } from '@/hooks/useUserNotifications';
+import { UserCircle, Loader2 } from "lucide-react";
 import { UserProfile } from '@/types/user';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import NotificationSettings from '@/components/NotificationSettings';
@@ -23,9 +20,10 @@ const ProfilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchOrCreateProfile = async () => {
       if (!user) {
         setIsLoading(false);
         return;
@@ -42,48 +40,59 @@ const ProfilePage = () => {
           .from('user_profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
+        
+        // If profile exists, use it
+        if (data) {
+          console.log('Profile retrieved successfully:', data);
+          setProfile(data as UserProfile);
+          setDisplayName(data.name || '');
+          return;
+        }
         
         // If no profile found, create one
-        if (fetchError && fetchError.code === 'PGRST116') {
+        if (fetchError || !data) {
           console.log('No profile found for user, creating one:', user.id);
+          
+          const defaultName = user.email?.split('@')[0] || 'User';
           
           const { data: newProfile, error: createError } = await supabase
             .from('user_profiles')
-            .insert([{ id: user.id, name: user.email?.split('@')[0] || 'User' }])
+            .insert([{ 
+              id: user.id, 
+              name: defaultName 
+            }])
             .select()
             .single();
           
           if (createError) {
             console.error('Error creating profile:', createError);
-            setError('Failed to create your profile. Please try refreshing or contact support.');
-            setIsLoading(false);
-            return;
+            throw new Error('Failed to create your profile. Please try refreshing or contact support.');
           }
           
           console.log('Profile created successfully:', newProfile);
           setProfile(newProfile as UserProfile);
-          setDisplayName(newProfile.name || '');
-        } else if (fetchError) {
-          console.error('Error fetching profile:', fetchError);
-          setError('Failed to load profile data. Please try refreshing the page.');
-          setIsLoading(false);
-          return;
-        } else {
-          console.log('Profile retrieved successfully:', data);
-          setProfile(data as UserProfile);
-          setDisplayName(data.name || '');
+          setDisplayName(newProfile.name || defaultName);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Unexpected error in profile management:', err);
-        setError('An unexpected error occurred. Please try again later.');
+        setError(err.message || 'An unexpected error occurred. Please try again later.');
+        
+        // Allow a few retries for transient errors
+        if (retryCount < 2) {
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, 1000);
+        }
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchProfile();
-  }, [user]);
+    if (user || retryCount > 0) {
+      fetchOrCreateProfile();
+    }
+  }, [user, retryCount]);
 
   const handleSaveProfile = async () => {
     if (!user || !profile) return;
@@ -112,7 +121,7 @@ const ProfilePage = () => {
         title: "Profile saved",
         description: "Your profile has been updated successfully"
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving profile:', error);
       setError('Failed to save profile. Please try again later.');
       toast({
@@ -123,6 +132,10 @@ const ProfilePage = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
   };
 
   if (isLoading) {
@@ -144,7 +157,14 @@ const ProfilePage = () => {
       
       {error && (
         <Alert variant="destructive" className="mb-4">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>
+            {error}
+            {retryCount < 3 && (
+              <Button variant="link" className="p-0 h-auto ml-2" onClick={handleRetry}>
+                Retry
+              </Button>
+            )}
+          </AlertDescription>
         </Alert>
       )}
       
@@ -187,7 +207,7 @@ const ProfilePage = () => {
           </CardFooter>
         </Card>
         
-        <NotificationSettings user={user} />
+        {user && <NotificationSettings user={user} />}
       </div>
     </div>
   );

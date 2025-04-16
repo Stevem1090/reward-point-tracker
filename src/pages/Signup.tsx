@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -24,6 +25,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -36,9 +39,11 @@ const formSchema = z.object({
 });
 
 const Signup = () => {
-  const { signUp, loading } = useAuth();
+  const { signUp, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [signupError, setSignupError] = useState<string | null>(null);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -52,36 +57,34 @@ const Signup = () => {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      setLoading(true);
+      setSignupError(null);
+      
       // Sign up the user
       const signUpResult = await signUp(values.email, values.password);
       
       if (signUpResult.error) {
         console.error('Sign up error:', signUpResult.error);
-        toast({
-          title: "Registration failed",
-          description: signUpResult.error.message,
-          variant: "destructive"
-        });
+        setSignupError(signUpResult.error.message);
         return;
       }
       
       if (signUpResult.data?.user) {
-        // Create profile immediately after signup
+        const userId = signUpResult.data.user.id;
         const displayName = values.displayName || values.email.split('@')[0];
+        
+        // Create profile immediately after signup
         const { error: profileError } = await supabase
           .from('user_profiles')
           .insert({
-            id: signUpResult.data.user.id,
+            id: userId,
             name: displayName
           });
           
-        if (profileError && !profileError.message.includes('duplicate key')) {
+        if (profileError) {
           console.error('Error creating profile:', profileError);
-          toast({
-            title: "Profile setup issue",
-            description: "Your account was created, but there was an issue setting up your profile.",
-            variant: "destructive"
-          });
+          // Don't show this error to the user, since the account was created successfully
+          console.log('Profile creation failed, but account was created');
         }
         
         toast({
@@ -93,11 +96,9 @@ const Signup = () => {
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      toast({
-        title: "Registration failed",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive"
-      });
+      setSignupError('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -111,6 +112,12 @@ const Signup = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {signupError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{signupError}</AlertDescription>
+            </Alert>
+          )}
+          
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -165,8 +172,13 @@ const Signup = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Creating Account..." : "Sign Up"}
+              <Button type="submit" className="w-full" disabled={loading || authLoading}>
+                {loading || authLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : "Sign Up"}
               </Button>
             </form>
           </Form>
