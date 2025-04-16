@@ -1,14 +1,13 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
-import { Session, User } from '@supabase/supabase-js';
+import { Session, User, AuthError } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; data: { user: User | null } | null }>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   loading: boolean;
@@ -57,7 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string) => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signUp({
+      const result = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -68,22 +67,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      if (error) {
-        throw error;
+      if (result.error) {
+        toast({
+          title: "Error creating account",
+          description: result.error.message,
+          variant: "destructive",
+        });
+      } else if (result.data.user) {
+        toast({
+          title: "Account created!",
+          description: "Please check your email to confirm your account",
+        });
+        navigate('/');
       }
-
-      toast({
-        title: "Account created!",
-        description: "Please check your email to confirm your account",
-      });
       
-      navigate('/');
+      return result;
     } catch (error: any) {
       toast({
         title: "Error creating account",
         description: error.message,
         variant: "destructive",
       });
+      return { 
+        error: { message: error.message } as AuthError, 
+        data: null 
+      };
     } finally {
       setLoading(false);
     }

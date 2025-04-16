@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -54,25 +53,25 @@ const Signup = () => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       // Sign up the user
-      const { error: signUpError, data } = await signUp(values.email, values.password);
+      const signUpResult = await signUp(values.email, values.password);
       
-      if (signUpError) {
-        console.error('Sign up error:', signUpError);
+      if (signUpResult.error) {
+        console.error('Sign up error:', signUpResult.error);
         toast({
           title: "Registration failed",
-          description: signUpError.message,
+          description: signUpResult.error.message,
           variant: "destructive"
         });
         return;
       }
       
-      if (data?.user) {
+      if (signUpResult.data?.user) {
         // Create profile immediately after signup
         const displayName = values.displayName || values.email.split('@')[0];
         const { error: profileError } = await supabase
           .from('user_profiles')
           .insert({
-            id: data.user.id,
+            id: signUpResult.data.user.id,
             name: displayName
           });
           
@@ -92,7 +91,7 @@ const Signup = () => {
         
         navigate('/login');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
       toast({
         title: "Registration failed",
