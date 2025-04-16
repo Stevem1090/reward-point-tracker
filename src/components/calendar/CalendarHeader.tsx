@@ -16,7 +16,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onNextWeek
 }) => {
   return (
-    <div className="flex justify-between items-center mb-4 px-4 overflow-hidden-x">
+    <div className="items-center overflow-hidden-x">
       <Button variant="outline" onClick={onPreviousWeek}>
         <ChevronLeft className="h-4 w-4 mr-1" />
         Previous
