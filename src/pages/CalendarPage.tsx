@@ -298,7 +298,7 @@ const CalendarPage = () => {
   };
 
   return (
-    <div className="w-full overflow-x-hidden px-4">
+    <div className="w-full overflow-x-hidden">
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-kid-blue via-kid-purple to-kid-green bg-clip-text text-transparent">
         Family Calendar
       </h1>
@@ -308,13 +308,13 @@ const CalendarPage = () => {
       <div className="flex justify-between items-center mb-4 px-4">
         <Button variant="outline" onClick={goToPreviousWeek}>
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Previous Week
+          Previous
         </Button>
         <h2 className="text-xl font-semibold">
-          {format(weekDays[0], 'MMM d')} - {format(weekDays[6], 'MMM d, yyyy')}
+          {format(weekDays[0], 'MMM d')} - {format(weekDays[6], 'MMM d')}
         </h2>
         <Button variant="outline" onClick={goToNextWeek}>
-          Next Week
+          Next
           <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
