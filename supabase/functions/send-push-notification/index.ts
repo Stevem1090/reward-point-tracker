@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import webpush from "https://esm.sh/web-push@3.6.6";
+import webpush from "npm:web-push@3.6.6";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -104,11 +104,32 @@ serve(async (req) => {
     }
 
     // Fetch subscriptions for specific users
-    console.log(`Fetching subscriptions for ${targetUserIds.length} users`);
-    const { data: subscriptions, error } = await supabase
-      .from('user_push_subscriptions')
-      .select('*')
-      .in('user_id', targetUserIds);
+    let subscriptions;
+    let error;
+    
+    // Try to get subscriptions from user_push_subscriptions first (for authenticated users)
+    if (userId || userIds) {
+      console.log(`Fetching subscriptions for ${targetUserIds.length} users from user_push_subscriptions`);
+      const result = await supabase
+        .from('user_push_subscriptions')
+        .select('*')
+        .in('user_id', targetUserIds);
+      
+      subscriptions = result.data;
+      error = result.error;
+    }
+    
+    // If no subscriptions found or we're looking for family members, try the push_subscriptions table
+    if ((!subscriptions || subscriptions.length === 0) && familyMemberIds) {
+      console.log(`Fetching subscriptions for ${familyMemberIds.length} family members from push_subscriptions`);
+      const result = await supabase
+        .from('push_subscriptions')
+        .select('*')
+        .in('family_member_id', familyMemberIds);
+      
+      subscriptions = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error('Error fetching subscriptions:', error);
@@ -138,16 +159,22 @@ serve(async (req) => {
           }
         };
         
-        await webpush.sendNotification(
+        const result = await webpush.sendNotification(
           pushSubscription, 
           JSON.stringify({ 
             title, 
             body,
-            userId: subscription.user_id 
+            userId: subscription.user_id || subscription.family_member_id 
           })
         );
         
-        return { success: true, endpoint: subscription.endpoint, userId: subscription.user_id };
+        console.log('Push notification sent successfully', result.statusCode);
+        
+        return { 
+          success: true, 
+          endpoint: subscription.endpoint, 
+          userId: subscription.user_id || subscription.family_member_id
+        };
       } catch (error) {
         console.error(`Error sending to ${subscription.endpoint}:`, error);
         
@@ -155,11 +182,18 @@ serve(async (req) => {
         if (error.statusCode === 404 || error.statusCode === 410) {
           console.log(`Subscription appears to be invalid, removing: ${subscription.endpoint}`);
           try {
-            // Remove invalid subscription
-            await supabase
-              .from('user_push_subscriptions')
-              .delete()
-              .eq('endpoint', subscription.endpoint);
+            // Remove invalid subscription from appropriate table
+            if (subscription.user_id) {
+              await supabase
+                .from('user_push_subscriptions')
+                .delete()
+                .eq('endpoint', subscription.endpoint);
+            } else if (subscription.family_member_id) {
+              await supabase
+                .from('push_subscriptions')
+                .delete()
+                .eq('endpoint', subscription.endpoint);
+            }
           } catch (deleteError) {
             console.error('Error removing invalid subscription:', deleteError);
           }
@@ -168,7 +202,7 @@ serve(async (req) => {
         return { 
           success: false, 
           endpoint: subscription.endpoint, 
-          userId: subscription.user_id, 
+          userId: subscription.user_id || subscription.family_member_id, 
           error: error.message,
           statusCode: error.statusCode
         };
