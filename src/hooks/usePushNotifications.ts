@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getVapidPublicKey, urlBase64ToUint8Array } from '@/utils/vapidUtils';
@@ -11,7 +10,6 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // Check if a specific family member is subscribed
   const checkSubscriptionStatus = useCallback(async (familyMemberId: string) => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.log('Push notifications not supported in this browser');
@@ -19,18 +17,15 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
     }
 
     try {
-      // Check for existing subscription in the database
       const { data } = await supabase
         .from('push_subscriptions')
         .select('*')
         .eq('family_member_id', familyMemberId)
         .maybeSingle();
 
-      // Check if service worker is registered
       const reg = await navigator.serviceWorker.getRegistration();
       if (!reg) return false;
 
-      // Check if there's an active push subscription
       const existingSub = await reg.pushManager.getSubscription();
       
       return !!(data && existingSub);
@@ -48,7 +43,6 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
       }
 
       try {
-        // Check if service worker is registered and ready
         const registration = await navigator.serviceWorker.getRegistration();
         if (!registration) {
           console.log('Service worker not registered yet');
@@ -58,11 +52,9 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         
         setRegistration(registration);
         
-        // Check for existing subscription in Push Manager
         const existingSubscription = await registration.pushManager.getSubscription();
         setSubscription(existingSubscription);
         
-        // Check if there's a record in the database for this family member
         const isSubbed = await checkSubscriptionStatus(initialFamilyMemberId);
         setIsSubscribed(isSubbed);
       } catch (error) {
@@ -78,41 +70,76 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
   const subscribe = useCallback(async (familyMemberId: string) => {
     setIsLoading(true);
     try {
-      // Ensure service worker is registered and ready
       let reg = registration;
       if (!reg) {
+        console.log('Registering service worker for push notifications');
         reg = await navigator.serviceWorker.register('/sw.js');
         await navigator.serviceWorker.ready;
+        console.log('Service worker registered successfully');
         setRegistration(reg);
       }
       
+      console.log('Fetching VAPID public key for subscription');
       const publicKey = await getVapidPublicKey();
       if (!publicKey) {
+        console.error('Failed to retrieve VAPID public key');
         throw new Error('VAPID public key not available');
       }
+      console.log('VAPID public key retrieved, length:', publicKey.length);
 
-      // Unsubscribe from any existing subscription first to ensure clean state
       const existingSub = await reg.pushManager.getSubscription();
       if (existingSub) {
+        console.log('Unsubscribing from existing push subscription');
         await existingSub.unsubscribe();
+        console.log('Successfully unsubscribed from existing subscription');
       }
 
-      // Create a new subscription
-      const newSubscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
+      console.log('Processing VAPID key to applicationServerKey');
+      let applicationServerKey;
+      try {
+        applicationServerKey = urlBase64ToUint8Array(publicKey);
+        console.log('ApplicationServerKey created successfully, length:', applicationServerKey.length);
+      } catch (keyError) {
+        console.error('Error processing VAPID key:', keyError);
+        throw new Error(`Failed to process VAPID key: ${keyError.message}`);
+      }
 
-      // Extract keys and convert to base64
-      const p256dhKey = btoa(
-        String.fromCharCode.apply(null, Array.from(new Uint8Array(newSubscription.getKey('p256dh')!)))
-      );
+      console.log('Creating new push subscription');
+      let newSubscription: PushSubscription;
+      try {
+        newSubscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+        console.log('Push subscription created successfully:', newSubscription.endpoint);
+      } catch (subscribeError) {
+        console.error('Error creating push subscription:', subscribeError);
+        throw new Error(`Failed to subscribe to push notifications: ${subscribeError.message}`);
+      }
+
+      console.log('Extracting subscription keys');
+      let p256dhKey: string;
+      let authKey: string;
       
-      const authKey = btoa(
-        String.fromCharCode.apply(null, Array.from(new Uint8Array(newSubscription.getKey('auth')!)))
-      );
+      try {
+        const p256dhRaw = new Uint8Array(newSubscription.getKey('p256dh')!);
+        const authRaw = new Uint8Array(newSubscription.getKey('auth')!);
+        
+        p256dhKey = btoa(
+          String.fromCharCode.apply(null, Array.from(p256dhRaw))
+        );
+        
+        authKey = btoa(
+          String.fromCharCode.apply(null, Array.from(authRaw))
+        );
+        
+        console.log('Subscription keys processed successfully');
+      } catch (keyError) {
+        console.error('Error processing subscription keys:', keyError);
+        throw new Error(`Failed to process subscription keys: ${keyError.message}`);
+      }
 
-      // Store the subscription in Supabase
+      console.log('Saving subscription to database for family member:', familyMemberId);
       const { error } = await supabase.from('push_subscriptions').upsert({
         family_member_id: familyMemberId,
         endpoint: newSubscription.endpoint,
@@ -122,8 +149,12 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         onConflict: 'family_member_id'
       });
 
-      if (error) throw error;
-
+      if (error) {
+        console.error('Database error saving subscription:', error);
+        throw error;
+      }
+      
+      console.log('Subscription saved successfully');
       setSubscription(newSubscription);
       if (familyMemberId === initialFamilyMemberId) {
         setIsSubscribed(true);
@@ -140,7 +171,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
       
       toast({
         title: "Notification Error",
-        description: "Failed to enable notifications. Please try again.",
+        description: error.message || "Failed to enable notifications. Please try again.",
         variant: "destructive"
       });
       
@@ -153,7 +184,6 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
   const unsubscribe = useCallback(async (familyMemberId: string) => {
     setIsLoading(true);
     try {
-      // Remove from database first
       await supabase
         .from('push_subscriptions')
         .delete()
@@ -163,7 +193,6 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         setIsSubscribed(false);
       }
       
-      // Only unsubscribe from push manager if we're unsubscribing the last family member
       const { count } = await supabase
         .from('push_subscriptions')
         .select('*', { count: 'exact', head: true });

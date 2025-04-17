@@ -20,6 +20,14 @@ export async function getVapidPublicKey() {
       return null;
     }
 
+    // Log the key format to help with debugging
+    console.log('VAPID public key format check:', {
+      keyLength: data.public_key.length,
+      startsWithDashes: data.public_key.includes('-'),
+      startsWithUnderscores: data.public_key.includes('_'),
+      base64Format: /^[A-Za-z0-9+/=_-]+$/.test(data.public_key)
+    });
+
     console.log('Successfully retrieved VAPID public key');
     return data.public_key;
   } catch (error) {
@@ -37,21 +45,37 @@ export function urlBase64ToUint8Array(base64String: string) {
       throw new Error('Invalid VAPID key format');
     }
 
-    // Ensure padding is correct
+    console.log('Processing VAPID key:', {
+      keyLength: base64String.length,
+      keyStart: base64String.substring(0, 10) + '...',
+      containsDashes: base64String.includes('-'),
+      containsUnderscores: base64String.includes('_')
+    });
+
+    // Ensure padding is correct - this is crucial for proper base64 decoding
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding)
       .replace(/-/g, '+')
       .replace(/_/g, '/');
 
+    console.log('Processed base64 string length:', base64.length);
+
     // Decode base64
-    const rawData = atob(base64);
-    
-    // Convert to Uint8Array
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
+    try {
+      const rawData = atob(base64);
+      console.log('Successfully decoded base64, raw data length:', rawData.length);
+      
+      // Convert to Uint8Array
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      console.log('Successfully created Uint8Array, length:', outputArray.length);
+      return outputArray;
+    } catch (decodeError) {
+      console.error('Base64 decoding error:', decodeError);
+      throw new Error(`Failed to decode VAPID key: ${decodeError.message}`);
     }
-    return outputArray;
   } catch (error) {
     console.error('Error in urlBase64ToUint8Array:', error);
     throw new Error(`Failed to process VAPID key: ${error.message}. Key might be in invalid format.`);
