@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +27,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
+        if (currentSession) {
+          console.log('Auth state changed:', event, 'User ID:', currentSession.user?.id);
+        } else {
+          console.log('Auth state changed:', event, 'No session');
+        }
+        
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
@@ -45,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log('Initial session check:', currentSession ? `User ID: ${currentSession.user?.id}` : 'No session');
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       setLoading(false);
