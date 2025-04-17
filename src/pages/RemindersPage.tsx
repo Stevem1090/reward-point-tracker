@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,32 +10,14 @@ import PushNotificationToggle from '@/components/PushNotificationToggle';
 import { useToast } from '@/hooks/use-toast';
 import { sendPushNotification } from '@/utils/vapidUtils';
 
-const initialReminders = [
-  { 
-    id: "1", 
-    title: "Take medication", 
-    time: "08:00", 
-    days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-    active: true,
-    owner_ids: [] as string[]
-  },
-  { 
-    id: "2", 
-    title: "Soccer practice", 
-    time: "16:30", 
-    days: ["Tuesday", "Thursday"],
-    active: true,
-    owner_ids: [] as string[]
-  },
-  { 
-    id: "3", 
-    title: "Bedtime", 
-    time: "21:00", 
-    days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-    active: true,
-    owner_ids: [] as string[]
-  }
-];
+type Reminder = {
+  id: string;
+  title: string;
+  time: string;
+  days: string[];
+  active: boolean;
+  owner_ids: string[];
+};
 
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -47,7 +28,7 @@ type FamilyMember = {
 };
 
 const RemindersPage = () => {
-  const [reminders, setReminders] = useState(initialReminders);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [newReminder, setNewReminder] = useState({
     title: "",
     time: "12:00",
@@ -61,7 +42,41 @@ const RemindersPage = () => {
   
   useEffect(() => {
     fetchFamilyMembers();
+    fetchReminders();
   }, []);
+
+  const fetchReminders = async () => {
+    try {
+      const { data: reminderData, error: reminderError } = await supabase
+        .from('reminders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (reminderError) throw reminderError;
+
+      const { data: ownerData, error: ownerError } = await supabase
+        .from('reminder_owners')
+        .select('*');
+
+      if (ownerError) throw ownerError;
+
+      const remindersWithOwners = reminderData.map(reminder => ({
+        ...reminder,
+        owner_ids: ownerData
+          .filter(owner => owner.reminder_id === reminder.id)
+          .map(owner => owner.owner_id)
+      }));
+
+      setReminders(remindersWithOwners);
+    } catch (error) {
+      console.error('Error fetching reminders:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load reminders",
+        variant: "destructive",
+      });
+    }
+  };
 
   const fetchFamilyMembers = async () => {
     try {
@@ -74,6 +89,11 @@ const RemindersPage = () => {
       setFamilyMembers(data || []);
     } catch (error) {
       console.error('Error fetching family members:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load family members",
+        variant: "destructive",
+      });
     }
   };
 
@@ -86,32 +106,106 @@ const RemindersPage = () => {
     });
   };
 
-  const handleAddReminder = () => {
+  const handleAddReminder = async () => {
     if (!newReminder.title.trim() || newReminder.days.length === 0) return;
 
-    const reminder = {
-      id: Date.now().toString(),
-      title: newReminder.title,
-      time: newReminder.time,
-      days: newReminder.days,
-      active: true,
-      owner_ids: selectedFamilyMembers
-    };
+    try {
+      const { data: reminderData, error: reminderError } = await supabase
+        .from('reminders')
+        .insert([{
+          title: newReminder.title,
+          time: newReminder.time,
+          days: newReminder.days,
+          active: true
+        }])
+        .select()
+        .single();
 
-    setReminders([...reminders, reminder]);
-    setNewReminder({ title: "", time: "12:00", days: [] });
-    setSelectedFamilyMembers([]);
-    setIsAddingReminder(false);
+      if (reminderError) throw reminderError;
+
+      if (selectedFamilyMembers.length > 0) {
+        const ownerInserts = selectedFamilyMembers.map(memberId => ({
+          reminder_id: reminderData.id,
+          owner_id: memberId
+        }));
+
+        const { error: ownerError } = await supabase
+          .from('reminder_owners')
+          .insert(ownerInserts);
+
+        if (ownerError) throw ownerError;
+      }
+
+      await fetchReminders();
+
+      setNewReminder({ title: "", time: "12:00", days: [] });
+      setSelectedFamilyMembers([]);
+      setIsAddingReminder(false);
+
+      toast({
+        title: "Success",
+        description: "Reminder created successfully",
+      });
+    } catch (error) {
+      console.error('Error adding reminder:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create reminder",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleToggleActive = (id: string) => {
-    setReminders(reminders.map(r => 
-      r.id === id ? { ...r, active: !r.active } : r
-    ));
+  const handleToggleActive = async (id: string, currentActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('reminders')
+        .update({ active: !currentActive })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setReminders(reminders.map(r => 
+        r.id === id ? { ...r, active: !currentActive } : r
+      ));
+
+      toast({
+        title: "Success",
+        description: `Reminder ${!currentActive ? 'activated' : 'deactivated'}`,
+      });
+    } catch (error) {
+      console.error('Error toggling reminder:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update reminder",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteReminder = (id: string) => {
-    setReminders(reminders.filter(r => r.id !== id));
+  const handleDeleteReminder = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('reminders')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setReminders(reminders.filter(r => r.id !== id));
+      
+      toast({
+        title: "Success",
+        description: "Reminder deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting reminder:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete reminder",
+        variant: "destructive",
+      });
+    }
   };
 
   const formatTime = (timeString: string) => {
@@ -272,6 +366,11 @@ const RemindersPage = () => {
                                   : [...prev, member.id]
                               );
                             }}
+                            style={{
+                              backgroundColor: selectedFamilyMembers.includes(member.id) ? member.color : 'transparent',
+                              color: selectedFamilyMembers.includes(member.id) ? 'white' : 'inherit',
+                              borderColor: member.color
+                            }}
                           >
                             {member.name}
                           </Badge>
@@ -296,7 +395,7 @@ const RemindersPage = () => {
                       !reminder.active ? 'opacity-50' : ''
                     }`}
                   >
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start">
                       <div>
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-kid-purple" />
@@ -305,12 +404,32 @@ const RemindersPage = () => {
                         <p className="text-sm text-muted-foreground mt-1">
                           {formatTime(reminder.time)} • {reminder.days.map(d => d.substring(0, 3)).join(', ')}
                         </p>
+                        {reminder.owner_ids && reminder.owner_ids.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {reminder.owner_ids.map(ownerId => {
+                              const member = familyMembers.find(m => m.id === ownerId);
+                              return member ? (
+                                <Badge
+                                  key={ownerId}
+                                  variant="secondary"
+                                  style={{
+                                    backgroundColor: `${member.color}20`,
+                                    color: member.color,
+                                    borderColor: `${member.color}40`
+                                  }}
+                                >
+                                  {member.name}
+                                </Badge>
+                              ) : null;
+                            })}
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-1">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleToggleActive(reminder.id)}
+                          onClick={() => handleToggleActive(reminder.id, reminder.active)}
                           className={reminder.active 
                             ? "border-kid-purple text-kid-purple hover:bg-kid-purple hover:text-white" 
                             : "border-muted-foreground text-muted-foreground"

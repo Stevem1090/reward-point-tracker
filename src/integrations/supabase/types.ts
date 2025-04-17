@@ -199,6 +199,89 @@ export type Database = {
           },
         ]
       }
+      reminder_notifications: {
+        Row: {
+          body: string | null
+          id: string
+          reminder_id: string
+          sent_at: string
+          sent_to: string[]
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          id?: string
+          reminder_id: string
+          sent_at?: string
+          sent_to?: string[]
+          title: string
+        }
+        Update: {
+          body?: string | null
+          id?: string
+          reminder_id?: string
+          sent_at?: string
+          sent_to?: string[]
+          title?: string
+        }
+        Relationships: []
+      }
+      reminder_owners: {
+        Row: {
+          created_at: string | null
+          id: string
+          owner_id: string
+          reminder_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          owner_id: string
+          reminder_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          owner_id?: string
+          reminder_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_owners_reminder_id_fkey"
+            columns: ["reminder_id"]
+            isOneToOne: false
+            referencedRelation: "reminders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reminders: {
+        Row: {
+          active: boolean
+          created_at: string | null
+          days: string[]
+          id: string
+          time: string
+          title: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string | null
+          days: string[]
+          id?: string
+          time: string
+          title: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string | null
+          days?: string[]
+          id?: string
+          time?: string
+          title?: string
+        }
+        Relationships: []
+      }
       reward_categories: {
         Row: {
           created_at: string
@@ -294,6 +377,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_and_send_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_points_summary_html: {
         Args: { summary_date: string }
         Returns: string
