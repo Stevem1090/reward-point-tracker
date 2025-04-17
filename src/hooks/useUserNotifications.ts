@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getVapidPublicKey, urlBase64ToUint8Array } from '@/utils/vapidUtils';
@@ -217,25 +216,50 @@ export const useUserNotifications = () => {
         throw new Error(`Failed to process subscription keys: ${keyError.message}`);
       }
 
-      // Save subscription to database
-      console.log('Saving subscription to database');
-      const { error } = await supabase
+      // Replace the upsert operation with a check-then-update-or-insert approach
+      // First, check if a subscription for this user already exists
+      console.log('Checking for existing subscription in database');
+      const { data: existingData } = await supabase
         .from('user_push_subscriptions')
-        .upsert({
-          user_id: user.id,
-          endpoint: newSubscription.endpoint,
-          p256dh: p256dhKey,
-          auth: authKey,
-        }, {
-          onConflict: 'user_id, endpoint'
-        });
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('endpoint', newSubscription.endpoint)
+        .maybeSingle();
 
-      if (error) {
-        console.error('Error saving subscription to database:', error);
-        throw error;
+      // If it exists, update it
+      if (existingData?.id) {
+        console.log('Updating existing subscription in database');
+        const { error: updateError } = await supabase
+          .from('user_push_subscriptions')
+          .update({
+            p256dh: p256dhKey,
+            auth: authKey,
+          })
+          .eq('id', existingData.id);
+
+        if (updateError) {
+          console.error('Error updating subscription:', updateError);
+          throw updateError;
+        }
+      } 
+      // Otherwise, insert a new one
+      else {
+        console.log('Inserting new subscription to database');
+        const { error: insertError } = await supabase
+          .from('user_push_subscriptions')
+          .insert({
+            user_id: user.id,
+            endpoint: newSubscription.endpoint,
+            p256dh: p256dhKey,
+            auth: authKey,
+          });
+
+        if (insertError) {
+          console.error('Error inserting subscription:', insertError);
+          throw insertError;
+        }
       }
-      console.log('Subscription saved to database successfully');
-
+      
       setSubscription(newSubscription);
       setIsSubscribed(true);
       

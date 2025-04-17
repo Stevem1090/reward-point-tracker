@@ -139,19 +139,44 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         throw new Error(`Failed to process subscription keys: ${keyError.message}`);
       }
 
-      console.log('Saving subscription to database for family member:', familyMemberId);
-      const { error } = await supabase.from('push_subscriptions').upsert({
-        family_member_id: familyMemberId,
-        endpoint: newSubscription.endpoint,
-        p256dh: p256dhKey,
-        auth: authKey,
-      }, {
-        onConflict: 'family_member_id'
-      });
+      console.log('Checking for existing subscription in database');
+      const { data: existingData } = await supabase
+        .from('push_subscriptions')
+        .select('id')
+        .eq('family_member_id', familyMemberId)
+        .maybeSingle();
 
-      if (error) {
-        console.error('Database error saving subscription:', error);
-        throw error;
+      if (existingData?.id) {
+        console.log('Updating existing subscription in database');
+        const { error: updateError } = await supabase
+          .from('push_subscriptions')
+          .update({
+            endpoint: newSubscription.endpoint,
+            p256dh: p256dhKey,
+            auth: authKey,
+          })
+          .eq('id', existingData.id);
+
+        if (updateError) {
+          console.error('Error updating subscription:', updateError);
+          throw updateError;
+        }
+      } 
+      else {
+        console.log('Inserting new subscription to database');
+        const { error: insertError } = await supabase
+          .from('push_subscriptions')
+          .insert({
+            family_member_id: familyMemberId,
+            endpoint: newSubscription.endpoint,
+            p256dh: p256dhKey,
+            auth: authKey,
+          });
+
+        if (insertError) {
+          console.error('Error inserting subscription:', insertError);
+          throw insertError;
+        }
       }
       
       console.log('Subscription saved successfully');

@@ -20,6 +20,15 @@ export async function getVapidPublicKey() {
       return null;
     }
 
+    // Verify the key looks like a valid base64 URL-safe string
+    if (!/^[A-Za-z0-9_-]+$/.test(data.public_key)) {
+      console.error('VAPID public key is not in valid base64 URL-safe format:', {
+        keyLength: data.public_key.length,
+        keyContains: data.public_key.substring(0, 10) + '...'
+      });
+      throw new Error('Invalid VAPID key format: Key must be in base64 URL-safe format');
+    }
+
     // Log the key format to help with debugging
     console.log('VAPID public key format check:', {
       keyLength: data.public_key.length,
@@ -42,7 +51,13 @@ export function urlBase64ToUint8Array(base64String: string) {
     // Validate the input
     if (!base64String || typeof base64String !== 'string') {
       console.error('Invalid VAPID key format:', base64String);
-      throw new Error('Invalid VAPID key format');
+      throw new Error('Invalid VAPID key format: Key is missing or not a string');
+    }
+
+    // Ensure the key is in the correct format (URL-safe base64)
+    if (!/^[A-Za-z0-9_-]+$/.test(base64String)) {
+      console.error('Invalid VAPID key format. Key contains invalid characters.');
+      throw new Error('Invalid VAPID key format: Key contains invalid characters');
     }
 
     console.log('Processing VAPID key:', {
@@ -74,7 +89,7 @@ export function urlBase64ToUint8Array(base64String: string) {
       return outputArray;
     } catch (decodeError) {
       console.error('Base64 decoding error:', decodeError);
-      throw new Error(`Failed to decode VAPID key: ${decodeError.message}`);
+      throw new Error(`Failed to decode VAPID key: ${decodeError.message}. The key might be in an invalid format.`);
     }
   } catch (error) {
     console.error('Error in urlBase64ToUint8Array:', error);
