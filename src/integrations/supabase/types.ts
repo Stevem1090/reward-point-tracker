@@ -149,6 +149,27 @@ export type Database = {
         }
         Relationships: []
       }
+      reminder_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          level: string
+          message: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          level: string
+          message: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          level?: string
+          message?: string
+        }
+        Relationships: []
+      }
       reminder_notifications: {
         Row: {
           body: string | null

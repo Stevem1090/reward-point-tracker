@@ -5,6 +5,27 @@ import { getVapidPublicKey, urlBase64ToUint8Array } from '@/utils/vapidUtils';
 import { useToast } from '@/hooks/use-toast';
 import { SubscriptionResponse } from '@/types/user';
 
+// Utility function to process subscription keys
+const processSubscriptionKeys = (newSubscription: PushSubscription) => {
+  try {
+    const p256dhRaw = new Uint8Array(newSubscription.getKey('p256dh')!);
+    const authRaw = new Uint8Array(newSubscription.getKey('auth')!);
+    
+    const p256dhKey = btoa(
+      String.fromCharCode.apply(null, Array.from(p256dhRaw))
+    );
+    
+    const authKey = btoa(
+      String.fromCharCode.apply(null, Array.from(authRaw))
+    );
+    
+    return { p256dhKey, authKey };
+  } catch (keyError) {
+    console.error('Error processing subscription keys:', keyError);
+    throw new Error(`Failed to process subscription keys: ${(keyError as Error).message}`);
+  }
+};
+
 export const usePushNotifications = (initialFamilyMemberId: string) => {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
@@ -87,59 +108,22 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         console.error('Failed to retrieve VAPID public key');
         throw new Error('VAPID public key not available');
       }
-      console.log('VAPID public key retrieved, length:', publicKey.length);
 
       const existingSub = await reg.pushManager.getSubscription();
       if (existingSub) {
         console.log('Unsubscribing from existing push subscription');
         await existingSub.unsubscribe();
-        console.log('Successfully unsubscribed from existing subscription');
       }
 
-      console.log('Processing VAPID key to applicationServerKey');
-      let applicationServerKey;
-      try {
-        applicationServerKey = urlBase64ToUint8Array(publicKey);
-        console.log('ApplicationServerKey created successfully, length:', applicationServerKey.length);
-      } catch (keyError: any) {
-        console.error('Error processing VAPID key:', keyError);
-        throw new Error(`Failed to process VAPID key: ${keyError.message}`);
-      }
+      const applicationServerKey = urlBase64ToUint8Array(publicKey);
 
       console.log('Creating new push subscription');
-      let newSubscription: PushSubscription;
-      try {
-        newSubscription = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey,
-        });
-        console.log('Push subscription created successfully:', newSubscription.endpoint);
-      } catch (subscribeError: any) {
-        console.error('Error creating push subscription:', subscribeError);
-        throw new Error(`Failed to subscribe to push notifications: ${subscribeError.message}`);
-      }
+      const newSubscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
 
-      console.log('Extracting subscription keys');
-      let p256dhKey: string;
-      let authKey: string;
-      
-      try {
-        const p256dhRaw = new Uint8Array(newSubscription.getKey('p256dh')!);
-        const authRaw = new Uint8Array(newSubscription.getKey('auth')!);
-        
-        p256dhKey = btoa(
-          String.fromCharCode.apply(null, Array.from(p256dhRaw))
-        );
-        
-        authKey = btoa(
-          String.fromCharCode.apply(null, Array.from(authRaw))
-        );
-        
-        console.log('Subscription keys processed successfully');
-      } catch (keyError: any) {
-        console.error('Error processing subscription keys:', keyError);
-        throw new Error(`Failed to process subscription keys: ${keyError.message}`);
-      }
+      const { p256dhKey, authKey } = processSubscriptionKeys(newSubscription);
 
       console.log('Checking for existing subscription in database');
       const { data: existingData, error: checkError } = await supabase
@@ -168,8 +152,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
           console.error('Error updating subscription:', updateError);
           throw updateError;
         }
-      } 
-      else {
+      } else {
         console.log('Inserting new subscription to database');
         const { error: insertError } = await supabase
           .from('user_push_subscriptions')
@@ -189,7 +172,6 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         }
       }
       
-      console.log('Subscription saved successfully');
       setSubscription(newSubscription);
       if (userId === initialFamilyMemberId) {
         setIsSubscribed(true);
