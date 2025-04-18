@@ -1,14 +1,13 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Session, User, AuthError } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; data: { user: User | null } | null }>;
+  signUp: (email: string, password: string, name?: string) => Promise<{ error: AuthError | null; data: { user: User | null } | null }>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   loading: boolean;
@@ -26,7 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
+      async (event, currentSession) => {
         if (currentSession) {
           console.log('Auth state changed:', event, 'User ID:', currentSession.user?.id);
         } else {
@@ -37,6 +36,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(currentSession?.user ?? null);
         
         if (event === 'SIGNED_IN') {
+          // Ensure user profile exists when signed in
+          await ensureUserProfile(currentSession?.user);
+          
           toast({
             title: "Welcome back!",
             description: "You're now signed in",
@@ -51,26 +53,70 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
       console.log('Initial session check:', currentSession ? `User ID: ${currentSession.user?.id}` : 'No session');
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      
+      // Ensure user profile exists for existing session
+      if (currentSession?.user) {
+        await ensureUserProfile(currentSession.user);
+      }
+      
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, [toast]);
 
-  const signUp = async (email: string, password: string) => {
+  // Helper function to ensure user profile exists
+  const ensureUserProfile = async (authUser: User | null) => {
+    if (!authUser) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking user profile:', error);
+        return;
+      }
+
+      // If no profile exists, create one
+      if (!data) {
+        const { error: insertError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: authUser.id,
+            name: authUser.email?.split('@')[0] || 'User'
+          });
+
+        if (insertError) {
+          console.error('Error creating user profile:', insertError);
+          toast({
+            title: "Profile Creation Error",
+            description: "Could not create user profile",
+            variant: "destructive"
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Unexpected error in ensureUserProfile:', error);
+    }
+  };
+
+  const signUp = async (email: string, password: string, name?: string) => {
     try {
       setLoading(true);
       const result = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // Set session to expire in 30 days (1 month)
           data: {
-            session_expiry: 30
+            name // Optional name during signup
           }
         }
       });
