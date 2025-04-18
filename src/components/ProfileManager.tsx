@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, User, Trash2 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 type Props = {};
 
@@ -60,10 +61,16 @@ export const ProfileManager: React.FC<Props> = () => {
       setIsSubmitting(true);
       
       // Generate a UUID on the client-side for the profile
+      const newProfileId = uuidv4();
+      
       const { data: newMember, error } = await supabase
         .from('user_profiles')
         .insert([
-          { name: newName.trim(), color: newColor }
+          { 
+            id: newProfileId,
+            name: newName.trim(), 
+            color: newColor 
+          }
         ])
         .select()
         .single();
