@@ -1,7 +1,8 @@
+
 // Service Worker for Push Notifications
 
 // Cache name for offline content - incremented version
-const CACHE_NAME = 'family-app-cache-v5'; // Version updated to force cache refresh
+const CACHE_NAME = 'family-app-cache-v6'; // Version updated to force cache refresh
 
 // Install event - cache essential files and force activation
 self.addEventListener('install', event => {
@@ -17,9 +18,15 @@ self.addEventListener('install', event => {
         '/',
         '/index.html',
         '/favicon.ico'
-      ]);
+      ]).catch(error => {
+        console.error('[Service Worker] Cache install specific error:', error);
+        // Continue even if caching fails
+        return Promise.resolve();
+      });
     }).catch(error => {
       console.error('[Service Worker] Cache install error:', error);
+      // Continue service worker installation even if caching fails
+      return Promise.resolve();
     })
   );
 });
@@ -48,6 +55,8 @@ self.addEventListener('activate', event => {
     })
     .catch(error => {
       console.error('[Service Worker] Activation error:', error);
+      // Continue activation even if there's an error
+      return self.clients.claim();
     })
   );
 });
