@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar } from "@/components/ui/calendar";
@@ -17,8 +16,9 @@ import { useAuth } from '@/contexts/AuthContext';
 
 type UserProfile = {
   id: string;
-  name: string;
-  color: string;
+  name: string | null;
+  color: string | null;
+  created_at: string;
 };
 
 type EventType = {
@@ -56,7 +56,7 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
     title: '',
     description: '',
     start_time: initialDate,
-    end_time: new Date(initialDate.getTime() + 60 * 60 * 1000), // Default 1 hour duration
+    end_time: new Date(initialDate.getTime() + 60 * 60 * 1000),
     type: 'other',
     is_recurring: false,
     recurrence_pattern: null,
@@ -77,7 +77,6 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
   useEffect(() => {
     fetchUserProfiles();
     
-    // If we're editing an event, populate the form
     if (editEvent) {
       setEvent(editEvent);
       setStartDate(new Date(editEvent.start_time));
@@ -85,7 +84,6 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
       setStartTime(format(new Date(editEvent.start_time), 'HH:mm'));
       setEndTime(format(new Date(editEvent.end_time), 'HH:mm'));
     } else {
-      // Reset form when opening for a new event
       setEvent({
         title: '',
         description: '',
@@ -94,7 +92,7 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
         type: 'other',
         is_recurring: false,
         recurrence_pattern: null,
-        members: user ? [user.id] : [], // Default to current user
+        members: user ? [user.id] : [],
       });
       setStartDate(initialDate);
       setEndDate(new Date(initialDate.getTime() + 60 * 60 * 1000));
@@ -113,7 +111,6 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
         
       if (error) throw error;
       
-      // Add default colors if not present
       const profilesWithColors = data?.map(profile => ({
         ...profile,
         color: profile.color || '#6366f1'
@@ -143,7 +140,6 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
         return;
       }
 
-      // Combine date and time
       const startDateTime = new Date(startDate);
       const [startHours, startMinutes] = startTime.split(':').map(Number);
       startDateTime.setHours(startHours, startMinutes, 0, 0);
@@ -171,12 +167,10 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
         type: event.type,
         is_recurring: event.is_recurring,
         recurrence_pattern: event.recurrence_pattern,
-        owner_ids: event.members, // Store member IDs directly in the events table
+        owner_ids: event.members,
       };
 
-      // Insert or update the event
       if (editEvent) {
-        // Update existing event
         const { error: updateError } = await supabase
           .from('events')
           .update(eventData)
@@ -184,7 +178,6 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
           
         if (updateError) throw updateError;
       } else {
-        // Create a new event
         const { error: insertError } = await supabase
           .from('events')
           .insert(eventData);

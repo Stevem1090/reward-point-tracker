@@ -247,16 +247,19 @@ export type Database = {
       }
       user_profiles: {
         Row: {
+          color: string | null
           created_at: string
           id: string
           name: string | null
         }
         Insert: {
+          color?: string | null
           created_at?: string
           id: string
           name?: string | null
         }
         Update: {
+          color?: string | null
           created_at?: string
           id?: string
           name?: string | null

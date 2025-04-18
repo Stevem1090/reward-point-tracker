@@ -1,140 +1,144 @@
-
 import React, { useState, useEffect } from 'react';
-import { supabase } from "@/integrations/supabase/client";
-import { X, Plus, Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { Input } from "@/components/ui/input";
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { UserCircle, Loader2 } from "lucide-react";
+import { UserProfile } from '@/types/user';
 
-type UserProfile = {
-  id: string;
-  name: string;
-  color: string;
-};
+type Props = {};
 
-export const UserProfileManager = () => {
-  const [profiles, setProfiles] = useState<UserProfile[]>([]);
-  const [selectedColor, setSelectedColor] = useState('#6366f1');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
+export const UserProfileManager: React.FC<Props> = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [displayName, setDisplayName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProfiles();
-  }, []);
-
-  const fetchProfiles = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .order('name');
+    const fetchProfile = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+      
+      try {
+        setIsLoading(true);
+        setError(null);
         
-      if (error) throw error;
-      
-      // Add default color if not present
-      const profilesWithColors = data?.map(profile => ({
-        ...profile,
-        color: profile.color || '#6366f1'
-      })) || [];
-      
-      setProfiles(profilesWithColors);
-    } catch (error) {
-      console.error('Error fetching user profiles:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load user profiles",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) {
+          console.error('Error fetching profile:', error);
+          setError('Failed to load profile. Please try again later.');
+          return;
+        }
+        
+        setProfile(data as UserProfile);
+        setDisplayName(data.name || '');
+      } catch (error: any) {
+        console.error('Unexpected error:', error);
+        setError(error.message || 'An unexpected error occurred. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchProfile();
+  }, [user]);
 
-  const updateProfileColor = async (id: string, color: string) => {
-    if (!color) return;
-
+  const handleSaveProfile = async () => {
+    if (!user || !profile) return;
+    
     try {
-      setSaving(true);
+      setIsSaving(true);
+      setError(null);
+      
       const { error } = await supabase
         .from('user_profiles')
-        .update({ color })
-        .eq('id', id);
-        
+        .update({ 
+          name: displayName,
+          color: profile.color 
+        })
+        .eq('id', user.id);
+    
       if (error) throw error;
-      
-      setProfiles(profiles.map(profile => 
-        profile.id === id ? { ...profile, color } : profile
-      ));
-      
-      toast({
-        title: "Success",
-        description: "Profile color updated",
+    
+      setProfile({
+        ...profile,
+        name: displayName
       });
-    } catch (error) {
-      console.error('Error updating profile color:', error);
+    
       toast({
-        title: "Error",
-        description: "Failed to update profile color",
-        variant: "destructive",
+        title: "Profile saved",
+        description: "Your profile has been updated successfully"
+      });
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      setError('Failed to save profile. Please try again later.');
+      toast({
+        title: "Error saving profile",
+        description: "Please try again later",
+        variant: "destructive"
       });
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
   return (
     <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle className="text-kid-purple flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          User Profiles
-        </CardTitle>
-      </CardHeader>
       <CardContent>
-        {loading ? (
-          <div className="flex justify-center my-4">
+        <CardTitle className="text-kid-purple flex items-center gap-2">
+          <UserCircle className="h-5 w-5 mr-2" />
+          User Profile
+        </CardTitle>
+        {error && (
+          <div className="text-red-500 mt-4">
+            {error}
+          </div>
+        )}
+        {isLoading ? (
+          <div className="flex justify-center items-center py-4">
             <Loader2 className="animate-spin h-6 w-6 text-kid-purple" />
           </div>
         ) : (
-          <>
-            <div className="space-y-2 mb-4">
-              {profiles.length === 0 ? (
-                <p className="text-muted-foreground text-center py-2">No user profiles found</p>
-              ) : (
-                profiles.map(profile => (
-                  <div key={profile.id} className="flex items-center justify-between p-2 rounded-md bg-background border">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: profile.color }}></div>
-                      <span>{profile.name}</span>
-                      {profile.id === user?.id && (
-                        <span className="text-xs bg-kid-purple/20 text-kid-purple px-1.5 py-0.5 rounded-full">You</span>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="color"
-                        value={profile.color}
-                        onChange={(e) => updateProfileColor(profile.id, e.target.value)}
-                        className="w-8 h-8 p-1 rounded-md cursor-pointer"
-                        disabled={saving}
-                      />
-                    </div>
-                  </div>
-                ))
-              )}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" value={user?.email || ''} readOnly className="bg-gray-100" />
             </div>
-
-            <div className="mt-4 text-sm text-muted-foreground text-center">
-              <p>User profiles are created automatically when users sign up.</p>
-              <p>You can customize profile colors above.</p>
+            <div className="space-y-2">
+              <Label htmlFor="displayName">Display Name</Label>
+              <Input 
+                id="displayName" 
+                value={displayName} 
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Enter your name"
+              />
             </div>
-          </>
+            <Button 
+              onClick={handleSaveProfile} 
+              disabled={isSaving || displayName === profile?.name}
+              className="bg-kid-purple hover:bg-purple-700"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : "Save Changes"}
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>

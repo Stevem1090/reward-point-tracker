@@ -1,7 +1,7 @@
-
 export type UserProfile = {
   id: string;
   name: string | null;
+  color: string | null;
   created_at: string;
 };
 
@@ -14,7 +14,6 @@ export type UserPushSubscription = {
   created_at: string;
 };
 
-// Add a helper type for subscription responses
 export type SubscriptionResponse = {
   success: boolean;
   message: string;
