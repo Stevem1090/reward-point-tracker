@@ -23,8 +23,15 @@ import { useToast } from "./hooks/use-toast";
 
 const queryClient = new QueryClient();
 
+// Define the return type of registerServiceWorker
+interface ServiceWorkerResult {
+  success: boolean;
+  registration?: ServiceWorkerRegistration;
+  error?: Error;
+}
+
 // Create a separate function for service worker registration with enhanced error handling and timeout
-const registerServiceWorker = async () => {
+const registerServiceWorker = async (): Promise<ServiceWorkerResult> => {
   if ('serviceWorker' in navigator) {
     try {
       console.log('Starting service worker registration process...');
@@ -53,7 +60,7 @@ const registerServiceWorker = async () => {
           console.log('ServiceWorker registration successful with scope:', registration.scope);
           return { success: true, registration };
         })(),
-        new Promise((_, reject) => 
+        new Promise<ServiceWorkerResult>((_, reject) => 
           setTimeout(() => reject(new Error('Service worker registration timed out')), 5000)
         )
       ]);
@@ -73,7 +80,7 @@ const registerServiceWorker = async () => {
       return result;
     } catch (error) {
       console.error('ServiceWorker registration failed:', error);
-      return { success: false, error };
+      return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
     }
   }
   

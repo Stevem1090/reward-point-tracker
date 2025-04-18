@@ -3,13 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { SubscriptionResponse } from '@/types/user';
 
 export const useNotificationDatabase = () => {
-  // Helper function to implement timeout for database operations
+  // Helper function to implement timeout for database operations that handles Supabase queries properly
   const withTimeout = async <T>(promise: Promise<T>, timeoutMs = 5000, fallback?: T): Promise<T> => {
     try {
+      // Create a timeout promise
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Database operation timed out')), timeoutMs);
       });
       
+      // Race between the original promise and the timeout
       return await Promise.race([promise, timeoutPromise]);
     } catch (error) {
       console.error('Database operation error or timeout:', error);
@@ -27,25 +29,25 @@ export const useNotificationDatabase = () => {
     authKey: string
   ): Promise<SubscriptionResponse> => {
     try {
-      const checkExistingPromise = supabase
+      // First, execute the Supabase query and then wrap the resulting Promise in withTimeout
+      const { data: existingData, error: checkError } = await supabase
         .from('user_push_subscriptions')
         .select('id')
         .eq('user_id', userId)
         .eq('endpoint', endpoint)
         .maybeSingle();
       
-      const { data: existingData } = await withTimeout(checkExistingPromise);
+      if (checkError) throw checkError;
 
       if (existingData?.id) {
-        const updatePromise = supabase
+        const { error: updateError } = await supabase
           .from('user_push_subscriptions')
           .update({ p256dh: p256dhKey, auth: authKey })
           .eq('id', existingData.id);
           
-        const { error: updateError } = await withTimeout(updatePromise);
         if (updateError) throw updateError;
       } else {
-        const insertPromise = supabase
+        const { error: insertError } = await supabase
           .from('user_push_subscriptions')
           .insert({
             user_id: userId,
@@ -54,7 +56,6 @@ export const useNotificationDatabase = () => {
             auth: authKey,
           });
           
-        const { error: insertError } = await withTimeout(insertPromise);
         if (insertError) throw insertError;
       }
 
@@ -70,12 +71,11 @@ export const useNotificationDatabase = () => {
 
   const removeSubscriptionFromDb = async (userId: string): Promise<SubscriptionResponse> => {
     try {
-      const deletePromise = supabase
+      const { error } = await supabase
         .from('user_push_subscriptions')
         .delete()
         .eq('user_id', userId);
         
-      const { error } = await withTimeout(deletePromise);
       if (error) throw error;
       
       return { success: true, message: "Subscription removed successfully" };
@@ -90,13 +90,12 @@ export const useNotificationDatabase = () => {
 
   const checkSubscriptionExists = async (userId: string): Promise<boolean> => {
     try {
-      const checkPromise = supabase
+      const { data } = await supabase
         .from('user_push_subscriptions')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
         
-      const { data } = await withTimeout(checkPromise, 5000, { data: null });
       return !!data;
     } catch (error) {
       console.error('Error checking subscription:', error);
