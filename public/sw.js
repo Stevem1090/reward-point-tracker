@@ -2,7 +2,7 @@
 // Service Worker for Push Notifications
 
 // Cache name for offline content
-const CACHE_NAME = 'family-app-cache-v1';
+const CACHE_NAME = 'family-app-cache-v2'; // Incremented version number
 
 // Install event - cache essential files
 self.addEventListener('install', event => {
@@ -20,7 +20,7 @@ self.addEventListener('install', event => {
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and take control immediately
 self.addEventListener('activate', event => {
   console.log('Service Worker activating...');
   event.waitUntil(
@@ -29,14 +29,47 @@ self.addEventListener('activate', event => {
         cacheNames.filter(cacheName => {
           return cacheName !== CACHE_NAME;
         }).map(cacheName => {
+          console.log('Deleting outdated cache:', cacheName);
           return caches.delete(cacheName);
         })
       ).then(() => {
-        // Ensure service worker takes control of clients right away
+        console.log('Service Worker now controls all clients');
         return self.clients.claim();
       });
     })
   );
+});
+
+// Fetch event - network-first strategy for HTML and JavaScript files
+self.addEventListener('fetch', event => {
+  // Don't handle non-GET requests
+  if (event.request.method !== 'GET') return;
+  
+  // Skip cross-origin requests
+  if (!event.request.url.startsWith(self.location.origin)) return;
+  
+  // For HTML and JS files, try network first, then fallback to cache
+  const isHtmlOrJs = event.request.url.endsWith('.html') || 
+                     event.request.url.endsWith('.js') ||
+                     event.request.url.endsWith('/');
+  
+  if (isHtmlOrJs) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          // Cache the fresh response
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseClone);
+          });
+          return response;
+        })
+        .catch(() => {
+          // Fallback to cache if network fails
+          return caches.match(event.request);
+        })
+    );
+  }
 });
 
 // Push event - show notification
