@@ -362,6 +362,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      debug_test_push_notification: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_points_summary_html: {
         Args: { summary_date: string }
         Returns: string
