@@ -128,8 +128,25 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
       
       for (const state of subscriptionStates) {
         if (operation === 'subscribe' && !state.isSubscribed) {
-          const success = await subscribe(state.id);
-          if (success) {
+          const result = await subscribe(state.id);
+          
+          // Handle duplicate key error
+          if (!result.success && result.message && result.message.includes("duplicate key")) {
+            toast({
+              title: "Already Subscribed",
+              description: `User ${state.id} is already subscribed to notifications.`,
+              variant: "default"
+            });
+            
+            // Update the state without actually subscribing again
+            setSubscriptionStates(prev => 
+              prev.map(s => s.id === state.id ? { ...s, isSubscribed: true } : s)
+            );
+            onSubscriptionChange?.(state.id, true);
+            continue;
+          }
+          
+          if (result.success) {
             setSubscriptionStates(prev => 
               prev.map(s => s.id === state.id ? { ...s, isSubscribed: true } : s)
             );
@@ -145,6 +162,10 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
           }
         }
       }
+      
+      // Force refresh subscription statuses
+      await loadSubscriptions();
+      
     } catch (error) {
       console.error('Error toggling push notifications:', error);
       toast({
@@ -154,6 +175,28 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+  
+  // Add this function to reload subscription states
+  const loadSubscriptions = async () => {
+    if (userIds.length === 0) {
+      setSubscriptionStates([]);
+      return;
+    }
+    
+    try {
+      // Check subscription status for each user
+      const states = await Promise.all(
+        userIds.map(async (id) => {
+          const isSubscribed = await checkSubscriptionStatus(id);
+          return { id, isSubscribed };
+        })
+      );
+      
+      setSubscriptionStates(states);
+    } catch (error) {
+      console.error('Error refreshing subscription states:', error);
     }
   };
 

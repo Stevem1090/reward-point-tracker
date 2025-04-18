@@ -68,7 +68,21 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
       if (isSubscribed) {
         await unsubscribe();
       } else {
-        await subscribe();
+        const result = await subscribe();
+        if (!result.success) {
+          console.error("Subscription failed:", result.message);
+          
+          // Handle duplicate subscription error
+          if (result.message && result.message.includes("duplicate key")) {
+            toast({
+              title: "Already Subscribed",
+              description: "You are already subscribed to notifications on this device.",
+              variant: "default"
+            });
+            // Force refresh subscription status
+            useUserNotifications().checkSubscriptionStatus();
+          }
+        }
       }
     } catch (error) {
       console.error('Error toggling notifications:', error);
