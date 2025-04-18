@@ -14,9 +14,12 @@ interface NotificationSettingsProps {
   user: User | null;
 }
 
+// Define NotificationPermission type if it's not available
+type NotificationPermissionType = "default" | "denied" | "granted";
+
 const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => {
   const [browserSupport, setBrowserSupport] = useState(true);
-  const [permissionStatus, setPermissionStatus] = useState<PermissionState | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<NotificationPermissionType | null>(null);
   const { toast } = useToast();
   
   const { 
@@ -35,7 +38,7 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
 
     // Check current notification permission status
     if ('Notification' in window) {
-      setPermissionStatus(Notification.permission);
+      setPermissionStatus(Notification.permission as NotificationPermissionType);
     }
   }, []);
   
@@ -43,7 +46,7 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     try {
       // Request notification permission explicitly
       const permission = await Notification.requestPermission();
-      setPermissionStatus(permission);
+      setPermissionStatus(permission as NotificationPermissionType);
       
       if (permission === 'granted') {
         // Only try to subscribe if permission is granted

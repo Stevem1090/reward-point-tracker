@@ -12,6 +12,9 @@ interface PushNotificationToggleProps {
   onSubscriptionChange?: (userId: string, isSubscribed: boolean) => void;
 }
 
+// Define NotificationPermission type if it's not available
+type NotificationPermissionType = "default" | "denied" | "granted";
+
 const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({ 
   userIds,
   onSubscriptionChange 
@@ -23,7 +26,7 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
     isSubscribed: boolean;
   }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [permissionStatus, setPermissionStatus] = useState<PermissionState | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<NotificationPermissionType | null>(null);
   
   // We'll use a single instance of the hook for all operations
   const { 
@@ -37,7 +40,7 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
   useEffect(() => {
     // Check current notification permission status
     if ('Notification' in window) {
-      setPermissionStatus(Notification.permission);
+      setPermissionStatus(Notification.permission as NotificationPermissionType);
     }
   }, []);
   
@@ -89,7 +92,7 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
       // Request notification permission explicitly
       if ('Notification' in window) {
         const permission = await Notification.requestPermission();
-        setPermissionStatus(permission);
+        setPermissionStatus(permission as NotificationPermissionType);
         
         if (permission !== 'granted') {
           toast({
