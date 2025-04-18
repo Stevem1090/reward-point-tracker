@@ -24,15 +24,21 @@ serve(async (req) => {
     const requestBody = await req.json();
     console.debug("[INPUT] Raw request body:", JSON.stringify(requestBody));
 
-    const userIds = requestBody.userIds || requestBody.familyMemberIds;
+    // Extract userIds from request - check all possible properties
+    const userIds = requestBody.userIds || 
+                   requestBody.familyMemberIds || 
+                   (requestBody.userId ? [requestBody.userId] : undefined);
+                   
     const { title, body } = requestBody;
+
+    console.debug("[VALIDATION] UserIds extracted:", userIds);
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       console.warn("[VALIDATION] Invalid or missing userIds:", userIds);
       return new Response(
         JSON.stringify({ 
           status: 400,
-          message: 'Invalid or missing userIds' 
+          message: 'Invalid or missing userIds. Please provide userIds, familyMemberIds, or userId' 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
