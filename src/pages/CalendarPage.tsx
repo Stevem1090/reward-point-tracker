@@ -12,7 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { FamilyMemberManager } from "@/components/FamilyMemberManager";
+import { ProfileManager } from "@/components/ProfileManager";
 import { WeeklyCalendarView } from '@/components/calendar/WeeklyCalendarView';
 import { CalendarHeader } from '@/components/calendar/CalendarHeader';
 import { DeleteEventDialog } from '@/components/calendar/DeleteEventDialog';
@@ -76,18 +76,18 @@ const CalendarPage = () => {
           <SheetTrigger asChild>
             <Button variant="outline">
               <Settings className="h-4 w-4 mr-2" />
-              Family Members
+              User Profiles
             </Button>
           </SheetTrigger>
           <SheetContent>
             <SheetHeader>
-              <SheetTitle>Family Settings</SheetTitle>
+              <SheetTitle>Profile Settings</SheetTitle>
               <SheetDescription>
-                Manage your family members here.
+                Manage your user profiles here.
               </SheetDescription>
             </SheetHeader>
             <div className="mt-4">
-              <FamilyMemberManager />
+              <ProfileManager />
             </div>
           </SheetContent>
         </Sheet>

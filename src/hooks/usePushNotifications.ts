@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getVapidPublicKey, urlBase64ToUint8Array } from '@/utils/vapidUtils';
@@ -10,7 +11,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  const checkSubscriptionStatus = useCallback(async (familyMemberId: string) => {
+  const checkSubscriptionStatus = useCallback(async (userId: string) => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.log('Push notifications not supported in this browser');
       return false;
@@ -18,9 +19,9 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
 
     try {
       const { data } = await supabase
-        .from('push_subscriptions')
+        .from('user_push_subscriptions')
         .select('*')
-        .eq('family_member_id', familyMemberId)
+        .eq('user_id', userId)
         .maybeSingle();
 
       const reg = await navigator.serviceWorker.getRegistration();
@@ -67,7 +68,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
     loadInitialData();
   }, [initialFamilyMemberId, checkSubscriptionStatus]);
 
-  const subscribe = useCallback(async (familyMemberId: string) => {
+  const subscribe = useCallback(async (userId: string) => {
     setIsLoading(true);
     try {
       let reg = registration;
@@ -99,7 +100,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
       try {
         applicationServerKey = urlBase64ToUint8Array(publicKey);
         console.log('ApplicationServerKey created successfully, length:', applicationServerKey.length);
-      } catch (keyError) {
+      } catch (keyError: any) {
         console.error('Error processing VAPID key:', keyError);
         throw new Error(`Failed to process VAPID key: ${keyError.message}`);
       }
@@ -112,7 +113,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
           applicationServerKey,
         });
         console.log('Push subscription created successfully:', newSubscription.endpoint);
-      } catch (subscribeError) {
+      } catch (subscribeError: any) {
         console.error('Error creating push subscription:', subscribeError);
         throw new Error(`Failed to subscribe to push notifications: ${subscribeError.message}`);
       }
@@ -134,22 +135,22 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         );
         
         console.log('Subscription keys processed successfully');
-      } catch (keyError) {
+      } catch (keyError: any) {
         console.error('Error processing subscription keys:', keyError);
         throw new Error(`Failed to process subscription keys: ${keyError.message}`);
       }
 
       console.log('Checking for existing subscription in database');
       const { data: existingData } = await supabase
-        .from('push_subscriptions')
+        .from('user_push_subscriptions')
         .select('id')
-        .eq('family_member_id', familyMemberId)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (existingData?.id) {
         console.log('Updating existing subscription in database');
         const { error: updateError } = await supabase
-          .from('push_subscriptions')
+          .from('user_push_subscriptions')
           .update({
             endpoint: newSubscription.endpoint,
             p256dh: p256dhKey,
@@ -165,9 +166,9 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
       else {
         console.log('Inserting new subscription to database');
         const { error: insertError } = await supabase
-          .from('push_subscriptions')
+          .from('user_push_subscriptions')
           .insert({
-            family_member_id: familyMemberId,
+            user_id: userId,
             endpoint: newSubscription.endpoint,
             p256dh: p256dhKey,
             auth: authKey,
@@ -181,7 +182,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
       
       console.log('Subscription saved successfully');
       setSubscription(newSubscription);
-      if (familyMemberId === initialFamilyMemberId) {
+      if (userId === initialFamilyMemberId) {
         setIsSubscribed(true);
       }
       
@@ -191,7 +192,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
       });
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error subscribing to push notifications:', error);
       
       toast({
@@ -206,20 +207,20 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
     }
   }, [registration, initialFamilyMemberId, toast]);
 
-  const unsubscribe = useCallback(async (familyMemberId: string) => {
+  const unsubscribe = useCallback(async (userId: string) => {
     setIsLoading(true);
     try {
       await supabase
-        .from('push_subscriptions')
+        .from('user_push_subscriptions')
         .delete()
-        .eq('family_member_id', familyMemberId);
+        .eq('user_id', userId);
       
-      if (familyMemberId === initialFamilyMemberId) {
+      if (userId === initialFamilyMemberId) {
         setIsSubscribed(false);
       }
       
       const { count } = await supabase
-        .from('push_subscriptions')
+        .from('user_push_subscriptions')
         .select('*', { count: 'exact', head: true });
       
       if (count === 0 && subscription) {
@@ -233,7 +234,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
       });
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error unsubscribing from push notifications:', error);
       
       toast({
