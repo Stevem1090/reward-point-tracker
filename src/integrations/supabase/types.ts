@@ -33,42 +33,6 @@ export type Database = {
         }
         Relationships: []
       }
-      event_members: {
-        Row: {
-          created_at: string
-          event_id: string
-          family_member_id: string
-          id: string
-        }
-        Insert: {
-          created_at?: string
-          event_id: string
-          family_member_id: string
-          id?: string
-        }
-        Update: {
-          created_at?: string
-          event_id?: string
-          family_member_id?: string
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_members_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_members_family_member_id_fkey"
-            columns: ["family_member_id"]
-            isOneToOne: false
-            referencedRelation: "family_members"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       events: {
         Row: {
           created_at: string
@@ -105,27 +69,6 @@ export type Database = {
           start_time?: string
           title?: string
           type?: string
-        }
-        Relationships: []
-      }
-      family_members: {
-        Row: {
-          color: string
-          created_at: string
-          id: string
-          name: string
-        }
-        Insert: {
-          color: string
-          created_at?: string
-          id?: string
-          name: string
-        }
-        Update: {
-          color?: string
-          created_at?: string
-          id?: string
-          name?: string
         }
         Relationships: []
       }
@@ -169,7 +112,6 @@ export type Database = {
           auth: string
           created_at: string
           endpoint: string
-          family_member_id: string | null
           id: string
           p256dh: string
         }
@@ -177,7 +119,6 @@ export type Database = {
           auth: string
           created_at?: string
           endpoint: string
-          family_member_id?: string | null
           id?: string
           p256dh: string
         }
@@ -185,19 +126,10 @@ export type Database = {
           auth?: string
           created_at?: string
           endpoint?: string
-          family_member_id?: string | null
           id?: string
           p256dh?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "push_subscriptions_family_member_id_fkey"
-            columns: ["family_member_id"]
-            isOneToOne: false
-            referencedRelation: "family_members"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       reminder_notifications: {
         Row: {
@@ -246,6 +178,13 @@ export type Database = {
           reminder_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "reminder_owners_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "reminder_owners_reminder_id_fkey"
             columns: ["reminder_id"]

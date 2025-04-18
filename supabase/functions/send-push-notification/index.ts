@@ -68,12 +68,11 @@ serve(async (req) => {
     }
 
     const requestBody = await req.json();
-    const { userId, userIds, familyMemberIds, title, body } = requestBody;
+    const { userId, userIds, title, body } = requestBody;
     
     console.log("Request body:", JSON.stringify({
       hasUserId: !!userId,
       hasUserIds: !!userIds && Array.isArray(userIds),
-      hasFamilyMemberIds: !!familyMemberIds && Array.isArray(familyMemberIds),
       title,
       bodyLength: body?.length
     }));
@@ -89,13 +88,9 @@ serve(async (req) => {
       // Multiple users notification
       targetUserIds = userIds;
       console.log(`Sending push notification to ${targetUserIds.length} users`);
-    } else if (familyMemberIds && Array.isArray(familyMemberIds)) {
-      // If family member IDs are provided instead of user IDs (for backward compatibility)
-      targetUserIds = familyMemberIds;
-      console.log(`Sending push notification to ${targetUserIds.length} family members`);
     } else {
       return new Response(
-        JSON.stringify({ error: 'Either userId, userIds, or familyMemberIds must be provided' }),
+        JSON.stringify({ error: 'Either userId or userIds must be provided' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -103,33 +98,12 @@ serve(async (req) => {
       );
     }
 
-    // Fetch subscriptions for specific users
-    let subscriptions;
-    let error;
-    
-    // Try to get subscriptions from user_push_subscriptions first (for authenticated users)
-    if (userId || userIds) {
-      console.log(`Fetching subscriptions for ${targetUserIds.length} users from user_push_subscriptions`);
-      const result = await supabase
-        .from('user_push_subscriptions')
-        .select('*')
-        .in('user_id', targetUserIds);
-      
-      subscriptions = result.data;
-      error = result.error;
-    }
-    
-    // If no subscriptions found or we're looking for family members, try the push_subscriptions table
-    if ((!subscriptions || subscriptions.length === 0) && familyMemberIds) {
-      console.log(`Fetching subscriptions for ${familyMemberIds.length} family members from push_subscriptions`);
-      const result = await supabase
-        .from('push_subscriptions')
-        .select('*')
-        .in('family_member_id', familyMemberIds);
-      
-      subscriptions = result.data;
-      error = result.error;
-    }
+    // Fetch subscriptions for specific users from user_push_subscriptions
+    console.log(`Fetching subscriptions for ${targetUserIds.length} users from user_push_subscriptions`);
+    const { data: subscriptions, error } = await supabase
+      .from('user_push_subscriptions')
+      .select('*')
+      .in('user_id', targetUserIds);
 
     if (error) {
       console.error('Error fetching subscriptions:', error);
@@ -164,7 +138,7 @@ serve(async (req) => {
           JSON.stringify({ 
             title, 
             body,
-            userId: subscription.user_id || subscription.family_member_id 
+            userId: subscription.user_id
           })
         );
         
@@ -173,7 +147,7 @@ serve(async (req) => {
         return { 
           success: true, 
           endpoint: subscription.endpoint, 
-          userId: subscription.user_id || subscription.family_member_id
+          userId: subscription.user_id
         };
       } catch (error) {
         console.error(`Error sending to ${subscription.endpoint}:`, error);
@@ -182,18 +156,11 @@ serve(async (req) => {
         if (error.statusCode === 404 || error.statusCode === 410) {
           console.log(`Subscription appears to be invalid, removing: ${subscription.endpoint}`);
           try {
-            // Remove invalid subscription from appropriate table
-            if (subscription.user_id) {
-              await supabase
-                .from('user_push_subscriptions')
-                .delete()
-                .eq('endpoint', subscription.endpoint);
-            } else if (subscription.family_member_id) {
-              await supabase
-                .from('push_subscriptions')
-                .delete()
-                .eq('endpoint', subscription.endpoint);
-            }
+            // Remove invalid subscription 
+            await supabase
+              .from('user_push_subscriptions')
+              .delete()
+              .eq('endpoint', subscription.endpoint);
           } catch (deleteError) {
             console.error('Error removing invalid subscription:', deleteError);
           }
@@ -202,7 +169,7 @@ serve(async (req) => {
         return { 
           success: false, 
           endpoint: subscription.endpoint, 
-          userId: subscription.user_id || subscription.family_member_id, 
+          userId: subscription.user_id, 
           error: error.message,
           statusCode: error.statusCode
         };

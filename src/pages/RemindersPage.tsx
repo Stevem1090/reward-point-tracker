@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import PushNotificationToggle from '@/components/PushNotificationToggle';
 import { useToast } from '@/hooks/use-toast';
 import { sendPushNotification } from '@/utils/vapidUtils';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Reminder = {
   id: string;
@@ -21,7 +23,7 @@ type Reminder = {
 
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-type FamilyMember = {
+type UserProfile = {
   id: string;
   name: string;
   color: string;
@@ -35,13 +37,14 @@ const RemindersPage = () => {
     days: [] as string[]
   });
   const [isAddingReminder, setIsAddingReminder] = useState(false);
-  const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<string[]>([]);
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   const [isEnablingReminders, setIsEnablingReminders] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
   
   useEffect(() => {
-    fetchFamilyMembers();
+    fetchUserProfiles();
     fetchReminders();
   }, []);
 
@@ -78,20 +81,32 @@ const RemindersPage = () => {
     }
   };
 
-  const fetchFamilyMembers = async () => {
+  const fetchUserProfiles = async () => {
     try {
       const { data, error } = await supabase
-        .from('family_members')
+        .from('user_profiles')
         .select('*')
         .order('name');
         
       if (error) throw error;
-      setFamilyMembers(data || []);
+      
+      // Add default colors if not present
+      const profilesWithColors = data?.map(profile => ({
+        ...profile,
+        color: profile.color || '#6366f1'
+      })) || [];
+      
+      setUserProfiles(profilesWithColors);
+      
+      // Auto-select current user if logged in
+      if (user && !selectedUsers.includes(user.id)) {
+        setSelectedUsers([user.id]);
+      }
     } catch (error) {
-      console.error('Error fetching family members:', error);
+      console.error('Error fetching user profiles:', error);
       toast({
         title: "Error",
-        description: "Failed to load family members",
+        description: "Failed to load user profiles",
         variant: "destructive",
       });
     }
@@ -123,10 +138,10 @@ const RemindersPage = () => {
 
       if (reminderError) throw reminderError;
 
-      if (selectedFamilyMembers.length > 0) {
-        const ownerInserts = selectedFamilyMembers.map(memberId => ({
+      if (selectedUsers.length > 0) {
+        const ownerInserts = selectedUsers.map(userId => ({
           reminder_id: reminderData.id,
-          owner_id: memberId
+          owner_id: userId
         }));
 
         const { error: ownerError } = await supabase
@@ -139,7 +154,7 @@ const RemindersPage = () => {
       await fetchReminders();
 
       setNewReminder({ title: "", time: "12:00", days: [] });
-      setSelectedFamilyMembers([]);
+      setSelectedUsers(user ? [user.id] : []);  // Reset to just current user
       setIsAddingReminder(false);
 
       toast({
@@ -216,31 +231,31 @@ const RemindersPage = () => {
     return format(date, 'h:mm a');
   };
 
-  const handleSubscriptionChange = (memberId: string, isSubscribed: boolean) => {
-    console.log(`Family member ${memberId} notification status: ${isSubscribed}`);
+  const handleSubscriptionChange = (userId: string, isSubscribed: boolean) => {
+    console.log(`User ${userId} notification status: ${isSubscribed}`);
   };
 
   const handleEnableReminders = async () => {
     try {
       setIsEnablingReminders(true);
       
-      let targetMembers = selectedFamilyMembers;
-      if (targetMembers.length === 0 && familyMembers.length > 0) {
-        targetMembers = familyMembers.map(member => member.id);
-        setSelectedFamilyMembers(targetMembers);
+      let targetUsers = selectedUsers;
+      if (targetUsers.length === 0 && user) {
+        targetUsers = [user.id];
+        setSelectedUsers(targetUsers);
       }
 
-      if (targetMembers.length === 0) {
+      if (targetUsers.length === 0) {
         toast({
-          title: "No family members available",
-          description: "Please add family members first to enable notifications",
+          title: "No users selected",
+          description: "Please select users to enable notifications for",
           variant: "destructive",
         });
         return;
       }
 
       await sendPushNotification(
-        targetMembers,
+        targetUsers,
         "Reminders Enabled",
         "You'll now receive notifications for your reminders!"
       );
@@ -271,14 +286,14 @@ const RemindersPage = () => {
       </h1>
       <div className="flex justify-center mb-6 gap-2">
         <PushNotificationToggle 
-          familyMemberIds={selectedFamilyMembers} 
+          userIds={selectedUsers} 
           onSubscriptionChange={handleSubscriptionChange}
         />
         <Button 
           variant="default" 
           className="bg-kid-purple hover:bg-kid-purple/90 gap-2"
           onClick={handleEnableReminders}
-          disabled={isEnablingReminders || selectedFamilyMembers.length === 0}
+          disabled={isEnablingReminders || selectedUsers.length === 0}
         >
           {isEnablingReminders ? (
             <>
@@ -352,27 +367,28 @@ const RemindersPage = () => {
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium mb-1 block">Assign to Family Members</label>
+                      <label className="text-sm font-medium mb-1 block">Assign to Users</label>
                       <div className="flex flex-wrap gap-1">
-                        {familyMembers.map(member => (
+                        {userProfiles.map(profile => (
                           <Badge 
-                            key={member.id}
-                            variant={selectedFamilyMembers.includes(member.id) ? "default" : "outline"}
+                            key={profile.id}
+                            variant={selectedUsers.includes(profile.id) ? "default" : "outline"}
                             className="cursor-pointer"
                             onClick={() => {
-                              setSelectedFamilyMembers(prev => 
-                                prev.includes(member.id) 
-                                  ? prev.filter(id => id !== member.id)
-                                  : [...prev, member.id]
+                              setSelectedUsers(prev => 
+                                prev.includes(profile.id) 
+                                  ? prev.filter(id => id !== profile.id)
+                                  : [...prev, profile.id]
                               );
                             }}
                             style={{
-                              backgroundColor: selectedFamilyMembers.includes(member.id) ? member.color : 'transparent',
-                              color: selectedFamilyMembers.includes(member.id) ? 'white' : 'inherit',
-                              borderColor: member.color
+                              backgroundColor: selectedUsers.includes(profile.id) ? profile.color : 'transparent',
+                              color: selectedUsers.includes(profile.id) ? 'white' : 'inherit',
+                              borderColor: profile.color
                             }}
                           >
-                            {member.name}
+                            {profile.name}
+                            {profile.id === user?.id && " (You)"}
                           </Badge>
                         ))}
                       </div>
@@ -407,18 +423,19 @@ const RemindersPage = () => {
                         {reminder.owner_ids && reminder.owner_ids.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {reminder.owner_ids.map(ownerId => {
-                              const member = familyMembers.find(m => m.id === ownerId);
-                              return member ? (
+                              const profile = userProfiles.find(p => p.id === ownerId);
+                              return profile ? (
                                 <Badge
                                   key={ownerId}
                                   variant="secondary"
                                   style={{
-                                    backgroundColor: `${member.color}20`,
-                                    color: member.color,
-                                    borderColor: `${member.color}40`
+                                    backgroundColor: `${profile.color}20`,
+                                    color: profile.color,
+                                    borderColor: `${profile.color}40`
                                   }}
                                 >
-                                  {member.name}
+                                  {profile.name}
+                                  {profile.id === user?.id && " (You)"}
                                 </Badge>
                               ) : null;
                             })}

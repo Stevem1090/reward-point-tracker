@@ -13,8 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { useAuth } from '@/contexts/AuthContext';
 
-type FamilyMember = {
+type UserProfile = {
   id: string;
   name: string;
   color: string;
@@ -66,14 +67,15 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
   const [startTime, setStartTime] = useState<string>(format(initialDate, 'HH:mm'));
   const [endDate, setEndDate] = useState<Date>(new Date(initialDate.getTime() + 60 * 60 * 1000));
   const [endTime, setEndTime] = useState<string>(format(new Date(initialDate.getTime() + 60 * 60 * 1000), 'HH:mm'));
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fetchingMembers, setFetchingMembers] = useState(true);
+  const [fetchingProfiles, setFetchingProfiles] = useState(true);
+  const { user } = useAuth();
   
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchFamilyMembers();
+    fetchUserProfiles();
     
     // If we're editing an event, populate the form
     if (editEvent) {
@@ -92,34 +94,41 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
         type: 'other',
         is_recurring: false,
         recurrence_pattern: null,
-        members: [],
+        members: user ? [user.id] : [], // Default to current user
       });
       setStartDate(initialDate);
       setEndDate(new Date(initialDate.getTime() + 60 * 60 * 1000));
       setStartTime(format(initialDate, 'HH:mm'));
       setEndTime(format(new Date(initialDate.getTime() + 60 * 60 * 1000), 'HH:mm'));
     }
-  }, [isOpen, initialDate, editEvent]);
+  }, [isOpen, initialDate, editEvent, user]);
 
-  const fetchFamilyMembers = async () => {
+  const fetchUserProfiles = async () => {
     try {
-      setFetchingMembers(true);
+      setFetchingProfiles(true);
       const { data, error } = await supabase
-        .from('family_members')
+        .from('user_profiles')
         .select('*')
         .order('name');
         
       if (error) throw error;
-      setFamilyMembers(data || []);
+      
+      // Add default colors if not present
+      const profilesWithColors = data?.map(profile => ({
+        ...profile,
+        color: profile.color || '#6366f1'
+      })) || [];
+      
+      setUserProfiles(profilesWithColors);
     } catch (error) {
-      console.error('Error fetching family members:', error);
+      console.error('Error fetching user profiles:', error);
       toast({
         title: "Error",
-        description: "Failed to load family members",
+        description: "Failed to load user profiles",
         variant: "destructive",
       });
     } finally {
-      setFetchingMembers(false);
+      setFetchingProfiles(false);
     }
   };
 
@@ -162,9 +171,8 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
         type: event.type,
         is_recurring: event.is_recurring,
         recurrence_pattern: event.recurrence_pattern,
+        owner_ids: event.members, // Store member IDs directly in the events table
       };
-
-      let eventId = event.id;
 
       // Insert or update the event
       if (editEvent) {
@@ -177,40 +185,11 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
         if (updateError) throw updateError;
       } else {
         // Create a new event
-        const { data: newEvent, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('events')
-          .insert(eventData)
-          .select();
+          .insert(eventData);
           
         if (insertError) throw insertError;
-        eventId = newEvent[0].id;
-      }
-
-      // Handle family member assignments
-      if (eventId) {
-        // First, delete existing assignments if editing
-        if (editEvent) {
-          const { error: deleteError } = await supabase
-            .from('event_members')
-            .delete()
-            .eq('event_id', eventId);
-            
-          if (deleteError) throw deleteError;
-        }
-
-        // Then add new assignments
-        if (event.members.length > 0) {
-          const memberInserts = event.members.map(memberId => ({
-            event_id: eventId,
-            family_member_id: memberId
-          }));
-
-          const { error: memberError } = await supabase
-            .from('event_members')
-            .insert(memberInserts);
-            
-          if (memberError) throw memberError;
-        }
       }
 
       toast({
@@ -232,19 +211,19 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
     }
   };
 
-  const handleMemberToggle = (memberId: string) => {
+  const handleMemberToggle = (profileId: string) => {
     setEvent(prev => {
-      const isSelected = prev.members.includes(memberId);
+      const isSelected = prev.members.includes(profileId);
       
       if (isSelected) {
         return {
           ...prev,
-          members: prev.members.filter(id => id !== memberId)
+          members: prev.members.filter(id => id !== profileId)
         };
       } else {
         return {
           ...prev,
-          members: [...prev.members, memberId]
+          members: [...prev.members, profileId]
         };
       }
     });
@@ -373,23 +352,26 @@ export function EventForm({ isOpen, onClose, initialDate = new Date(), editEvent
           )}
 
           <div className="grid gap-2">
-            <Label>Family Members</Label>
-            {fetchingMembers ? (
+            <Label>Participants</Label>
+            {fetchingProfiles ? (
               <div className="flex justify-center p-2">
                 <Loader2 className="animate-spin h-4 w-4" />
               </div>
-            ) : familyMembers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No family members found. Add some in settings.</p>
+            ) : userProfiles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No users found.</p>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                {familyMembers.map(member => (
+                {userProfiles.map(profile => (
                   <div 
-                    key={member.id}
-                    className={`flex items-center gap-2 p-2 rounded-md cursor-pointer border ${event.members.includes(member.id) ? 'border-kid-purple bg-purple-50' : 'border-gray-200'}`}
-                    onClick={() => handleMemberToggle(member.id)}
+                    key={profile.id}
+                    className={`flex items-center gap-2 p-2 rounded-md cursor-pointer border ${event.members.includes(profile.id) ? 'border-kid-purple bg-purple-50' : 'border-gray-200'}`}
+                    onClick={() => handleMemberToggle(profile.id)}
                   >
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: member.color }}></div>
-                    <span className="text-sm">{member.name}</span>
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: profile.color }}></div>
+                    <span className="text-sm">{profile.name}</span>
+                    {profile.id === user?.id && (
+                      <span className="text-xs bg-kid-purple/20 text-kid-purple px-1.5 py-0.5 rounded-full">You</span>
+                    )}
                   </div>
                 ))}
               </div>

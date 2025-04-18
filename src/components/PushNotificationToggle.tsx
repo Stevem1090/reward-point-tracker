@@ -7,12 +7,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from "@/components/ui/badge";
 
 interface PushNotificationToggleProps {
-  familyMemberIds: string[];
-  onSubscriptionChange?: (memberId: string, isSubscribed: boolean) => void;
+  userIds: string[];
+  onSubscriptionChange?: (userId: string, isSubscribed: boolean) => void;
 }
 
 const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({ 
-  familyMemberIds,
+  userIds,
   onSubscriptionChange 
 }) => {
   const { toast } = useToast();
@@ -35,7 +35,7 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
   // Handle loading subscriptions status
   useEffect(() => {
     const loadSubscriptions = async () => {
-      if (familyMemberIds.length === 0) {
+      if (userIds.length === 0) {
         setSubscriptionStates([]);
         setIsLoading(false);
         return;
@@ -44,9 +44,9 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
       try {
         setIsLoading(true);
         
-        // Check subscription status for each family member
+        // Check subscription status for each user
         const states = await Promise.all(
-          familyMemberIds.map(async (id) => {
+          userIds.map(async (id) => {
             const isSubscribed = await checkSubscriptionStatus(id);
             return { id, isSubscribed };
           })
@@ -66,7 +66,7 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
     };
     
     loadSubscriptions();
-  }, [familyMemberIds, checkSubscriptionStatus, toast]);
+  }, [userIds, checkSubscriptionStatus, toast]);
 
   const allSubscribed = subscriptionStates.length > 0 && subscriptionStates.every(state => state.isSubscribed);
   const someSubscribed = subscriptionStates.some(state => state.isSubscribed);
@@ -109,11 +109,11 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
     }
   };
 
-  if (familyMemberIds.length === 0) {
+  if (userIds.length === 0) {
     return (
       <Button variant="outline" disabled className="gap-2">
         <BellOff className="h-4 w-4" />
-        Select family members
+        Select users
       </Button>
     );
   }
@@ -147,7 +147,7 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
         </>
       )}
       <Badge variant="secondary" className="ml-2">
-        {familyMemberIds.length}
+        {userIds.length}
       </Badge>
     </Button>
   );
