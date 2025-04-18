@@ -1,12 +1,13 @@
-
 // Service Worker for Push Notifications
 
-// Cache name for offline content
-const CACHE_NAME = 'family-app-cache-v4'; // Incremented version number
+// Cache name for offline content - incremented version
+const CACHE_NAME = 'family-app-cache-v5'; // Version updated to force cache refresh
 
-// Install event - cache essential files
+// Install event - cache essential files and force activation
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Installing...');
+  console.log('[Service Worker] Installing new version...');
+  
+  // Force this service worker to become active immediately
   self.skipWaiting();
   
   event.waitUntil(
@@ -25,8 +26,11 @@ self.addEventListener('install', event => {
 
 // Activate event - clean up old caches and take control immediately
 self.addEventListener('activate', event => {
-  console.log('[Service Worker] Activating...');
+  console.log('[Service Worker] Activating new version...');
+  
+  // Use waitUntil to ensure activation completes before fetch events
   event.waitUntil(
+    // Delete old cache versions
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.filter(cacheName => {
@@ -35,34 +39,38 @@ self.addEventListener('activate', event => {
           console.log('[Service Worker] Deleting outdated cache:', cacheName);
           return caches.delete(cacheName);
         })
-      ).then(() => {
-        console.log('[Service Worker] Now controls all clients');
-        return self.clients.claim();
-      }).catch(error => {
-        console.error('[Service Worker] Activation error:', error);
-      });
+      );
+    })
+    .then(() => {
+      // Take control of all clients immediately
+      console.log('[Service Worker] Now controlling all clients');
+      return self.clients.claim();
+    })
+    .catch(error => {
+      console.error('[Service Worker] Activation error:', error);
     })
   );
 });
 
-// Fetch event - network-first strategy for HTML and JavaScript files
+// Fetch event - network-first strategy with improved reliability
 self.addEventListener('fetch', event => {
-  // Don't handle non-GET requests
+  // Skip non-GET requests
   if (event.request.method !== 'GET') return;
   
   // Skip cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) return;
   
-  // For HTML and JS files, try network first, then fallback to cache
+  // Always network-first for HTML and JS files, which ensures fresh content
   const isHtmlOrJs = event.request.url.endsWith('.html') || 
                      event.request.url.endsWith('.js') ||
-                     event.request.url.endsWith('/');
+                     event.request.url.endsWith('/') ||
+                     event.request.url.includes('/assets/');
   
   if (isHtmlOrJs) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
-          // Cache the fresh response
+          // Cache the fresh network response
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then(cache => {
             cache.put(event.request, responseClone);
@@ -73,21 +81,74 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => {
           console.log('[Service Worker] Falling back to cache for:', event.request.url);
+          // Attempt to serve from cache if network request fails
           return caches.match(event.request).then(cachedResponse => {
+            // If we have a cached version, return it
             if (cachedResponse) {
               return cachedResponse;
             }
+            
+            // Otherwise return a simple offline message
             console.warn('[Service Worker] No cache found for:', event.request.url);
-            // If we don't have a cache, return a simple offline page
-            return new Response('You are offline and this resource is not cached.', {
-              status: 503,
-              statusText: 'Service Unavailable',
-              headers: new Headers({
-                'Content-Type': 'text/plain'
-              })
-            });
+            if (event.request.url.includes('.html') || event.request.url.endsWith('/')) {
+              return new Response(
+                `<!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="utf-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1">
+                  <title>Offline</title>
+                  <style>
+                    body { font-family: sans-serif; padding: 20px; text-align: center; }
+                    .offline-message { max-width: 400px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }
+                    button { padding: 10px 20px; background: #4a76a8; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                  </style>
+                </head>
+                <body>
+                  <div class="offline-message">
+                    <h2>You're offline</h2>
+                    <p>The app is currently unavailable. Please check your internet connection.</p>
+                    <button onclick="window.location.reload()">Try Again</button>
+                  </div>
+                </body>
+                </html>`, 
+                {
+                  status: 503,
+                  statusText: 'Service Unavailable',
+                  headers: new Headers({
+                    'Content-Type': 'text/html'
+                  })
+                }
+              );
+            } else {
+              return new Response('You are offline and this resource is not cached.', {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: new Headers({
+                  'Content-Type': 'text/plain'
+                })
+              });
+            }
           });
         })
+    );
+  } else {
+    // For non-HTML/JS assets, try cache first, then network
+    event.respondWith(
+      caches.match(event.request).then(cachedResponse => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(event.request)
+          .then(response => {
+            // Cache the response for next time
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseClone);
+            });
+            return response;
+          });
+      })
     );
   }
 });
@@ -195,5 +256,21 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
     console.log('[Service Worker] Skip waiting and activate immediately');
+  } else if (event.data && event.data.type === 'CLEAR_CACHES') {
+    // Handle explicit cache clearing request
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          console.log('[Service Worker] Clearing cache by request:', cacheName);
+          return caches.delete(cacheName);
+        })
+      );
+    }).then(() => {
+      // Return confirmation if possible
+      if (event.source && event.source.postMessage) {
+        event.source.postMessage({ type: 'CACHES_CLEARED' });
+      }
+      console.log('[Service Worker] All caches cleared by request');
+    });
   }
 });
