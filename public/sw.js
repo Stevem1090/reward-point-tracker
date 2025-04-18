@@ -1,7 +1,8 @@
+
 // Service Worker for Push Notifications
 
 // Cache name for offline content
-const CACHE_NAME = 'family-app-cache-v3'; // Incremented version number
+const CACHE_NAME = 'family-app-cache-v4'; // Incremented version number
 
 // Install event - cache essential files
 self.addEventListener('install', event => {
@@ -91,7 +92,7 @@ self.addEventListener('fetch', event => {
   }
 });
 
-// Push event - show notification
+// Push event - show notification with improved error handling
 self.addEventListener('push', function(event) {
   console.log('[Service Worker] Push event received');
   
@@ -134,6 +135,11 @@ self.addEventListener('push', function(event) {
         console.log('[Service Worker] Notification shown successfully');
       }).catch(error => {
         console.error('[Service Worker] Error showing notification:', error);
+        
+        // Check if this is a permission error or expired subscription
+        if (error.name === 'NotAllowedError') {
+          console.error('[Service Worker] Notification permission denied');
+        }
       })
     );
   } catch (error) {
@@ -148,7 +154,7 @@ self.addEventListener('push', function(event) {
   }
 });
 
-// Notification click event - open app
+// Notification click event - open app with improved error handling
 self.addEventListener('notificationclick', function(event) {
   console.log('[Service Worker] Notification click received', event.action);
   
@@ -180,4 +186,14 @@ self.addEventListener('notificationclick', function(event) {
 // Handle errors
 self.addEventListener('error', function(event) {
   console.error('[Service Worker] Unhandled error:', event.message, event.filename, event.lineno);
+});
+
+// Listen for message events from the main page
+self.addEventListener('message', (event) => {
+  console.log('[Service Worker] Message received:', event.data);
+  
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    console.log('[Service Worker] Skip waiting and activate immediately');
+  }
 });

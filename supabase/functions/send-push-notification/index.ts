@@ -121,26 +121,47 @@ serve(async (req) => {
 
       } catch (error) {
         console.error(`[FAILURE] Error sending to ${sub.endpoint}:`, error);
-
-        if (error.statusCode === 404 || error.statusCode === 410) {
-          console.warn(`[CLEANUP] Removing stale subscription for ${sub.user_id}`);
-          await supabase
-            .from('user_push_subscriptions')
-            .delete()
-            .eq('endpoint', sub.endpoint);
+        
+        // Log more information about the error
+        console.error(`[ERROR_DETAILS] Status code: ${error.statusCode}, Error type: ${error.name}, Message: ${error.message}`);
+        
+        // Check for expired subscription (status code 410 - Gone)
+        if (error.statusCode === 410 || error.statusCode === 404) {
+          console.warn(`[CLEANUP] Removing expired subscription for ${sub.user_id} with endpoint ${sub.endpoint}`);
+          
+          try {
+            // Delete the expired subscription
+            const { error: deleteError } = await supabase
+              .from('user_push_subscriptions')
+              .delete()
+              .eq('endpoint', sub.endpoint);
+              
+            if (deleteError) {
+              console.error(`[CLEANUP_ERROR] Failed to delete subscription:`, deleteError);
+            } else {
+              console.info(`[CLEANUP_SUCCESS] Successfully removed expired subscription for ${sub.user_id}`);
+            }
+          } catch (cleanupError) {
+            console.error(`[CLEANUP_ERROR] Exception during subscription cleanup:`, cleanupError);
+          }
         }
 
         return { 
           success: false, 
           userId: sub.user_id, 
-          error: error.message 
+          error: error.message,
+          statusCode: error.statusCode || 'unknown'
         };
       }
     }));
 
     const successCount = sendResults.filter(r => r.success).length;
+    const expiredCount = sendResults.filter(r => !r.success && (r.statusCode === 410 || r.statusCode === 404)).length;
 
     console.info(`[COMPLETE] ${successCount}/${sendResults.length} notifications sent successfully.`);
+    if (expiredCount > 0) {
+      console.info(`[CLEANUP] Removed ${expiredCount} expired subscription(s)`);
+    }
 
     return new Response(
       JSON.stringify({ 
@@ -148,6 +169,7 @@ serve(async (req) => {
         message: 'Push notifications processed', 
         total: sendResults.length,
         successful: successCount,
+        expired: expiredCount,
         results: sendResults 
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

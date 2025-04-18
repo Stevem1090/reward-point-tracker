@@ -18,7 +18,7 @@ import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { Button } from "./components/ui/button";
-import { Trash2 } from "lucide-react";
+import { RefreshCw, Trash2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +60,7 @@ const registerServiceWorker = async () => {
 const App = () => {
   const [swRegistered, setSwRegistered] = useState(false);
   const [showClearCacheButton, setShowClearCacheButton] = useState(false);
+  const [isRefreshingSubscriptions, setIsRefreshingSubscriptions] = useState(false);
   
   // Clear all caches function
   const clearAllCaches = async () => {
@@ -74,6 +75,61 @@ const App = () => {
       }
     } catch (error) {
       console.error('Error clearing caches:', error);
+    }
+  };
+
+  // Force Service Worker to update
+  const updateServiceWorker = async () => {
+    if (!('serviceWorker' in navigator)) return;
+    
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      if (registrations.length > 0) {
+        // Send message to skip waiting
+        registrations.forEach(registration => {
+          if (registration.waiting) {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+        
+        console.log('Service worker update requested');
+      }
+      
+      // Re-register the service worker
+      await registerServiceWorker();
+      
+    } catch (error) {
+      console.error('Error updating service worker:', error);
+    }
+  };
+  
+  // Refresh push notification subscriptions
+  const refreshSubscriptions = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.log('Push notifications not supported');
+      return;
+    }
+    
+    try {
+      setIsRefreshingSubscriptions(true);
+      
+      // First update the service worker
+      await updateServiceWorker();
+      
+      // Check for stale subscriptions and clean them up
+      // This will be handled in the useUserNotifications hook when users visit pages
+      // that use push notifications
+      
+      console.log('Push notification subscriptions refresh initiated');
+      
+      // Brief delay to allow state to update
+      setTimeout(() => {
+        setIsRefreshingSubscriptions(false);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error refreshing push subscriptions:', error);
+      setIsRefreshingSubscriptions(false);
     }
   };
   
@@ -107,7 +163,7 @@ const App = () => {
             <div className="min-h-screen flex flex-col">
               <NavBar />
               {showClearCacheButton && (
-                <div className="bg-amber-100 p-2 flex justify-center items-center">
+                <div className="bg-amber-100 p-2 flex justify-center items-center gap-2">
                   <p className="text-amber-800 text-sm mr-2">Having trouble loading the app?</p>
                   <Button 
                     variant="outline" 
@@ -116,6 +172,16 @@ const App = () => {
                     onClick={clearAllCaches}
                   >
                     <Trash2 className="h-4 w-4 mr-1" /> Clear Cache
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-amber-800 border-amber-800 hover:bg-amber-800 hover:text-white"
+                    onClick={refreshSubscriptions}
+                    disabled={isRefreshingSubscriptions}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshingSubscriptions ? 'animate-spin' : ''}`} /> 
+                    {isRefreshingSubscriptions ? 'Refreshing...' : 'Refresh Notifications'}
                   </Button>
                 </div>
               )}
