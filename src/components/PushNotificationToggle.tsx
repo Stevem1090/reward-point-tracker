@@ -1,10 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Bell, BellOff, Loader2 } from 'lucide-react';
+import { Bell, BellOff, Loader2, AlertCircle } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PushNotificationToggleProps {
   userIds: string[];
@@ -22,6 +23,7 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
     isSubscribed: boolean;
   }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [permissionStatus, setPermissionStatus] = useState<PermissionState | null>(null);
   
   // We'll use a single instance of the hook for all operations
   const { 
@@ -31,6 +33,13 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
     unsubscribe,
     checkSubscriptionStatus
   } = usePushNotifications("");  // Empty string as initial value
+  
+  useEffect(() => {
+    // Check current notification permission status
+    if ('Notification' in window) {
+      setPermissionStatus(Notification.permission);
+    }
+  }, []);
   
   // Handle loading subscriptions status
   useEffect(() => {
@@ -70,6 +79,42 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
 
   const allSubscribed = subscriptionStates.length > 0 && subscriptionStates.every(state => state.isSubscribed);
   const someSubscribed = subscriptionStates.some(state => state.isSubscribed);
+
+  const handleRequestPermission = async () => {
+    if (isProcessing || isLoading) return;
+    
+    try {
+      setIsProcessing(true);
+      
+      // Request notification permission explicitly
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        setPermissionStatus(permission);
+        
+        if (permission !== 'granted') {
+          toast({
+            title: "Permission Denied",
+            description: "You need to allow notifications in your browser settings to receive reminders.",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+      
+      // Continue with subscription if permission is granted
+      await handleToggleAll();
+      
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      toast({
+        title: "Error",
+        description: "Failed to request notification permission",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleToggleAll = async () => {
     if (isProcessing || isLoading) return;
@@ -114,6 +159,44 @@ const PushNotificationToggle: React.FC<PushNotificationToggleProps> = ({
       <Button variant="outline" disabled className="gap-2">
         <BellOff className="h-4 w-4" />
         Select users
+      </Button>
+    );
+  }
+  
+  if (permissionStatus === 'denied') {
+    return (
+      <Alert variant="destructive" className="max-w-md">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Notifications are blocked. Please enable them in your browser settings.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  // If permission hasn't been granted yet, show a request button
+  if (permissionStatus === 'default') {
+    return (
+      <Button
+        variant="outline"
+        onClick={handleRequestPermission}
+        disabled={isProcessing}
+        className="gap-2"
+      >
+        {isProcessing ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          <>
+            <Bell className="h-4 w-4" />
+            Enable Notifications
+            <Badge variant="secondary" className="ml-2">
+              {userIds.length}
+            </Badge>
+          </>
+        )}
       </Button>
     );
   }

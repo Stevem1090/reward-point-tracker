@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Bell, Loader2 } from "lucide-react";
+import { Bell, Loader2, Info } from 'lucide-react';
 import { useUserNotifications } from '@/hooks/useUserNotifications';
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,7 @@ interface NotificationSettingsProps {
 
 const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => {
   const [browserSupport, setBrowserSupport] = useState(true);
+  const [permissionStatus, setPermissionStatus] = useState<PermissionState | null>(null);
   const { toast } = useToast();
   
   const { 
@@ -29,8 +30,35 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     // Check browser support for push notifications
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       setBrowserSupport(false);
+      return;
+    }
+
+    // Check current notification permission status
+    if ('Notification' in window) {
+      setPermissionStatus(Notification.permission);
     }
   }, []);
+  
+  const handleRequestPermission = async () => {
+    try {
+      // Request notification permission explicitly
+      const permission = await Notification.requestPermission();
+      setPermissionStatus(permission);
+      
+      if (permission === 'granted') {
+        // Only try to subscribe if permission is granted
+        await handleToggleNotifications();
+      } else {
+        toast({
+          title: "Permission Denied",
+          description: "You need to allow notifications in your browser settings to receive reminders.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+    }
+  };
   
   const handleToggleNotifications = async () => {
     try {
@@ -72,6 +100,26 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     }
   };
   
+  const renderPermissionGuidance = () => {
+    if (permissionStatus === 'denied') {
+      return (
+        <Alert variant="destructive" className="mb-4">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Notification Permission Blocked</AlertTitle>
+          <AlertDescription>
+            You've blocked notifications for this site. To enable notifications, you need to:
+            <ol className="ml-4 mt-2 list-decimal">
+              <li>Click the lock/info icon in your browser's address bar</li>
+              <li>Find the notifications setting and change it to "Allow"</li>
+              <li>Refresh this page</li>
+            </ol>
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    return null;
+  };
+  
   return (
     <Card>
       <CardHeader>
@@ -88,6 +136,8 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
             </Alert>
           ) : (
             <>
+              {renderPermissionGuidance()}
+              
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <div className="font-medium">Push Notifications</div>
@@ -95,11 +145,28 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
                     Receive notifications on this device
                   </div>
                 </div>
-                <Switch 
-                  checked={isSubscribed} 
-                  onCheckedChange={handleToggleNotifications}
-                  disabled={notificationLoading || !browserSupport}
-                />
+                
+                {permissionStatus === 'default' ? (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleRequestPermission}
+                    disabled={notificationLoading}
+                  >
+                    {notificationLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Bell className="h-4 w-4 mr-2" />
+                    )}
+                    Enable Notifications
+                  </Button>
+                ) : (
+                  <Switch 
+                    checked={isSubscribed} 
+                    onCheckedChange={handleToggleNotifications}
+                    disabled={notificationLoading || !browserSupport || permissionStatus === 'denied'}
+                  />
+                )}
               </div>
               
               {isSubscribed && (

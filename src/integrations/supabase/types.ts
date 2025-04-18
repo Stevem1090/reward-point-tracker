@@ -33,6 +33,24 @@ export type Database = {
         }
         Relationships: []
       }
+      cron_job_log: {
+        Row: {
+          id: number
+          job_name: string
+          run_at: string
+        }
+        Insert: {
+          id?: number
+          job_name: string
+          run_at?: string
+        }
+        Update: {
+          id?: number
+          job_name?: string
+          run_at?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           created_at: string
