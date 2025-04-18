@@ -23,7 +23,10 @@ serve(async (req) => {
 
     // Validate input
     const requestBody = await req.json();
-    const { userIds, title, body } = requestBody;
+    
+    // Accept either userIds or familyMemberIds for backward compatibility
+    const userIds = requestBody.userIds || requestBody.familyMemberIds;
+    const { title, body } = requestBody;
 
     // Validate required fields
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
