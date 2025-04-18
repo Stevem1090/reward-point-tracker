@@ -59,6 +59,7 @@ export const ProfileManager: React.FC<Props> = () => {
     try {
       setIsSubmitting(true);
       
+      // Generate a UUID on the client-side for the profile
       const { data: newMember, error } = await supabase
         .from('user_profiles')
         .insert([

@@ -18,10 +18,24 @@ import { CalendarHeader } from '@/components/calendar/CalendarHeader';
 import { DeleteEventDialog } from '@/components/calendar/DeleteEventDialog';
 import { useCalendar } from '@/hooks/useCalendar';
 
+// Define a temporary adapter type to bridge between the two Event types
+type CalendarEvent = {
+  id: string;
+  title: string;
+  description: string | null;
+  start_time: string;
+  end_time: string;
+  type: string;
+  is_recurring: boolean;
+  recurrence_pattern: string | null;
+  owner_ids: string[];
+  members: { id: string; name: string; color: string }[];
+};
+
 const CalendarPage = () => {
   const { 
     weekDays, 
-    events, 
+    events,
     loading,
     selectedEvent,
     selectedDate,
@@ -37,6 +51,15 @@ const CalendarPage = () => {
     setEventFormOpen,
     setDeleteDialogOpen
   } = useCalendar();
+
+  // Adapt the events for WeeklyCalendarView
+  const adaptedEvents = events.map(event => ({
+    ...event,
+    members: event.owner_ids.map(id => {
+      const profile = event.profiles?.find(p => p.id === id) || { id, name: 'Unknown', color: '#6366f1' };
+      return { id: profile.id, name: profile.name || 'Unknown', color: profile.color || '#6366f1' };
+    })
+  }));
 
   return (
     <div className="w-full overflow-x-hidden">
@@ -62,11 +85,19 @@ const CalendarPage = () => {
         <CardContent className="p-0">
           <WeeklyCalendarView 
             weekDays={weekDays}
-            events={events}
+            events={adaptedEvents as any}
             loading={loading}
             onAddEvent={handleAddEvent}
-            onEditEvent={handleEditEvent}
-            onDeleteEvent={confirmDeleteEvent}
+            onEditEvent={(event) => handleEditEvent({
+              ...event,
+              owner_ids: event.members.map(m => m.id),
+              profiles: event.members.map(m => ({ id: m.id, name: m.name, color: m.color, created_at: '' }))
+            })}
+            onDeleteEvent={(event) => confirmDeleteEvent({
+              ...event,
+              owner_ids: event.members.map(m => m.id),
+              profiles: event.members.map(m => ({ id: m.id, name: m.name, color: m.color, created_at: '' }))
+            })}
           />
         </CardContent>
       </Card>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { format, startOfWeek, addDays } from 'date-fns';
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +15,7 @@ type Event = {
   is_recurring: boolean;
   recurrence_pattern: string | null;
   owner_ids: string[];
+  profiles?: UserProfile[]; // User profiles associated with the event
 };
 
 // Type definition for the EventForm component
@@ -32,7 +34,7 @@ type EventType = {
 export const useCalendar = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<Event[]>([]);
-  const [familyMembers, setFamilyMembers] = useState<UserProfile[]>([]);
+  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<EventType | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -49,43 +51,49 @@ export const useCalendar = () => {
 
   const weekDays = getWeekDays(currentDate);
 
-const fetchEvents = async () => {
-  try {
-    setLoading(true);
-    
-    const weekStart = weekDays[0];
-    const weekEnd = addDays(weekDays[6], 1);
-    
-    const { data: eventsData, error: eventsError } = await supabase
-      .from('events')
-      .select('*')
-      .or(`start_time.gte.${weekStart.toISOString()},end_time.lte.${weekEnd.toISOString()}`)
-      .order('start_time');
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
       
-    if (eventsError) throw eventsError;
-    
-    // Get all user profiles for event members
-    const { data: profiles, error: profilesError } = await supabase
-      .from('user_profiles')
-      .select('*');
+      const weekStart = weekDays[0];
+      const weekEnd = addDays(weekDays[6], 1);
       
-    if (profilesError) throw profilesError;
-    
-    setEvents(eventsData || []);
-    setFamilyMembers(profiles || []);
-  } catch (error) {
-    console.error('Error fetching events:', error);
-    toast({
-      title: "Error",
-      description: "Failed to load events",
-      variant: "destructive",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('events')
+        .select('*')
+        .or(`start_time.gte.${weekStart.toISOString()},end_time.lte.${weekEnd.toISOString()}`)
+        .order('start_time');
+        
+      if (eventsError) throw eventsError;
+      
+      // Get all user profiles for event members
+      const { data: profiles, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('*');
+        
+      if (profilesError) throw profilesError;
+      
+      // Attach profiles to events for easier access
+      const eventsWithProfiles = eventsData?.map(event => ({
+        ...event,
+        profiles: profiles?.filter(profile => event.owner_ids?.includes(profile.id)) || []
+      })) || [];
+      
+      setEvents(eventsWithProfiles);
+      setUserProfiles(profiles || []);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load events",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const fetchFamilyMembers = async () => {
+  const fetchUserProfiles = async () => {
     try {
       const { data, error } = await supabase
         .from('user_profiles')
@@ -93,15 +101,15 @@ const fetchEvents = async () => {
         .order('name');
         
       if (error) throw error;
-      setFamilyMembers(data || []);
+      setUserProfiles(data || []);
     } catch (error) {
-      console.error('Error fetching family members:', error);
+      console.error('Error fetching user profiles:', error);
     }
   };
 
   useEffect(() => {
     fetchEvents();
-    fetchFamilyMembers();
+    fetchUserProfiles();
   }, [currentDate]);
 
   // Navigate to the previous/next week
@@ -132,7 +140,7 @@ const fetchEvents = async () => {
       type: event.type,
       is_recurring: event.is_recurring,
       recurrence_pattern: event.recurrence_pattern,
-      members: event.owner_ids
+      members: event.owner_ids || []
     };
     
     setSelectedEvent(formattedEvent);
@@ -150,7 +158,7 @@ const fetchEvents = async () => {
       type: event.type,
       is_recurring: event.is_recurring,
       recurrence_pattern: event.recurrence_pattern,
-      members: event.owner_ids
+      members: event.owner_ids || []
     };
     
     setSelectedEvent(eventToDelete);
@@ -192,7 +200,7 @@ const fetchEvents = async () => {
     currentDate,
     weekDays,
     events,
-    familyMembers,
+    userProfiles,
     loading,
     selectedEvent,
     selectedDate,

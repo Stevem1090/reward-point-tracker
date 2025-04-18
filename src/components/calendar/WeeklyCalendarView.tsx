@@ -1,13 +1,12 @@
-
 import React from 'react';
-import { format, isSameDay, addHours } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { Edit2, Trash2 } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Time slots for the day view (from 6 AM to 9 PM)
 const timeSlots = Array.from({ length: 16 }, (_, i) => i + 6);
 
-type FamilyMember = {
+type Member = {
   id: string;
   name: string;
   color: string;
@@ -22,7 +21,7 @@ type Event = {
   type: string;
   is_recurring: boolean;
   recurrence_pattern: string | null;
-  members: FamilyMember[];
+  members: Member[];
 };
 
 interface WeeklyCalendarViewProps {
@@ -54,7 +53,6 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
     }
   };
 
-  // Function to position events in the grid based on their time
   const getEventPosition = (event: Event, day: Date) => {
     if (!isSameDay(new Date(event.start_time), day)) return null;
     
@@ -63,10 +61,8 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
     const endHour = new Date(event.end_time).getHours();
     const endMinutes = new Date(event.end_time).getMinutes();
     
-    // Calculate top position based on start time (relative to 6 AM)
     const topPosition = (startHour - 6) * 60 + startMinutes;
     
-    // Calculate height based on duration
     const duration = ((endHour - startHour) * 60 + (endMinutes - startMinutes));
     
     return {
@@ -124,14 +120,11 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
     <div className="flex flex-col h-[800px]">
       <div className="overflow-x-auto">
         <div className="w-fit min-w-[880px]">
-          {/* Day headers - sticky at the top */}
           <div className="flex border-b sticky top-0 bg-white z-20">
-            {/* Time column header - empty space for alignment */}
             <div className="w-[80px] min-w-[80px] shrink-0 border-r px-2 font-semibold text-muted-foreground text-center py-2 flex flex-col justify-center sticky left-0 z-30 bg-white">
               Time
             </div>
             
-            {/* Day headers container */}
             <div className="flex flex-1">
               {weekDays.map((day, index) => (
                 <div 
@@ -153,9 +146,7 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
             </div>
           </div>
 
-          {/* Calendar body */}
           <div className="flex">
-            {/* Time slots - sticky left column */}
             <div className="w-[80px] min-w-[80px] shrink-0 border-r sticky left-0 bg-white z-20 h-full">
               {timeSlots.map((hour) => (
                 <div 
@@ -167,11 +158,9 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
               ))}
             </div>
 
-            {/* Calendar grid with events */}
             <div className="flex flex-1">
               {weekDays.map((day, dayIndex) => (
                 <div key={dayIndex} className="w-[200px] shrink-0 relative">
-                  {/* Time grid for this day */}
                   {timeSlots.map((hour) => (
                     <div 
                       key={hour} 
@@ -179,7 +168,6 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
                     />
                   ))}
                   
-                  {/* Events for this day */}
                   {events.map((event) => {
                     const position = getEventPosition(event, day);
                     if (!position) return null;
