@@ -28,7 +28,10 @@ serve(async (req) => {
     // Validate required fields
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Invalid or missing userIds' }),
+        JSON.stringify({ 
+          status: 400,
+          message: 'Invalid or missing userIds' 
+        }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -45,7 +48,10 @@ serve(async (req) => {
     if (vapidError || !vapidKeys) {
       console.error('Failed to fetch VAPID keys:', vapidError);
       return new Response(
-        JSON.stringify({ error: 'Failed to retrieve VAPID keys' }),
+        JSON.stringify({ 
+          status: 500,
+          message: 'Failed to retrieve VAPID keys' 
+        }),
         { 
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -69,7 +75,10 @@ serve(async (req) => {
     if (error) {
       console.error('Error fetching subscriptions:', error);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch user subscriptions' }),
+        JSON.stringify({ 
+          status: 500,
+          message: 'Failed to fetch user subscriptions' 
+        }),
         { 
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -79,7 +88,10 @@ serve(async (req) => {
 
     if (!subscriptions || subscriptions.length === 0) {
       return new Response(
-        JSON.stringify({ message: 'No subscriptions found for the given users' }),
+        JSON.stringify({ 
+          status: 200,
+          message: 'No subscriptions found for the given users' 
+        }),
         { 
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -135,6 +147,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ 
+        status: 200,
         message: 'Push notifications processed', 
         total: results.length,
         successful: successCount,
@@ -149,8 +162,9 @@ serve(async (req) => {
     console.error('Unhandled error in send-push-notification:', error);
     return new Response(
       JSON.stringify({ 
-        error: 'Unexpected error processing push notifications',
-        details: error.message 
+        status: 500,
+        message: 'Unexpected error processing push notifications',
+        error: error.message 
       }),
       { 
         status: 500,
