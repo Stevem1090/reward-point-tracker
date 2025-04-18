@@ -1,4 +1,3 @@
-
 export type UserProfile = {
   id: string;
   name: string | null;
@@ -15,7 +14,8 @@ export type UserPushSubscription = {
   created_at: string;
 };
 
-export type SubscriptionResponse = {
+// Response type for subscription operations
+export interface SubscriptionResponse {
   success: boolean;
   message: string;
-};
+}

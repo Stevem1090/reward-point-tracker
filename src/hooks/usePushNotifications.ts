@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getVapidPublicKey, urlBase64ToUint8Array } from '@/utils/vapidUtils';
 import { useToast } from '@/hooks/use-toast';
+import { SubscriptionResponse } from '@/types/user';
 
 export const usePushNotifications = (initialFamilyMemberId: string) => {
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -68,7 +69,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
     loadInitialData();
   }, [initialFamilyMemberId, checkSubscriptionStatus]);
 
-  const subscribe = useCallback(async (userId: string) => {
+  const subscribe = useCallback(async (userId: string): Promise<SubscriptionResponse> => {
     setIsLoading(true);
     try {
       let reg = registration;
@@ -141,11 +142,16 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
       }
 
       console.log('Checking for existing subscription in database');
-      const { data: existingData } = await supabase
+      const { data: existingData, error: checkError } = await supabase
         .from('user_push_subscriptions')
         .select('id')
         .eq('user_id', userId)
         .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing subscription:', checkError);
+        throw checkError;
+      }
 
       if (existingData?.id) {
         console.log('Updating existing subscription in database');
@@ -176,6 +182,9 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
 
         if (insertError) {
           console.error('Error inserting subscription:', insertError);
+          if (insertError.message && insertError.message.includes('duplicate key')) {
+            return { success: false, message: insertError.message };
+          }
           throw insertError;
         }
       }
@@ -191,7 +200,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         description: "You'll receive reminder notifications",
       });
       
-      return true;
+      return { success: true, message: "Notifications enabled" };
     } catch (error: any) {
       console.error('Error subscribing to push notifications:', error);
       
@@ -201,13 +210,13 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         variant: "destructive"
       });
       
-      return false;
+      return { success: false, message: error.message || "Unknown error" };
     } finally {
       setIsLoading(false);
     }
   }, [registration, initialFamilyMemberId, toast]);
 
-  const unsubscribe = useCallback(async (userId: string) => {
+  const unsubscribe = useCallback(async (userId: string): Promise<SubscriptionResponse> => {
     setIsLoading(true);
     try {
       await supabase
@@ -233,7 +242,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         description: "You won't receive reminder notifications",
       });
       
-      return true;
+      return { success: true, message: "Notifications disabled" };
     } catch (error: any) {
       console.error('Error unsubscribing from push notifications:', error);
       
@@ -243,7 +252,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         variant: "destructive"
       });
       
-      return false;
+      return { success: false, message: error.message || "Unknown error" };
     } finally {
       setIsLoading(false);
     }
