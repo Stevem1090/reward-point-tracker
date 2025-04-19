@@ -14,12 +14,14 @@ interface NotificationSettingsProps {
   user: User | null;
 }
 
-// Define NotificationPermission type if it's not available
 type NotificationPermissionType = "default" | "denied" | "granted";
 
 const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => {
   const [browserSupport, setBrowserSupport] = useState(true);
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermissionType | null>(null);
+  const [emailNotifications, setEmailNotifications] = useState(false);
+  const [pushNotifications, setPushNotifications] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   
   const { 
@@ -30,113 +32,114 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
   } = useUserNotifications();
   
   useEffect(() => {
-    // Check browser support for push notifications
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      setBrowserSupport(false);
-      return;
-    }
+    const fetchNotificationSettings = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
 
-    // Check current notification permission status
-    if ('Notification' in window) {
-      setPermissionStatus(Notification.permission as NotificationPermissionType);
-    }
-  }, []);
-  
-  const handleRequestPermission = async () => {
-    try {
-      // Request notification permission explicitly
-      const permission = await Notification.requestPermission();
-      setPermissionStatus(permission as NotificationPermissionType);
-      
-      if (permission === 'granted') {
-        // Only try to subscribe if permission is granted
-        await handleToggleNotifications();
-      } else {
+      try {
+        // Fetch notification settings from database
+        const { data, error } = await supabase
+          .from('user_notification_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) throw error;
+
+        setEmailNotifications(data?.email_notifications || false);
+        setPushNotifications(data?.push_notifications || false);
+      } catch (error) {
+        console.error('Error fetching notification settings:', error);
         toast({
-          title: "Permission Denied",
-          description: "You need to allow notifications in your browser settings to receive reminders.",
+          title: "Error",
+          description: "Could not load notification settings",
           variant: "destructive"
         });
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error requesting notification permission:', error);
-    }
-  };
-  
-  const handleToggleNotifications = async () => {
-    try {
-      if (isSubscribed) {
-        await unsubscribe();
-      } else {
-        const result = await subscribe();
-        if (!result.success) {
-          console.error("Subscription failed:", result.message);
-          
-          // Handle duplicate subscription error
-          if (result.message && result.message.includes("duplicate key")) {
-            toast({
-              title: "Already Subscribed",
-              description: "You are already subscribed to notifications on this device.",
-              variant: "default"
-            });
-            // Force refresh subscription status
-            useUserNotifications().checkSubscriptionStatus();
-          }
-        }
+
+      // Check browser support and permissions
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        setBrowserSupport(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error toggling notifications:', error);
-    }
-  };
-  
-  const handleTestNotification = async () => {
-    if (!user?.id) return;
-    
+
+      if ('Notification' in window) {
+        setPermissionStatus(Notification.permission as NotificationPermissionType);
+      }
+    };
+
+    fetchNotificationSettings();
+  }, [user, toast]);
+
+  const updateNotificationSettings = async (updates: Partial<{
+    email_notifications: boolean, 
+    push_notifications: boolean
+  }>) => {
+    if (!user) return;
+
     try {
-      const { error } = await supabase.functions.invoke('send-push-notification', {
-        body: {
-          userId: user.id,
-          title: "Test Notification",
-          body: "This is a test notification from your profile page"
-        }
-      });
-      
+      const { error } = await supabase
+        .from('user_notification_settings')
+        .upsert({
+          user_id: user.id,
+          ...updates,
+          updated_at: new Date().toISOString()
+        }, { 
+          onConflict: 'user_id' 
+        });
+
       if (error) throw error;
-      
+
       toast({
-        title: "Test notification sent",
-        description: "You should receive it shortly"
+        title: "Settings Updated",
+        description: "Your notification preferences have been saved",
       });
     } catch (error) {
-      console.error('Error sending test notification:', error);
+      console.error('Error updating notification settings:', error);
       toast({
         title: "Error",
-        description: "Failed to send test notification",
+        description: "Could not update notification settings",
         variant: "destructive"
       });
     }
   };
-  
-  const renderPermissionGuidance = () => {
-    if (permissionStatus === 'denied') {
-      return (
-        <Alert variant="destructive" className="mb-4">
-          <Info className="h-4 w-4" />
-          <AlertTitle>Notification Permission Blocked</AlertTitle>
-          <AlertDescription>
-            You've blocked notifications for this site. To enable notifications, you need to:
-            <ol className="ml-4 mt-2 list-decimal">
-              <li>Click the lock/info icon in your browser's address bar</li>
-              <li>Find the notifications setting and change it to "Allow"</li>
-              <li>Refresh this page</li>
-            </ol>
-          </AlertDescription>
-        </Alert>
-      );
-    }
-    return null;
+
+  const handleEmailNotificationsToggle = async (checked: boolean) => {
+    setEmailNotifications(checked);
+    await updateNotificationSettings({ email_notifications: checked });
   };
-  
+
+  const handlePushNotificationsToggle = async (checked: boolean) => {
+    setPushNotifications(checked);
+    
+    if (checked) {
+      const result = await subscribe();
+      if (result.success) {
+        await updateNotificationSettings({ push_notifications: true });
+      } else {
+        // Revert the UI state if subscription fails
+        setPushNotifications(false);
+      }
+    } else {
+      await unsubscribe();
+      await updateNotificationSettings({ push_notifications: false });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex justify-center items-center py-6">
+          <Loader2 className="animate-spin h-6 w-6" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -153,50 +156,34 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
             </Alert>
           ) : (
             <>
-              {renderPermissionGuidance()}
-              
+              {/* Email Notifications Toggle */}
               <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <div className="font-medium">Push Notifications</div>
+                <div>
+                  <div className="font-medium">Email Notifications</div>
                   <div className="text-sm text-muted-foreground">
-                    Receive notifications on this device
+                    Receive summary emails
                   </div>
                 </div>
-                
-                {permissionStatus === 'default' ? (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleRequestPermission}
-                    disabled={notificationLoading}
-                  >
-                    {notificationLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Bell className="h-4 w-4 mr-2" />
-                    )}
-                    Enable Notifications
-                  </Button>
-                ) : (
-                  <Switch 
-                    checked={isSubscribed} 
-                    onCheckedChange={handleToggleNotifications}
-                    disabled={notificationLoading || !browserSupport || permissionStatus === 'denied'}
-                  />
-                )}
+                <Switch
+                  checked={emailNotifications}
+                  onCheckedChange={handleEmailNotificationsToggle}
+                />
               </div>
-              
-              {isSubscribed && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleTestNotification}
-                  className="mt-2"
-                >
-                  <Bell className="mr-2 h-4 w-4" />
-                  Send Test Notification
-                </Button>
-              )}
+
+              {/* Push Notifications Toggle */}
+              <div className="flex items-center justify-between mt-4">
+                <div>
+                  <div className="font-medium">Push Notifications</div>
+                  <div className="text-sm text-muted-foreground">
+                    Receive real-time notifications on this device
+                  </div>
+                </div>
+                <Switch
+                  checked={pushNotifications}
+                  onCheckedChange={handlePushNotificationsToggle}
+                  disabled={!browserSupport || permissionStatus === 'denied'}
+                />
+              </div>
             </>
           )}
         </div>
