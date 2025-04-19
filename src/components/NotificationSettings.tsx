@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Bell, Loader2, Info } from 'lucide-react';
+import { Bell, Loader2 } from 'lucide-react';
 import { useUserNotifications } from '@/hooks/useUserNotifications';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
@@ -39,11 +38,11 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
       }
 
       try {
-        // Fetch notification settings from database
+        // Fetch notification settings from user_profiles
         const { data, error } = await supabase
-          .from('user_notification_settings')
+          .from('user_profiles')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('id', user.id)
           .single();
 
         if (error) throw error;
@@ -75,22 +74,20 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     fetchNotificationSettings();
   }, [user, toast]);
 
-  const updateNotificationSettings = async (updates: Partial<{
-    email_notifications: boolean, 
-    push_notifications: boolean
-  }>) => {
+  const updateNotificationSettings = async (updates: {
+    email_notifications?: boolean;
+    push_notifications?: boolean;
+  }) => {
     if (!user) return;
 
     try {
       const { error } = await supabase
-        .from('user_notification_settings')
-        .upsert({
-          user_id: user.id,
+        .from('user_profiles')
+        .update({
           ...updates,
           updated_at: new Date().toISOString()
-        }, { 
-          onConflict: 'user_id' 
-        });
+        })
+        .eq('id', user.id);
 
       if (error) throw error;
 

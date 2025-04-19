@@ -288,20 +288,26 @@ export type Database = {
         Row: {
           color: string | null
           created_at: string
+          email_notifications: boolean | null
           id: string
           name: string | null
+          push_notifications: boolean | null
         }
         Insert: {
           color?: string | null
           created_at?: string
+          email_notifications?: boolean | null
           id: string
           name?: string | null
+          push_notifications?: boolean | null
         }
         Update: {
           color?: string | null
           created_at?: string
+          email_notifications?: boolean | null
           id?: string
           name?: string | null
+          push_notifications?: boolean | null
         }
         Relationships: []
       }
