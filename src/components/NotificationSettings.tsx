@@ -42,28 +42,37 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     setFetchError(null);
 
     try {
-      // Set a timeout for the fetch operation
+      console.log("Fetching notification settings for user:", user.id);
+      
+      // Shorter timeout for faster feedback
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Database request timed out')), 5000);
+        setTimeout(() => reject(new Error('Database request timed out')), 4000);
       });
 
       // Fetch notification settings from user_profiles
       const fetchPromise = supabase
         .from('user_profiles')
-        .select('*')
+        .select('email_notifications, push_notifications')
         .eq('id', user.id)
         .single();
 
       // Race between the fetch and the timeout
       const { data, error } = await Promise.race([
         fetchPromise,
-        timeoutPromise.then(() => { throw new Error('Database request timed out'); })
+        timeoutPromise.then(() => { 
+          console.log("Database fetch timed out");
+          throw new Error('Database request timed out'); 
+        })
       ]) as any;
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching notification settings:", error);
+        throw error;
+      }
 
-      setEmailNotifications(data?.email_notifications || false);
-      setPushNotifications(data?.push_notifications || false);
+      console.log("Received notification settings:", data);
+      setEmailNotifications(!!data?.email_notifications);
+      setPushNotifications(!!data?.push_notifications);
     } catch (error: any) {
       console.error('Error fetching notification settings:', error);
       setFetchError(error.message || 'Failed to load settings');
@@ -99,10 +108,11 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     // Set a timeout to ensure we don't get stuck in loading state
     const loadingTimeout = setTimeout(() => {
       if (isLoading) {
+        console.log("Loading timed out, showing error");
         setIsLoading(false);
         setFetchError('Loading timed out. Please try refreshing.');
       }
-    }, 7000);
+    }, 5000); // Shorter timeout for faster feedback
     
     return () => clearTimeout(loadingTimeout);
   }, [user]);
@@ -114,8 +124,10 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     if (!user) return;
 
     try {
+      console.log("Updating notification settings:", updates);
+      
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Update request timed out')), 5000);
+        setTimeout(() => reject(new Error('Update request timed out')), 4000);
       });
       
       const updatePromise = supabase
@@ -129,11 +141,18 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
       // Race between the update and the timeout
       const { error } = await Promise.race([
         updatePromise,
-        timeoutPromise.then(() => { throw new Error('Update request timed out'); })
+        timeoutPromise.then(() => { 
+          console.log("Database update timed out");
+          throw new Error('Update request timed out'); 
+        })
       ]) as any;
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating notification settings:", error);
+        throw error;
+      }
 
+      console.log("Settings updated successfully");
       toast({
         title: "Settings Updated",
         description: "Your notification preferences have been saved",
@@ -157,20 +176,24 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     setPushNotifications(checked);
     
     if (checked) {
+      console.log("Attempting to subscribe to push notifications");
       const result = await subscribe();
       if (result.success) {
         await updateNotificationSettings({ push_notifications: true });
       } else {
         // Revert the UI state if subscription fails
+        console.error("Push notification subscription failed:", result.message);
         setPushNotifications(false);
       }
     } else {
+      console.log("Unsubscribing from push notifications");
       await unsubscribe();
       await updateNotificationSettings({ push_notifications: false });
     }
   };
 
   const handleRefresh = () => {
+    console.log("Refreshing notification settings");
     setIsRefreshing(true);
     fetchNotificationSettings();
   };
