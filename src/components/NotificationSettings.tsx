@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -33,8 +33,10 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     unsubscribe 
   } = useUserNotifications();
   
-  const fetchNotificationSettings = async () => {
+  // Memoize the fetch function to avoid recreation on each render
+  const fetchNotificationSettings = useCallback(async () => {
     if (!user) {
+      console.log("No user found, skipping notification settings fetch");
       setIsLoading(false);
       return;
     }
@@ -44,9 +46,9 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     try {
       console.log("Fetching notification settings for user:", user.id);
       
-      // Shorter timeout for faster feedback
+      // Even shorter timeout for faster feedback
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Database request timed out')), 4000);
+        setTimeout(() => reject(new Error('Database request timed out')), 3000);
       });
 
       // Fetch notification settings from user_profiles
@@ -54,16 +56,21 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
         .from('user_profiles')
         .select('email_notifications, push_notifications')
         .eq('id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to avoid errors if no record
 
       // Race between the fetch and the timeout
-      const { data, error } = await Promise.race([
-        fetchPromise,
-        timeoutPromise.then(() => { 
-          console.log("Database fetch timed out");
-          throw new Error('Database request timed out'); 
-        })
-      ]) as any;
+      let raceResult;
+      try {
+        raceResult = await Promise.race([
+          fetchPromise,
+          timeoutPromise
+        ]);
+      } catch (raceError) {
+        console.log("Race promise rejected:", raceError);
+        throw raceError;
+      }
+
+      const { data, error } = raceResult;
 
       if (error) {
         console.error("Error fetching notification settings:", error);
@@ -71,8 +78,10 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
       }
 
       console.log("Received notification settings:", data);
-      setEmailNotifications(!!data?.email_notifications);
-      setPushNotifications(!!data?.push_notifications);
+      
+      // Safely set the values with explicit boolean conversion
+      setEmailNotifications(data?.email_notifications === true);
+      setPushNotifications(data?.push_notifications === true);
     } catch (error: any) {
       console.error('Error fetching notification settings:', error);
       setFetchError(error.message || 'Failed to load settings');
@@ -90,44 +99,57 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
       setIsRefreshing(false);
     }
 
-    // Check browser support and permissions
+    // Check browser support and permissions - do this outside the try/catch
+    // so it doesn't interfere with the main data fetch
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.log("Browser doesn't support push notifications");
       setBrowserSupport(false);
       return;
     }
 
     if ('Notification' in window) {
-      setPermissionStatus(Notification.permission as NotificationPermissionType);
+      const permission = Notification.permission as NotificationPermissionType;
+      console.log("Notification permission status:", permission);
+      setPermissionStatus(permission);
     }
-  };
+  }, [user, toast]); // Only depend on user and toast
 
   useEffect(() => {
-    // Initial fetch
-    fetchNotificationSettings();
+    // Initial fetch with safety check
+    if (user?.id) {
+      console.log("User authenticated, fetching notification settings");
+      fetchNotificationSettings();
+    } else {
+      console.log("No authenticated user found");
+      setIsLoading(false);
+    }
     
-    // Set a timeout to ensure we don't get stuck in loading state
+    // Set a shorter timeout to ensure we don't get stuck in loading state
     const loadingTimeout = setTimeout(() => {
       if (isLoading) {
         console.log("Loading timed out, showing error");
         setIsLoading(false);
         setFetchError('Loading timed out. Please try refreshing.');
       }
-    }, 5000); // Shorter timeout for faster feedback
+    }, 3500); // Even shorter timeout for faster feedback
     
     return () => clearTimeout(loadingTimeout);
-  }, [user]);
+  }, [user, fetchNotificationSettings]);
 
   const updateNotificationSettings = async (updates: {
     email_notifications?: boolean;
     push_notifications?: boolean;
   }) => {
-    if (!user) return;
+    if (!user) {
+      console.log("No user found, can't update settings");
+      return;
+    }
 
     try {
       console.log("Updating notification settings:", updates);
       
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Update request timed out')), 4000);
+        setTimeout(() => reject(new Error('Update request timed out')), 3000);
       });
       
       const updatePromise = supabase
@@ -138,14 +160,19 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
         })
         .eq('id', user.id);
         
-      // Race between the update and the timeout
-      const { error } = await Promise.race([
-        updatePromise,
-        timeoutPromise.then(() => { 
-          console.log("Database update timed out");
-          throw new Error('Update request timed out'); 
-        })
-      ]) as any;
+      // Race between the update and the timeout with explicit error handling
+      let raceResult;
+      try {
+        raceResult = await Promise.race([
+          updatePromise,
+          timeoutPromise
+        ]);
+      } catch (raceError) {
+        console.log("Race promise rejected during update:", raceError);
+        throw raceError;
+      }
+      
+      const { error } = raceResult;
 
       if (error) {
         console.error("Error updating notification settings:", error);
@@ -197,6 +224,21 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => 
     setIsRefreshing(true);
     fetchNotificationSettings();
   };
+
+  // Special handling for when user is null
+  if (!user) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col justify-center items-center py-6">
+          <Alert>
+            <AlertDescription>
+              You need to be logged in to manage notification settings.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (
