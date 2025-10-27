@@ -83,7 +83,7 @@ export const MonthlySummary = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-3xl">${grandTotal.toFixed(2)}</CardTitle>
+          <CardTitle className="text-3xl">£{grandTotal.toFixed(2)}</CardTitle>
           <p className="text-sm text-muted-foreground">Total bills for {monthName} pay period</p>
         </CardHeader>
       </Card>
@@ -103,7 +103,7 @@ export const MonthlySummary = () => {
                   />
                   <CardTitle className="text-lg">{typeName}</CardTitle>
                 </div>
-                <p className="text-xl font-bold">${typeTotal.toFixed(2)}</p>
+                <p className="text-xl font-bold">£{typeTotal.toFixed(2)}</p>
               </div>
             </CardHeader>
             <CardContent>
@@ -114,17 +114,24 @@ export const MonthlySummary = () => {
                     className="flex items-start justify-between pb-3 border-b last:border-0 last:pb-0"
                   >
                     <div className="flex-1">
-                      <p className="font-medium">{calc.bill.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{calc.bill.name}</p>
+                        {calc.bill.frequency === 'one-time' && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-800">
+                            One-Time
+                          </span>
+                        )}
+                      </div>
                       {calc.paymentCount > 1 && (
                         <p className="text-sm text-muted-foreground">
-                          {calc.paymentCount} payments × ${calc.individualAmount.toFixed(2)}
+                          {calc.paymentCount} payments × £{calc.individualAmount.toFixed(2)}
                         </p>
                       )}
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">${calc.totalAmount.toFixed(2)}</p>
+                      <p className="font-semibold">£{calc.totalAmount.toFixed(2)}</p>
                       {calc.paymentCount === 0 && (
-                        <p className="text-xs text-muted-foreground">Not due this month</p>
+                        <p className="text-xs text-muted-foreground">Not due this period</p>
                       )}
                     </div>
                   </div>

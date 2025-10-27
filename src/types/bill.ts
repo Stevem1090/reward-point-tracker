@@ -1,4 +1,4 @@
-export type BillFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type BillFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'one-time';
 
 export interface BillType {
   id: string;

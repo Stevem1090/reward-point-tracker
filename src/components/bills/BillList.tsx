@@ -37,6 +37,30 @@ export const BillList = () => {
     }
   };
 
+  const getFrequencyBadge = (bill: Bill) => {
+    const frequencyColors: Record<string, string> = {
+      daily: 'bg-blue-100 text-blue-800',
+      weekly: 'bg-green-100 text-green-800',
+      monthly: 'bg-purple-100 text-purple-800',
+      yearly: 'bg-orange-100 text-orange-800',
+      'one-time': 'bg-pink-100 text-pink-800',
+    };
+
+    const frequencyLabels: Record<string, string> = {
+      daily: 'Daily',
+      weekly: 'Weekly',
+      monthly: 'Monthly',
+      yearly: 'Yearly',
+      'one-time': 'One-Time',
+    };
+
+    return (
+      <span className={`text-xs px-2 py-1 rounded-full ${frequencyColors[bill.frequency] || 'bg-gray-100 text-gray-800'}`}>
+        {frequencyLabels[bill.frequency] || bill.frequency}
+      </span>
+    );
+  };
+
   const getFrequencyDisplay = (bill: Bill): string => {
     switch (bill.frequency) {
       case 'daily':
@@ -50,6 +74,14 @@ export const BillList = () => {
         return bill.payment_date
           ? `Yearly (${new Date(bill.payment_date).toLocaleDateString()})`
           : 'Yearly';
+      case 'one-time':
+        return bill.payment_date
+          ? `One-Time (${new Date(bill.payment_date).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric'
+            })})`
+          : 'One-Time';
       default:
         return bill.frequency;
     }
@@ -97,6 +129,7 @@ export const BillList = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-semibold">{bill.name}</h4>
+                      {getFrequencyBadge(bill)}
                       {bill.bill_type && (
                         <Badge
                           style={{
@@ -109,7 +142,7 @@ export const BillList = () => {
                       )}
                     </div>
                     <p className="text-2xl font-bold">
-                      ${bill.amount.toFixed(2)}
+                      £{bill.amount.toFixed(2)}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {getFrequencyDisplay(bill)}

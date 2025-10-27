@@ -90,6 +90,18 @@ export const isPaymentDueInPayPeriod = (
   return isDateInPayPeriod(paymentDate, startDate, endDate);
 };
 
+// Check if a one-time bill is due in a specific pay period
+export const isOneTimeBillInPayPeriod = (
+  bill: Bill,
+  startDate: Date,
+  endDate: Date
+): boolean => {
+  if (!bill.payment_date) return false;
+  
+  const paymentDate = new Date(bill.payment_date);
+  return isDateInPayPeriod(paymentDate, startDate, endDate);
+};
+
 // Calculate monthly payments for a bill within a pay period
 export const calculateMonthlyPaymentsInPeriod = (
   bill: Bill,
@@ -162,6 +174,13 @@ export const calculateBillTotalForPayPeriod = (
 
     case 'yearly':
       if (isPaymentDueInPayPeriod(bill, startDate, endDate)) {
+        paymentCount = 1;
+        totalAmount = bill.amount;
+      }
+      break;
+
+    case 'one-time':
+      if (isOneTimeBillInPayPeriod(bill, startDate, endDate)) {
         paymentCount = 1;
         totalAmount = bill.amount;
       }

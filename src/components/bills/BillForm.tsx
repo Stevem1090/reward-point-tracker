@@ -33,6 +33,13 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate one-time bills have a payment date
+    if (formData.frequency === 'one-time' && !formData.payment_date) {
+      alert('One-time bills require a payment date');
+      return;
+    }
+    
     await onSubmit(formData as any);
   };
 
@@ -62,7 +69,7 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
           </div>
 
           <div>
-            <Label htmlFor="amount">Amount ($)</Label>
+            <Label htmlFor="amount">Amount (£)</Label>
             <Input
               id="amount"
               type="number"
@@ -127,6 +134,10 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
                 <RadioGroupItem value="yearly" id="yearly" />
                 <Label htmlFor="yearly">Yearly</Label>
               </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="one-time" id="one-time" />
+                <Label htmlFor="one-time">One-Time</Label>
+              </div>
             </RadioGroup>
           </div>
 
@@ -167,6 +178,24 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
               />
               <p className="text-sm text-muted-foreground mt-1">
                 Leave blank to automatically use the 1st of each month
+              </p>
+            </div>
+          )}
+
+          {formData.frequency === 'one-time' && (
+            <div>
+              <Label htmlFor="payment_date">Payment Date</Label>
+              <Input
+                id="payment_date"
+                type="date"
+                value={formData.payment_date || ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, payment_date: e.target.value })
+                }
+                required
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Select the specific date for this one-time expense
               </p>
             </div>
           )}
