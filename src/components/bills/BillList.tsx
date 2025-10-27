@@ -55,7 +55,7 @@ export const BillList = () => {
     };
 
     return (
-      <span className={`text-xs px-2 py-1 rounded-full ${frequencyColors[bill.frequency] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`text-[10px] md:text-xs px-2 py-1 rounded-full ${frequencyColors[bill.frequency] || 'bg-gray-100 text-gray-800'}`}>
         {frequencyLabels[bill.frequency] || bill.frequency}
       </span>
     );
@@ -104,8 +104,8 @@ export const BillList = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Bills</h3>
+      <div className="flex justify-between items-center gap-3">
+        <h3 className="text-base md:text-lg font-semibold">Bills</h3>
         <Button onClick={() => setIsAdding(true)} size="sm" className="shrink-0">
           <Plus className="h-4 w-4 md:mr-2" />
           <span className="hidden md:inline">Add Bill</span>
@@ -124,50 +124,67 @@ export const BillList = () => {
         <div className="grid gap-3">
           {bills.map((bill) => (
             <Card key={bill.id} className={!bill.active ? 'opacity-50' : ''}>
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold">{bill.name}</h4>
-                      {getFrequencyBadge(bill)}
-                      {bill.bill_type && (
-                        <Badge
-                          style={{
-                            backgroundColor: bill.bill_type.color,
-                            color: 'white',
-                          }}
-                        >
-                          {bill.bill_type.name}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-2xl font-bold">
-                      £{bill.amount.toFixed(2)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {getFrequencyDisplay(bill)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
+              <CardContent className="pt-4 pb-4 px-4">
+                <div className="space-y-3">
+                  {/* Row 1: Title + Switch */}
+                  <div className="flex items-start justify-between gap-3">
+                    <h4 className="font-semibold text-base break-words flex-1 min-w-0">
+                      {bill.name}
+                    </h4>
                     <Switch
                       checked={bill.active}
                       onCheckedChange={(checked) =>
                         toggleBillActive(bill.id, checked)
                       }
+                      className="shrink-0"
                     />
+                  </div>
+
+                  {/* Row 2: Badges */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {getFrequencyBadge(bill)}
+                    {bill.bill_type && (
+                      <Badge
+                        className="text-[10px] md:text-xs"
+                        style={{
+                          backgroundColor: bill.bill_type.color,
+                          color: 'white',
+                        }}
+                      >
+                        {bill.bill_type.name}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Row 3: Amount */}
+                  <p className="text-2xl md:text-3xl font-bold">
+                    £{bill.amount.toFixed(2)}
+                  </p>
+
+                  {/* Row 4: Description */}
+                  <p className="text-xs md:text-sm text-muted-foreground">
+                    {getFrequencyDisplay(bill)}
+                  </p>
+
+                  {/* Row 5: Action buttons */}
+                  <div className="flex gap-2 pt-2 border-t">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => setEditingBill(bill)}
+                      className="flex-1"
                     >
-                      <Edit2 className="h-4 w-4" />
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Edit
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => setDeleteId(bill.id)}
+                      className="flex-1"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
                     </Button>
                   </div>
                 </div>
