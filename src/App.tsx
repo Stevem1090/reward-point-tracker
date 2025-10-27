@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import AuthGuard from "./components/AuthGuard";
-import NavBar from "./components/NavBar";
 import AppLayout from "./components/AppLayout";
 import RewardsPage from "./pages/RewardsPage";
 import CalendarPage from "./pages/CalendarPage";
@@ -199,65 +198,75 @@ const App = () => {
     }
   };
   
-  // Register service worker when component mounts with timeout safety
+  // Register service worker AFTER initial render to prevent blocking
   useEffect(() => {
-    const initServiceWorker = async () => {
-      try {
-        console.log('Initializing service worker...');
-        
-        // Set a timeout to prevent infinite loading
-        const timeout = setTimeout(() => {
-          console.log('Service worker initialization timed out');
-          setSwStatus('timeout');
+    // Defer service worker initialization until after the app renders
+    const deferredInit = () => {
+      const initServiceWorker = async () => {
+        try {
+          console.log('Initializing service worker...');
           
-          toast({
-            title: "App Loading Issue",
-            description: "The app is taking too long to load. Try clearing your cache.",
-            variant: "destructive"
-          });
-        }, 10000); // 10 second timeout
-        
-        setInitTimeout(timeout);
-        
-        const result = await registerServiceWorker();
-        
-        // Clear timeout as we got a response
-        clearTimeout(timeout);
-        setInitTimeout(null);
-        
-        if (result.success) {
-          setSwRegistration(result.registration);
-          setSwStatus('success');
-          console.log('Service worker registered successfully');
-        } else {
-          // Proceed with the app even if SW fails
-          setSwStatus('error');
-          console.error('Service worker registration failed:', result.error);
-          
-          // Only show error toast for serious errors, not unsupported browsers
-          if (result.error?.message !== 'Service workers not supported') {
+          // Set a timeout to prevent infinite loading
+          const timeout = setTimeout(() => {
+            console.log('Service worker initialization timed out');
+            setSwStatus('timeout');
+            
             toast({
-              title: "Service Worker Error",
-              description: "App may have limited functionality. Try clearing your cache.",
+              title: "App Loading Issue",
+              description: "The app is taking too long to load. Try clearing your cache.",
               variant: "destructive"
             });
+          }, 10000); // 10 second timeout
+          
+          setInitTimeout(timeout);
+          
+          const result = await registerServiceWorker();
+          
+          // Clear timeout as we got a response
+          clearTimeout(timeout);
+          setInitTimeout(null);
+          
+          if (result.success) {
+            setSwRegistration(result.registration);
+            setSwStatus('success');
+            console.log('Service worker registered successfully');
           } else {
-            setSwStatus('unsupported');
+            // Proceed with the app even if SW fails
+            setSwStatus('error');
+            console.error('Service worker registration failed:', result.error);
+            
+            // Only show error toast for serious errors, not unsupported browsers
+            if (result.error?.message !== 'Service workers not supported') {
+              toast({
+                title: "Service Worker Error",
+                description: "App may have limited functionality. Try clearing your cache.",
+                variant: "destructive"
+              });
+            } else {
+              setSwStatus('unsupported');
+            }
+          }
+        } catch (error) {
+          console.error('Error during service worker initialization:', error);
+          setSwStatus('error');
+          
+          // Clear timeout if it exists
+          if (initTimeout) {
+            clearTimeout(initTimeout);
+            setInitTimeout(null);
           }
         }
-      } catch (error) {
-        console.error('Error during service worker initialization:', error);
-        setSwStatus('error');
-        
-        // Clear timeout if it exists
-        if (initTimeout) {
-          clearTimeout(initTimeout);
-          setInitTimeout(null);
-        }
-      }
+      };
+      
+      initServiceWorker();
     };
     
-    initServiceWorker();
+    // Use requestIdleCallback to defer SW registration, or setTimeout as fallback
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(deferredInit);
+    } else {
+      setTimeout(deferredInit, 0);
+    }
     
     // Cleanup any pending timeouts
     return () => {
@@ -275,8 +284,6 @@ const App = () => {
         <BrowserRouter>
           <AuthProvider>
             <div className="min-h-screen flex flex-col">
-              <NavBar />
-              
               {/* Enhanced status banner with more informative state handling */}
               {(swStatus === 'error' || swStatus === 'timeout' || isClearingCache || isRefreshingSubscriptions) && (
                 <div className={`p-2 flex justify-center items-center gap-2 ${
