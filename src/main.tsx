@@ -81,41 +81,5 @@ const renderApp = () => {
   }
 };
 
-// Check for the required script tag
-const checkRequiredScripts = () => {
-  const gptEngScriptExists = document.querySelector('script[src*="gptengineer.js"]') !== null;
-  
-  if (!gptEngScriptExists) {
-    console.error('Required GPT Engineer script is missing');
-    
-    const rootElement = document.getElementById('root');
-    if (rootElement) {
-      const errorDiv = document.createElement('div');
-      errorDiv.style.padding = '20px';
-      errorDiv.style.margin = '20px';
-      errorDiv.style.backgroundColor = '#ffebee';
-      errorDiv.style.border = '1px solid #ef5350';
-      errorDiv.style.borderRadius = '4px';
-      errorDiv.style.fontFamily = 'sans-serif';
-      
-      errorDiv.innerHTML = `
-        <h2>Missing Required Script</h2>
-        <p>The application cannot load because a required script is missing.</p>
-        <button onclick="window.location.reload()" style="padding: 8px 16px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer;">
-          Reload App
-        </button>
-      `;
-      
-      rootElement.innerHTML = '';
-      rootElement.appendChild(errorDiv);
-      return false;
-    }
-  }
-  
-  return true;
-}
-
-// Check for required scripts before rendering
-if (checkRequiredScripts()) {
-  renderApp();
-}
+// Render the app
+renderApp();
