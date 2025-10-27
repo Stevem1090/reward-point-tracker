@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useBills } from '@/hooks/useBills';
-import { calculateMonthlyTotal } from '@/utils/billCalculations';
+import { calculatePayPeriodTotal } from '@/utils/billCalculations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -9,16 +9,20 @@ export const MonthlySummary = () => {
   const { bills } = useBills();
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Calculate next month by default
-  const targetDate = useMemo(() => {
+  // Calculate next month by default (next pay period)
+  const displayDate = useMemo(() => {
     const date = new Date(currentDate);
     date.setMonth(date.getMonth() + 1);
     return date;
   }, [currentDate]);
 
-  const { calculations, grandTotal } = useMemo(() => {
-    return calculateMonthlyTotal(bills, targetDate.getFullYear(), targetDate.getMonth());
-  }, [bills, targetDate]);
+  const { calculations, grandTotal, startDate, endDate } = useMemo(() => {
+    return calculatePayPeriodTotal(
+      bills, 
+      displayDate.getFullYear(), 
+      displayDate.getMonth()
+    );
+  }, [bills, displayDate]);
 
   const groupedByType = useMemo(() => {
     const groups: { [key: string]: typeof calculations } = {};
@@ -46,10 +50,18 @@ export const MonthlySummary = () => {
     setCurrentDate(date);
   };
 
-  const monthName = targetDate.toLocaleDateString('en-US', {
+  const monthName = displayDate.toLocaleDateString('en-US', {
     month: 'long',
     year: 'numeric',
   });
+
+  const periodRange = `${startDate.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric' 
+  })} - ${endDate.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric' 
+  })}`;
 
   return (
     <div className="space-y-4">
@@ -59,7 +71,10 @@ export const MonthlySummary = () => {
           <Button variant="outline" size="sm" onClick={previousMonth}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="min-w-[150px] text-center font-medium">{monthName}</span>
+          <div className="min-w-[200px] text-center">
+            <div className="font-medium">{monthName}</div>
+            <div className="text-xs text-muted-foreground">{periodRange}</div>
+          </div>
           <Button variant="outline" size="sm" onClick={nextMonth}>
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -69,7 +84,7 @@ export const MonthlySummary = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-3xl">${grandTotal.toFixed(2)}</CardTitle>
-          <p className="text-sm text-muted-foreground">Total bills for {monthName}</p>
+          <p className="text-sm text-muted-foreground">Total bills for {monthName} pay period</p>
         </CardHeader>
       </Card>
 
