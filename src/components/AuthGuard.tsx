@@ -21,7 +21,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     if (loading) {
       timer = setTimeout(() => {
         setLoadingTimeout(true);
-      }, 10000); // 10 seconds before showing timeout message
+      }, 5000); // 5 seconds before showing timeout message
     }
     
     return () => {

@@ -23,21 +23,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log('[AuthContext] Initializing auth state...');
+    
+    // Safety timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      console.log('[AuthContext] Loading timeout - forcing loading to false');
+      setLoading(false);
+    }, 5000);
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
         if (currentSession) {
-          console.log('Auth state changed:', event, 'User ID:', currentSession.user?.id);
+          console.log('[AuthContext] Auth state changed:', event, 'User ID:', currentSession.user?.id);
         } else {
-          console.log('Auth state changed:', event, 'No session');
+          console.log('[AuthContext] Auth state changed:', event, 'No session');
         }
         
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (event === 'SIGNED_IN') {
-          // Ensure user profile exists when signed in
-          await ensureUserProfile(currentSession?.user);
+          // Ensure user profile exists in background (don't block UI)
+          setTimeout(() => ensureUserProfile(currentSession?.user), 0);
           
           toast({
             title: "Welcome back!",
@@ -53,20 +61,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      console.log('Initial session check:', currentSession ? `User ID: ${currentSession.user?.id}` : 'No session');
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      // Ensure user profile exists for existing session
-      if (currentSession?.user) {
-        await ensureUserProfile(currentSession.user);
-      }
-      
-      setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session: currentSession } }) => {
+        console.log('[AuthContext] Initial session check:', currentSession ? `User ID: ${currentSession.user?.id}` : 'No session');
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        // Ensure user profile exists in background (don't block UI)
+        if (currentSession?.user) {
+          setTimeout(() => ensureUserProfile(currentSession.user), 0);
+        }
+        
+        console.log('[AuthContext] Setting loading to false');
+        setLoading(false);
+        clearTimeout(loadingTimeout);
+      })
+      .catch((error) => {
+        console.error('[AuthContext] Error getting session:', error);
+        setLoading(false);
+        clearTimeout(loadingTimeout);
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(loadingTimeout);
+    };
   }, [toast]);
 
   // Helper function to ensure user profile exists
