@@ -106,9 +106,9 @@ export const BillList = () => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Bills</h3>
-        <Button onClick={() => setIsAdding(true)} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Bill
+        <Button onClick={() => setIsAdding(true)} size="sm" className="shrink-0">
+          <Plus className="h-4 w-4 md:mr-2" />
+          <span className="hidden md:inline">Add Bill</span>
         </Button>
       </div>
 
