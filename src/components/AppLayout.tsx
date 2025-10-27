@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Menu, X, Calendar, ListTodo, Award, Bell, Receipt } from 'lucide-react';
+import { Menu, Award, Receipt } from 'lucide-react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,9 +21,6 @@ type MenuLink = {
 
 const menuLinks: MenuLink[] = [
   { name: 'Rewards', path: '/rewards', icon: <Award className="h-5 w-5" /> },
-  { name: 'Calendar', path: '/calendar', icon: <Calendar className="h-5 w-5" /> },
-  { name: 'Lists', path: '/lists', icon: <ListTodo className="h-5 w-5" /> },
-  { name: 'Reminders', path: '/reminders', icon: <Bell className="h-5 w-5" /> },
   { name: 'Bills', path: '/bills', icon: <Receipt className="h-5 w-5" /> },
 ];
 

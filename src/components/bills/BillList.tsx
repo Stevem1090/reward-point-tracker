@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Edit2, Trash2, Plus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Edit2, Trash2, Plus, Search } from 'lucide-react';
 import { BillForm } from './BillForm';
 import {
   AlertDialog,
@@ -24,6 +25,7 @@ export const BillList = () => {
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleSubmit = async (
     data: Omit<Bill, 'id' | 'created_at' | 'updated_at' | 'bill_type'>
@@ -102,6 +104,13 @@ export const BillList = () => {
     );
   }
 
+  const filteredBills = bills.filter((bill) => {
+    const searchLower = searchQuery.toLowerCase();
+    const nameMatch = bill.name.toLowerCase().includes(searchLower);
+    const typeMatch = bill.bill_type?.name.toLowerCase().includes(searchLower);
+    return nameMatch || typeMatch;
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center gap-3">
@@ -112,6 +121,19 @@ export const BillList = () => {
         </Button>
       </div>
 
+      {bills.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search bills..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      )}
+
       {bills.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
@@ -120,9 +142,17 @@ export const BillList = () => {
             </p>
           </CardContent>
         </Card>
+      ) : filteredBills.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-center text-muted-foreground">
+              No bills found matching "{searchQuery}". Try a different search term.
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-3">
-          {bills.map((bill) => (
+          {filteredBills.map((bill) => (
             <Card key={bill.id} className={!bill.active ? 'opacity-50' : ''}>
               <CardContent className="pt-4 pb-4 px-4">
                 <div className="space-y-3">
