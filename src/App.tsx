@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import AuthGuard from "./components/AuthGuard";
-import NavBar from "./components/NavBar";
 import AppLayout from "./components/AppLayout";
 import RewardsPage from "./pages/RewardsPage";
 import CalendarPage from "./pages/CalendarPage";
@@ -275,8 +274,6 @@ const App = () => {
         <BrowserRouter>
           <AuthProvider>
             <div className="min-h-screen flex flex-col">
-              <NavBar />
-              
               {/* Enhanced status banner with more informative state handling */}
               {(swStatus === 'error' || swStatus === 'timeout' || isClearingCache || isRefreshingSubscriptions) && (
                 <div className={`p-2 flex justify-center items-center gap-2 ${
