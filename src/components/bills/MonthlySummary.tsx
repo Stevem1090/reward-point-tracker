@@ -91,6 +91,7 @@ export const MonthlySummary = () => {
       {Object.entries(groupedByType).map(([typeName, typeCalcs]) => {
         const typeTotal = typeCalcs.reduce((sum, calc) => sum + calc.totalAmount, 0);
         const typeColor = typeCalcs[0]?.bill.bill_type?.color || '#6366f1';
+        const percentage = grandTotal > 0 ? Math.round((typeTotal / grandTotal) * 100) : 0;
 
         return (
           <Card key={typeName}>
@@ -103,7 +104,9 @@ export const MonthlySummary = () => {
                   />
                   <CardTitle className="text-lg">{typeName}</CardTitle>
                 </div>
-                <p className="text-xl font-bold">£{typeTotal.toFixed(2)}</p>
+                <p className="text-xl font-bold">
+                  £{typeTotal.toFixed(2)} <span className="text-muted-foreground">({percentage}%)</span>
+                </p>
               </div>
             </CardHeader>
             <CardContent>
