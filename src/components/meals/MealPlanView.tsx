@@ -1,25 +1,38 @@
+import { useState } from 'react';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { useAIMealGeneration } from '@/hooks/useAIMealGeneration';
 import { useShoppingListGeneration } from '@/hooks/useShoppingListGeneration';
 import { MealSlot } from './MealSlot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Sparkles, Check, RefreshCw } from 'lucide-react';
+import { Loader2, Sparkles, Check, RefreshCw, Trash2 } from 'lucide-react';
 import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek, Ingredient } from '@/types/meal';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface MealPlanViewProps {
   weekStartDate: string;
 }
 
 export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
-  const { useMealPlanForWeek, createMealPlan, approveMealPlan } = useMealPlans();
+  const { useMealPlanForWeek, createMealPlan, approveMealPlan, deleteMealPlan } = useMealPlans();
   const { data: mealPlan, isLoading, error } = useMealPlanForWeek(weekStartDate);
   const { generateMealPlan } = useAIMealGeneration();
   const { generateShoppingList } = useShoppingListGeneration();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const isGenerating = generateMealPlan.isPending;
   const isFinalising = approveMealPlan.isPending || generateShoppingList.isPending;
+  const isDeleting = deleteMealPlan.isPending;
 
   const handleGeneratePlan = async () => {
     try {
@@ -254,8 +267,52 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
               </>
             )}
           </Button>
+
+          {/* Delete plan button */}
+          <Button 
+            variant="ghost"
+            onClick={() => setIsDeleteDialogOpen(true)}
+            disabled={isDeleting}
+            className="gap-2 w-full sm:w-auto text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete Plan
+          </Button>
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this meal plan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the meal plan and all its meals. You can generate a new plan afterwards.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (mealPlan) {
+                  await deleteMealPlan.mutateAsync(mealPlan.id);
+                  setIsDeleteDialogOpen(false);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Plan'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
