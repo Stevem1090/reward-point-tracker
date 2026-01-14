@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are a meal planning assistant for a UK family. Generate a weekly meal plan with one main meal per day (Monday to Sunday).
+const SYSTEM_PROMPT = `You are a meal planning assistant for a UK family. Generate meals for the specified days.
 
 RULES:
 - Suggest varied, family-friendly meals
@@ -35,18 +35,23 @@ serve(async (req) => {
   }
 
   try {
-    const { preferences, excludeMeals } = await req.json();
+    const { preferences, excludeMeals, daysToRegenerate } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const userPrompt = `Generate a meal plan for the week.
+    // Determine which days to generate
+    const allDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    const daysToGenerate = daysToRegenerate?.length > 0 ? daysToRegenerate : allDays;
+    const dayCount = daysToGenerate.length;
+
+    const userPrompt = `Generate ${dayCount} meal${dayCount > 1 ? 's' : ''} for: ${daysToGenerate.join(", ")}.
 ${preferences ? `Preferences: ${preferences}` : ""}
 ${excludeMeals?.length ? `Please avoid these meals we've had recently: ${excludeMeals.join(", ")}` : ""}
 
-Generate 7 meals, one for each day Monday through Sunday.`;
+Generate exactly ${dayCount} meal${dayCount > 1 ? 's' : ''}, one for each specified day.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -65,7 +70,7 @@ Generate 7 meals, one for each day Monday through Sunday.`;
             type: "function",
             function: {
               name: "suggest_meals",
-              description: "Return the weekly meal plan with 7 meals",
+              description: "Return the meal suggestions for the specified days",
               parameters: {
                 type: "object",
                 properties: {
@@ -76,7 +81,7 @@ Generate 7 meals, one for each day Monday through Sunday.`;
                       properties: {
                         day_of_week: { 
                           type: "string", 
-                          enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] 
+                          enum: allDays
                         },
                         meal_name: { type: "string" },
                         description: { type: "string" },

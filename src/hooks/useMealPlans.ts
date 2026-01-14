@@ -92,6 +92,21 @@ export function useMealPlans() {
     onError: () => toast.error('Failed to update servings')
   });
 
+  const updateMealUrl = useMutation({
+    mutationFn: async ({ mealId, recipeUrl }: { mealId: string; recipeUrl: string }) => {
+      const { error } = await supabase
+        .from('meals')
+        .update({ recipe_url: recipeUrl })
+        .eq('id', mealId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+      toast.success('Recipe URL updated');
+    },
+    onError: () => toast.error('Failed to update recipe URL')
+  });
+
   const approveMealPlan = useMutation({
     mutationFn: async (mealPlanId: string) => {
       const { error } = await supabase
@@ -143,6 +158,7 @@ export function useMealPlans() {
     createMealPlan,
     updateMealStatus,
     updateMealServings,
+    updateMealUrl,
     approveMealPlan,
     deleteMealPlan
   };
