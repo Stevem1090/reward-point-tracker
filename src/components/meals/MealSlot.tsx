@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { MealWithRecipeCard, DayOfWeek } from '@/types/meal';
-import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw } from 'lucide-react';
+import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen } from 'lucide-react';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { cn } from '@/lib/utils';
 import {
@@ -20,7 +20,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { SwapMealDialog } from './SwapMealDialog';
+import { RecipeCardDialog } from './RecipeCardDialog';
 
 interface MealSlotProps {
   day: DayOfWeek;
@@ -30,10 +36,11 @@ interface MealSlotProps {
 }
 
 export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotProps) {
-  const { updateMealStatus, updateMealUrl, replaceMeal, addMealToDay } = useMealPlans();
+  const { updateMealStatus, updateMealUrl, updateMealServings, replaceMeal, addMealToDay } = useMealPlans();
   const [isEditUrlOpen, setIsEditUrlOpen] = useState(false);
   const [editedUrl, setEditedUrl] = useState('');
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
+  const [isRecipeCardOpen, setIsRecipeCardOpen] = useState(false);
 
   const isWeekend = day === 'Saturday' || day === 'Sunday';
 
@@ -58,6 +65,13 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
     if (meal) {
       updateMealUrl.mutate({ mealId: meal.id, recipeUrl: editedUrl });
       setIsEditUrlOpen(false);
+    }
+  };
+
+  const handleServingsChange = (delta: number) => {
+    if (meal) {
+      const newServings = Math.max(1, meal.servings + delta);
+      updateMealServings.mutate({ mealId: meal.id, servings: newServings });
     }
   };
 
@@ -268,10 +282,60 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                       {meal.estimated_cook_minutes} mins
                     </span>
                   )}
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5" />
-                    {meal.servings} servings
-                  </span>
+                  
+                  {/* Editable servings - only before finalisation */}
+                  {!isPlanFinalised ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer">
+                          <Users className="h-3.5 w-3.5" />
+                          {meal.servings} servings
+                          <Pencil className="h-3 w-3 ml-0.5 opacity-50" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-2" align="start">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleServingsChange(-1)}
+                            disabled={meal.servings <= 1 || updateMealServings.isPending}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="w-12 text-center font-medium">
+                            {meal.servings}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleServingsChange(1)}
+                            disabled={updateMealServings.isPending}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5" />
+                      {meal.servings} servings
+                    </span>
+                  )}
+
+                  {/* View Recipe button - only for finalised meals with recipe card */}
+                  {isPlanFinalised && meal.recipe_card && (
+                    <button
+                      onClick={() => setIsRecipeCardOpen(true)}
+                      className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+                    >
+                      <BookOpen className="h-3.5 w-3.5" />
+                      View Recipe
+                    </button>
+                  )}
                 </div>
 
                 {/* Recipe URL */}
@@ -414,6 +478,18 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
         onSwap={handleSwapMeal}
         isSwapping={replaceMeal.isPending}
       />
+
+      {/* Recipe Card Dialog */}
+      {meal.recipe_card && (
+        <RecipeCardDialog
+          open={isRecipeCardOpen}
+          onOpenChange={setIsRecipeCardOpen}
+          recipeCard={meal.recipe_card}
+          currentServings={meal.servings}
+          recipeUrl={meal.recipe_url}
+          estimatedCookMinutes={meal.estimated_cook_minutes}
+        />
+      )}
     </>
   );
 }

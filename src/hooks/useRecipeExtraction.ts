@@ -94,6 +94,20 @@ export function useRecipeExtraction() {
         if (insertError) throw insertError;
       }
 
+      // Also update the meal record with extracted name and cook time
+      const { error: mealUpdateError } = await supabase
+        .from('meals')
+        .update({
+          meal_name: recipe.name,
+          estimated_cook_minutes: recipe.estimated_cook_minutes || null,
+        })
+        .eq('id', mealId);
+      
+      if (mealUpdateError) {
+        console.error('Failed to update meal with extracted data:', mealUpdateError);
+        // Don't throw - recipe card was created successfully
+      }
+
       return recipe;
     },
     onSuccess: () => {
