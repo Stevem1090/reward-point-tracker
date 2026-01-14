@@ -67,7 +67,18 @@ serve(async (req) => {
 
     const userPrompt = htmlContent 
       ? `Extract the recipe for "${mealName}" from this webpage content:\n\n${htmlContent}`
-      : `Generate a simple recipe for "${mealName}" as a fallback since the URL could not be fetched. Create reasonable ingredients and steps for this dish.`;
+      : `Generate a detailed, authentic recipe for "${mealName}".
+
+REQUIREMENTS:
+- Use realistic ingredient quantities for 4 servings
+- Include ALL necessary ingredients (don't skip basics like oil, salt, garlic, etc.)
+- Steps should be detailed and actionable (e.g., "dice the onion finely" not just "add onion")
+- Include prep techniques where relevant
+- Estimate realistic cooking time based on the dish
+- Use UK measurements (grams, ml, tbsp, tsp)
+- Make it a complete, cookable recipe that a home cook could follow successfully
+
+Create an authentic version of this dish with proper technique.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

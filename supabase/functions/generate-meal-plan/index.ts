@@ -5,25 +5,59 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are a meal planning assistant for a UK family. Generate meals for the specified days.
+const SYSTEM_PROMPT = `You are a creative meal planning assistant for a UK family.
 
-RULES:
-- Suggest varied, family-friendly meals
-- Include a mix of cuisines (British, Italian, Asian, Mexican, etc.)
-- Consider cooking time - some quick meals for busy weeknights
-- Avoid repeating the same protein two days in a row
-- IMPORTANT: Do NOT always suggest a roast dinner for Sunday. Vary Sunday meals - sometimes suggest pasta bake, curry, BBQ, stir fry, or other family favourites. Only include a roast occasionally.
-- Mark spicy dishes and note if kid-friendly adjustments are possible
+VARIETY RULES (CRITICAL - MUST FOLLOW):
+- Each week MUST include at least 4 different cuisines
+- NEVER suggest the same protein for consecutive meal slots
+- Include at least one "adventurous" meal the family might not have tried before
+- Mix cooking methods: include at least one each of oven-baked, stovetop, and one-pot/slow-cooker
+
+CUISINE ROTATION (pick at least 4 per week):
+British, Italian, Mexican, Thai, Chinese, Indian, Japanese, Greek, Middle Eastern, Korean, Vietnamese, American, Spanish, Moroccan, Caribbean, French, Turkish
+
+MEAL STYLE VARIETY (include a mix of these):
+- One-pot/traybake (easy cleanup)
+- Grilled or pan-fried
+- Stir-fry (quick)
+- Slow-cooked or braised
+- Fresh/salad-focused
+- Comfort food classics with a twist
+
+SLOT TIMING GUIDELINES:
+- WEEKDAY slots: Quick meals, under 30 mins active cooking
+- FRIDAY slots: Can be more indulgent, up to 45 mins
+- WEEKEND slots: Relaxed cooking, can be 60+ mins or slow-cooker meals
+
+AVOID (CRITICAL):
+- Generic dish names - be SPECIFIC (e.g., "Orecchiette with Broccoli Rabe & Sausage" NOT "Pasta Bake")
+- Defaulting to the same "safe" British options every time
+- Repetitive meal patterns (no spaghetti bolognese every week)
+- Bland or boring suggestions - be creative!
+
+GOOD EXAMPLES:
+- "Korean Beef Bulgogi Bowls with Pickled Vegetables"
+- "Moroccan Lamb Tagine with Apricots & Almonds"  
+- "Thai Basil Chicken (Pad Krapow Gai)"
+- "Crispy Gochujang Salmon with Sesame Rice"
+- "Shakshuka with Feta & Crusty Bread"
+
+BAD EXAMPLES (TOO GENERIC):
+- "Chicken Stir Fry"
+- "Pasta Bake"
+- "Fish and Chips"
+- "Beef Stew"
 
 URL INSTRUCTIONS:
 - Leave suggested_url as an empty string "" - users will find their own recipe links
 - Always set url_confidence to "low" since URLs cannot be verified
-- Focus on suggesting great meal ideas rather than specific recipes
 
 You MUST use the suggest_meals function to return your response.`;
 
+type SlotType = "WEEKDAY" | "FRIDAY" | "WEEKEND";
+
 interface MealSuggestion {
-  day_of_week: string;
+  slot_type: SlotType;
   meal_name: string;
   description: string;
   suggested_url: string;
@@ -32,6 +66,12 @@ interface MealSuggestion {
   servings: number;
   is_spicy: boolean;
   kid_friendly_notes?: string;
+}
+
+function getSlotType(day: string): SlotType {
+  if (["Saturday", "Sunday"].includes(day)) return "WEEKEND";
+  if (day === "Friday") return "FRIDAY";
+  return "WEEKDAY";
 }
 
 serve(async (req) => {
@@ -49,14 +89,42 @@ serve(async (req) => {
 
     // Determine which days to generate
     const allDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    const daysToGenerate = daysToRegenerate?.length > 0 ? daysToRegenerate : allDays;
-    const dayCount = daysToGenerate.length;
+    const daysToGenerate: string[] = daysToRegenerate?.length > 0 ? daysToRegenerate : allDays;
+    
+    // Map days to abstract slot types (AI doesn't see actual day names)
+    const daySlotMapping = daysToGenerate.map(day => ({
+      day,
+      slotType: getSlotType(day)
+    }));
 
-    const userPrompt = `Generate ${dayCount} meal${dayCount > 1 ? 's' : ''} for: ${daysToGenerate.join(", ")}.
-${preferences ? `Preferences: ${preferences}` : ""}
+    // Count slots needed by type
+    const slotCounts = {
+      WEEKDAY: daySlotMapping.filter(d => d.slotType === "WEEKDAY").length,
+      FRIDAY: daySlotMapping.filter(d => d.slotType === "FRIDAY").length,
+      WEEKEND: daySlotMapping.filter(d => d.slotType === "WEEKEND").length,
+    };
+
+    const totalMeals = daysToGenerate.length;
+
+    // Build user prompt with slot types instead of day names
+    const slotRequests = [];
+    if (slotCounts.WEEKDAY > 0) {
+      slotRequests.push(`- ${slotCounts.WEEKDAY} WEEKDAY meal${slotCounts.WEEKDAY > 1 ? 's' : ''} (quick, under 30 mins active cooking)`);
+    }
+    if (slotCounts.FRIDAY > 0) {
+      slotRequests.push(`- ${slotCounts.FRIDAY} FRIDAY meal${slotCounts.FRIDAY > 1 ? 's' : ''} (can be more indulgent, up to 45 mins)`);
+    }
+    if (slotCounts.WEEKEND > 0) {
+      slotRequests.push(`- ${slotCounts.WEEKEND} WEEKEND meal${slotCounts.WEEKEND > 1 ? 's' : ''} (relaxed cooking, can be 60+ mins)`);
+    }
+
+    const userPrompt = `Generate exactly ${totalMeals} meals for these slots:
+${slotRequests.join("\n")}
+
+${preferences ? `Family preferences: ${preferences}` : ""}
 ${excludeMeals?.length ? `Please avoid these meals we've had recently: ${excludeMeals.join(", ")}` : ""}
 
-Generate exactly ${dayCount} meal${dayCount > 1 ? 's' : ''}, one for each specified day.`;
+Remember: Be creative and specific with meal names. Include cuisine variety. Tag each meal with its slot_type.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -75,7 +143,7 @@ Generate exactly ${dayCount} meal${dayCount > 1 ? 's' : ''}, one for each specif
             type: "function",
             function: {
               name: "suggest_meals",
-              description: "Return the meal suggestions for the specified days",
+              description: "Return the meal suggestions for the specified slots",
               parameters: {
                 type: "object",
                 properties: {
@@ -84,9 +152,9 @@ Generate exactly ${dayCount} meal${dayCount > 1 ? 's' : ''}, one for each specif
                     items: {
                       type: "object",
                       properties: {
-                        day_of_week: { 
+                        slot_type: { 
                           type: "string", 
-                          enum: allDays
+                          enum: ["WEEKDAY", "FRIDAY", "WEEKEND"]
                         },
                         meal_name: { type: "string" },
                         description: { type: "string" },
@@ -97,7 +165,7 @@ Generate exactly ${dayCount} meal${dayCount > 1 ? 's' : ''}, one for each specif
                         is_spicy: { type: "boolean" },
                         kid_friendly_notes: { type: "string" },
                       },
-                      required: ["day_of_week", "meal_name", "description", "suggested_url", "url_confidence", "estimated_cook_minutes", "servings", "is_spicy"],
+                      required: ["slot_type", "meal_name", "description", "suggested_url", "url_confidence", "estimated_cook_minutes", "servings", "is_spicy"],
                     },
                   },
                 },
@@ -135,10 +203,53 @@ Generate exactly ${dayCount} meal${dayCount > 1 ? 's' : ''}, one for each specif
       throw new Error("Invalid response from AI");
     }
 
-    const meals: MealSuggestion[] = JSON.parse(toolCall.function.arguments).meals;
+    const aiMeals: MealSuggestion[] = JSON.parse(toolCall.function.arguments).meals;
+
+    // Map AI meals (by slot_type) back to actual days
+    const slotQueues: Record<SlotType, MealSuggestion[]> = {
+      WEEKDAY: aiMeals.filter(m => m.slot_type === "WEEKDAY"),
+      FRIDAY: aiMeals.filter(m => m.slot_type === "FRIDAY"),
+      WEEKEND: aiMeals.filter(m => m.slot_type === "WEEKEND"),
+    };
+
+    const slotIndices: Record<SlotType, number> = { WEEKDAY: 0, FRIDAY: 0, WEEKEND: 0 };
+
+    const mappedMeals = daySlotMapping.map(({ day, slotType }) => {
+      const queue = slotQueues[slotType];
+      const index = slotIndices[slotType];
+      slotIndices[slotType]++;
+      
+      const meal = queue[index];
+      if (!meal) {
+        // Fallback if AI didn't return enough meals for this slot type
+        console.warn(`Missing meal for ${slotType} slot, day ${day}`);
+        return {
+          day_of_week: day,
+          meal_name: "Meal suggestion unavailable",
+          description: "Please regenerate or add manually",
+          suggested_url: "",
+          url_confidence: "low" as const,
+          estimated_cook_minutes: 30,
+          servings: 4,
+          is_spicy: false,
+        };
+      }
+
+      return {
+        day_of_week: day,
+        meal_name: meal.meal_name,
+        description: meal.description,
+        suggested_url: meal.suggested_url,
+        url_confidence: meal.url_confidence,
+        estimated_cook_minutes: meal.estimated_cook_minutes,
+        servings: meal.servings,
+        is_spicy: meal.is_spicy,
+        kid_friendly_notes: meal.kid_friendly_notes,
+      };
+    });
 
     return new Response(
-      JSON.stringify({ meals }),
+      JSON.stringify({ meals: mappedMeals }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
