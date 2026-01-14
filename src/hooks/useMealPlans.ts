@@ -107,6 +107,89 @@ export function useMealPlans() {
     onError: () => toast.error('Failed to update recipe URL')
   });
 
+  const replaceMeal = useMutation({
+    mutationFn: async ({ 
+      mealId, 
+      mealName, 
+      description, 
+      recipeUrl, 
+      servings, 
+      estimatedCookMinutes,
+      recipeId 
+    }: { 
+      mealId: string; 
+      mealName: string; 
+      description?: string; 
+      recipeUrl?: string; 
+      servings: number;
+      estimatedCookMinutes?: number;
+      recipeId?: string;
+    }) => {
+      const { error } = await supabase
+        .from('meals')
+        .update({ 
+          meal_name: mealName,
+          description: description || null,
+          recipe_url: recipeUrl || null,
+          servings,
+          estimated_cook_minutes: estimatedCookMinutes || null,
+          recipe_id: recipeId || null,
+          source_type: recipeId ? 'library' : 'manual',
+          status: 'pending' // Reset to pending for re-approval
+        })
+        .eq('id', mealId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+      toast.success('Meal replaced');
+    },
+    onError: () => toast.error('Failed to replace meal')
+  });
+
+  const addMealToDay = useMutation({
+    mutationFn: async ({ 
+      mealPlanId,
+      dayOfWeek,
+      mealName, 
+      description, 
+      recipeUrl, 
+      servings, 
+      estimatedCookMinutes,
+      recipeId 
+    }: { 
+      mealPlanId: string;
+      dayOfWeek: DayOfWeek;
+      mealName: string; 
+      description?: string; 
+      recipeUrl?: string; 
+      servings: number;
+      estimatedCookMinutes?: number;
+      recipeId?: string;
+    }) => {
+      const { error } = await supabase
+        .from('meals')
+        .insert([{ 
+          meal_plan_id: mealPlanId,
+          day_of_week: dayOfWeek,
+          meal_name: mealName,
+          description: description || null,
+          recipe_url: recipeUrl || null,
+          servings,
+          estimated_cook_minutes: estimatedCookMinutes || null,
+          recipe_id: recipeId || null,
+          source_type: recipeId ? 'library' : 'manual',
+          status: 'pending'
+        }]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+      toast.success('Meal added');
+    },
+    onError: () => toast.error('Failed to add meal')
+  });
+
   const approveMealPlan = useMutation({
     mutationFn: async (mealPlanId: string) => {
       const { error } = await supabase
@@ -159,6 +242,8 @@ export function useMealPlans() {
     updateMealStatus,
     updateMealServings,
     updateMealUrl,
+    replaceMeal,
+    addMealToDay,
     approveMealPlan,
     deleteMealPlan
   };
