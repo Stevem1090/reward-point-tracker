@@ -12,8 +12,13 @@ RULES:
 - Include a mix of cuisines (British, Italian, Asian, Mexican, etc.)
 - Consider cooking time - some quick meals for busy weeknights
 - Avoid repeating the same protein two days in a row
-- For each meal, suggest a URL from a well-known recipe site (BBC Good Food, Delicious Magazine, Jamie Oliver, etc.)
+- IMPORTANT: Do NOT always suggest a roast dinner for Sunday. Vary Sunday meals - sometimes suggest pasta bake, curry, BBQ, stir fry, or other family favourites. Only include a roast occasionally.
 - Mark spicy dishes and note if kid-friendly adjustments are possible
+
+URL INSTRUCTIONS:
+- Leave suggested_url as an empty string "" - users will find their own recipe links
+- Always set url_confidence to "low" since URLs cannot be verified
+- Focus on suggesting great meal ideas rather than specific recipes
 
 You MUST use the suggest_meals function to return your response.`;
 

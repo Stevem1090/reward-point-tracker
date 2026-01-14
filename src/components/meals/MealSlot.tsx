@@ -203,10 +203,28 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                       >
                         <X className="h-5 w-5" />
                       </Button>
+                      {/* More options for pending meals */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-10 w-10">
+                            <MoreVertical className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={handleEditUrl}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Recipe URL
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setIsSwapDialogOpen(true)}>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Replace Meal
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   )}
 
-                  {/* More options menu - desktop only */}
+                  {/* More options menu for non-pending - desktop only */}
                   {!isPlanFinalised && meal.status !== 'pending' && (
                     <div className="hidden sm:block">
                       <DropdownMenu>
@@ -304,6 +322,23 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                   <X className="h-4 w-4 mr-2" />
                   Reject
                 </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="min-h-[44px] w-11 shrink-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleEditUrl}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Recipe URL
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsSwapDialogOpen(true)}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Replace Meal
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
 
