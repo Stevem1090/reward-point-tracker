@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { MealWithRecipeCard, DayOfWeek } from '@/types/meal';
-import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil } from 'lucide-react';
+import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw } from 'lucide-react';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { cn } from '@/lib/utils';
 import {
@@ -20,17 +20,20 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { SwapMealDialog } from './SwapMealDialog';
 
 interface MealSlotProps {
   day: DayOfWeek;
   meal?: MealWithRecipeCard;
   isPlanFinalised: boolean;
+  mealPlanId?: string;
 }
 
-export function MealSlot({ day, meal, isPlanFinalised }: MealSlotProps) {
-  const { updateMealStatus, updateMealUrl } = useMealPlans();
+export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotProps) {
+  const { updateMealStatus, updateMealUrl, replaceMeal, addMealToDay } = useMealPlans();
   const [isEditUrlOpen, setIsEditUrlOpen] = useState(false);
   const [editedUrl, setEditedUrl] = useState('');
+  const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
 
   const isWeekend = day === 'Saturday' || day === 'Sunday';
 
@@ -58,6 +61,29 @@ export function MealSlot({ day, meal, isPlanFinalised }: MealSlotProps) {
     }
   };
 
+  const handleSwapMeal = async (data: {
+    mealName: string;
+    description?: string;
+    recipeUrl?: string;
+    servings: number;
+    estimatedCookMinutes?: number;
+    recipeId?: string;
+  }) => {
+    if (meal) {
+      await replaceMeal.mutateAsync({
+        mealId: meal.id,
+        ...data,
+      });
+    } else if (mealPlanId) {
+      await addMealToDay.mutateAsync({
+        mealPlanId,
+        dayOfWeek: day,
+        ...data,
+      });
+    }
+    setIsSwapDialogOpen(false);
+  };
+
   // Extract domain from URL for display
   const getUrlDomain = (url: string) => {
     try {
@@ -71,24 +97,39 @@ export function MealSlot({ day, meal, isPlanFinalised }: MealSlotProps) {
   // Empty slot
   if (!meal) {
     return (
-      <Card className="border-dashed opacity-60">
-        <CardContent className="py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "w-12 h-12 rounded-lg flex items-center justify-center text-xs font-medium shrink-0",
-              isWeekend ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"
-            )}>
-              {day.slice(0, 3)}
+      <>
+        <Card className="border-dashed opacity-60">
+          <CardContent className="py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-12 h-12 rounded-lg flex items-center justify-center text-xs font-medium shrink-0",
+                isWeekend ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"
+              )}>
+                {day.slice(0, 3)}
+              </div>
+              <span className="text-muted-foreground">No meal planned</span>
             </div>
-            <span className="text-muted-foreground">No meal planned</span>
-          </div>
-          {!isPlanFinalised && (
-            <Button variant="ghost" size="icon" className="h-10 w-10">
-              <Plus className="h-5 w-5" />
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+            {!isPlanFinalised && mealPlanId && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-10 w-10"
+                onClick={() => setIsSwapDialogOpen(true)}
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+        
+        <SwapMealDialog
+          open={isSwapDialogOpen}
+          onOpenChange={setIsSwapDialogOpen}
+          day={day}
+          onSwap={handleSwapMeal}
+          isSwapping={addMealToDay.isPending}
+        />
+      </>
     );
   }
 
@@ -191,9 +232,9 @@ export function MealSlot({ day, meal, isPlanFinalised }: MealSlotProps) {
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit Recipe URL
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Users className="h-4 w-4 mr-2" />
-                            Change Servings
+                          <DropdownMenuItem onClick={() => setIsSwapDialogOpen(true)}>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Replace Meal
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -306,7 +347,6 @@ export function MealSlot({ day, meal, isPlanFinalised }: MealSlotProps) {
           </div>
         </CardContent>
       </Card>
-
       {/* Edit URL Dialog */}
       <Dialog open={isEditUrlOpen} onOpenChange={setIsEditUrlOpen}>
         <DialogContent>
@@ -329,6 +369,16 @@ export function MealSlot({ day, meal, isPlanFinalised }: MealSlotProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Swap Meal Dialog */}
+      <SwapMealDialog
+        open={isSwapDialogOpen}
+        onOpenChange={setIsSwapDialogOpen}
+        day={day}
+        mealId={meal.id}
+        onSwap={handleSwapMeal}
+        isSwapping={replaceMeal.isPending}
+      />
     </>
   );
 }

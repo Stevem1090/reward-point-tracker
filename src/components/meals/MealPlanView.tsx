@@ -1,10 +1,11 @@
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { useAIMealGeneration } from '@/hooks/useAIMealGeneration';
+import { useShoppingListGeneration } from '@/hooks/useShoppingListGeneration';
 import { MealSlot } from './MealSlot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Sparkles, Check, RefreshCw } from 'lucide-react';
-import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek } from '@/types/meal';
+import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek, Ingredient } from '@/types/meal';
 import { toast } from 'sonner';
 
 interface MealPlanViewProps {
@@ -15,8 +16,10 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   const { useMealPlanForWeek, createMealPlan, approveMealPlan } = useMealPlans();
   const { data: mealPlan, isLoading, error } = useMealPlanForWeek(weekStartDate);
   const { generateMealPlan } = useAIMealGeneration();
+  const { generateShoppingList } = useShoppingListGeneration();
 
   const isGenerating = generateMealPlan.isPending;
+  const isFinalising = approveMealPlan.isPending || generateShoppingList.isPending;
 
   const handleGeneratePlan = async () => {
     try {
@@ -64,9 +67,28 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   const handleFinalisePlan = async () => {
     if (!mealPlan) return;
     try {
+      // First approve the meal plan
       await approveMealPlan.mutateAsync(mealPlan.id);
+      
+      // Then generate shopping list from approved meals
+      const approvedMeals = mealPlan.meals.filter(m => m.status === 'approved');
+      const mealsWithIngredients = approvedMeals
+        .filter(m => m.recipe_card?.ingredients)
+        .map(m => ({
+          mealName: m.meal_name,
+          servings: m.servings,
+          ingredients: (m.recipe_card?.ingredients || []) as Ingredient[],
+        }));
+      
+      if (mealsWithIngredients.length > 0) {
+        await generateShoppingList.mutateAsync({
+          mealPlanId: mealPlan.id,
+          meals: mealsWithIngredients,
+        });
+        toast.success('Shopping list generated!');
+      }
     } catch (error) {
-      console.error('Failed to approve plan:', error);
+      console.error('Failed to finalise plan:', error);
     }
   };
 
@@ -160,6 +182,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
             day={day}
             meal={getMealForDay(day)}
             isPlanFinalised={isPlanFinalised}
+            mealPlanId={mealPlan.id}
           />
         ))}
       </div>
@@ -172,13 +195,13 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
             <Button 
               size="lg" 
               onClick={handleFinalisePlan}
-              disabled={approveMealPlan.isPending}
+              disabled={isFinalising}
               className="min-h-[48px] gap-2 w-full sm:w-auto"
             >
-              {approveMealPlan.isPending ? (
+              {isFinalising ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Finalising...
+                  {generateShoppingList.isPending ? 'Creating shopping list...' : 'Finalising...'}
                 </>
               ) : (
                 <>
