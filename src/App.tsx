@@ -13,6 +13,7 @@ import ListsPage from "./pages/ListsPage";
 import RemindersPage from "./pages/RemindersPage";
 import ProfilePage from "./pages/ProfilePage";
 import BillsPage from "./pages/BillsPage";
+import MealPlanningPage from "./pages/MealPlanningPage";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
@@ -346,6 +347,7 @@ const App = () => {
                     <Route path="/lists" element={<ListsPage />} />
                     <Route path="/reminders" element={<RemindersPage />} />
                     <Route path="/bills" element={<BillsPage />} />
+                    <Route path="/meals" element={<MealPlanningPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                   </Route>
                   
