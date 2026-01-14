@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,35 +9,25 @@ const corsHeaders = {
 const SYSTEM_PROMPT = `You are a practical meal planning assistant for a UK family.
 
 BALANCE PRINCIPLE:
-Aim for roughly 70% familiar, crowd-pleasing meals and 30% slightly more adventurous options. 
+Aim for roughly 70% familiar, crowd-pleasing meals and 30% slightly more adventurous options.
 Families need reliable weeknight dinners, not a culinary adventure every night.
 
 VARIETY GUIDELINES:
-- Include 2-3 different cuisines across the week (not 4+)
+- Include 2–3 cuisines across the week + 1 wildcard meal (still family-friendly)
 - Avoid repeating the same main protein on consecutive days
 - Mix cooking effort: some quick, some more involved
-
-CUISINE OPTIONS (use a sensible mix):
-British, Italian, Mexican, Chinese, Indian, American, Mediterranean
+- Across 7 meals: use at least 4 different main proteins and at least 4 different carb bases (e.g. rice, pasta, potatoes, wraps, noodles, couscous/bulgur, bread, low-carb bowl)
+- Across 7 meals: use at least 4 cooking methods (traybake, one-pan, oven-bake, simmer/curry, grill, slow-cook, stir-fry, build-your-own)
 
 SLOT TIMING:
-- WEEKDAY: Quick, practical meals under 30 mins - focus on family favourites
-- FRIDAY: Can be a treat meal or takeaway-style dish
-- WEEKEND: More time for cooking - could be a roast, slow-cook, or something slightly different
+- WEEKDAY: Quick, practical meals under 30 mins
+- FRIDAY: Treat meal or takeaway-style dish
+- WEEKEND: More time for cooking - roast, slow-cook, pie, traybake, etc.
 
 NAMING STYLE:
 - Use clear, recognisable dish names families will understand
 - Be specific enough to be useful, but not overly elaborate
 - Avoid pretentious or restaurant-style naming
-
-GOOD EXAMPLES (balanced, practical):
-- "Chicken Fajitas with Peppers and Onions"
-- "Spaghetti Bolognese"
-- "Salmon Teriyaki with Rice and Broccoli"
-- "Shepherd's Pie"
-- "Thai Green Chicken Curry"
-- "Homemade Beef Burgers with Chips"
-- "Lemon Herb Roast Chicken" (weekend)
 
 AVOID:
 - Overly exotic or unfamiliar ingredients
@@ -44,11 +35,36 @@ AVOID:
 - Dishes that require hard-to-find ingredients
 - Restaurant-style pretentious naming
 
+RECENT MEALS (VERY IMPORTANT):
+You will receive a list called recent_meals (meals from recent weekly plans).
+
+HARD CONSTRAINT — DO NOT REPEAT:
+- Do not include any meal that is the same as, very similar to, or a clear variant of anything in recent_meals.
+- Treat these as repeats (examples):
+  - "Spaghetti Bolognese" ≈ "Spag Bol" ≈ "Pasta Bolognese" ≈ "Turkey Bolognese"
+  - "Chicken Fajitas" ≈ "Fajita Wraps" ≈ "Sheet-pan Fajitas"
+  - "Beef Burgers" ≈ "Cheeseburgers" ≈ "Homemade Burgers"
+  - "Chilli con carne" ≈ "Beef chilli" ≈ "Chilli bowls"
+  - Curry variants count as repeats if the base is the same (e.g., "Chicken Tikka" ≈ "Chicken Tikka Masala")
+
+NOVELTY TARGET:
+- At least 5 of the 7 meals must be clearly different from recent_meals in: (1) core protein, (2) cuisine style, and (3) format (pasta vs traybake vs bowls vs pie etc.).
+- Include at least 3 "less common but still UK-family-friendly" meals (recognisable, no hard-to-find ingredients).
+
+TWO-PASS PLANNING (important):
+1) Silently generate a candidate pool of 20–25 dinners that fit all rules and avoid recent_meals.
+2) Select the final 7 that maximise variety across protein, carb, cuisine, and method.
+
+If constraints conflict, prioritise:
+1) Avoid repeats vs recent_meals
+2) Keep weekday meals under 30 mins
+3) Keep the plan family-friendly and practical
+
 URL INSTRUCTIONS:
 - Leave suggested_url as empty string ""
 - Set url_confidence to "low"
 
-You MUST use the suggest_meals function to return your response.`;
+Use the suggest_meals function to return your response.`;
 
 type SlotType = "WEEKDAY" | "FRIDAY" | "WEEKEND";
 
@@ -70,6 +86,41 @@ function getSlotType(day: string): SlotType {
   return "WEEKDAY";
 }
 
+async function fetchRecentMeals(supabase: ReturnType<typeof createClient>): Promise<string[]> {
+  // Get meals from the last 4 weeks
+  const fourWeeksAgo = new Date();
+  fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+  const fourWeeksAgoStr = fourWeeksAgo.toISOString().split('T')[0];
+
+  const { data: recentMealPlans, error: plansError } = await supabase
+    .from('meal_plans')
+    .select('id, week_start_date')
+    .gte('week_start_date', fourWeeksAgoStr)
+    .order('week_start_date', { ascending: false });
+
+  if (plansError || !recentMealPlans?.length) {
+    console.log('No recent meal plans found or error:', plansError);
+    return [];
+  }
+
+  const planIds = recentMealPlans.map(p => p.id);
+
+  const { data: meals, error: mealsError } = await supabase
+    .from('meals')
+    .select('meal_name')
+    .in('meal_plan_id', planIds);
+
+  if (mealsError) {
+    console.error('Error fetching recent meals:', mealsError);
+    return [];
+  }
+
+  // Return unique meal names
+  const mealNames = [...new Set(meals?.map(m => m.meal_name) || [])];
+  console.log(`Found ${mealNames.length} unique meals from last 4 weeks:`, mealNames);
+  return mealNames;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -78,10 +129,22 @@ serve(async (req) => {
   try {
     const { preferences, excludeMeals, daysToRegenerate } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
+
+    // Fetch recent meals from database
+    let recentMeals: string[] = [];
+    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      recentMeals = await fetchRecentMeals(supabase);
+    }
+
+    // Combine database recent meals with any explicitly excluded meals
+    const allExcludedMeals = [...new Set([...recentMeals, ...(excludeMeals || [])])];
 
     // Determine which days to generate
     const allDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -114,13 +177,17 @@ serve(async (req) => {
       slotRequests.push(`- ${slotCounts.WEEKEND} WEEKEND meal${slotCounts.WEEKEND > 1 ? 's' : ''} (relaxed cooking, can be 60+ mins)`);
     }
 
+    // Build the recent meals section for the prompt
+    const recentMealsSection = allExcludedMeals.length > 0
+      ? `\nrecent_meals (DO NOT REPEAT or use similar variants):\n${allExcludedMeals.map(m => `- ${m}`).join('\n')}\n`
+      : '';
+
     const userPrompt = `Generate exactly ${totalMeals} meals for these slots:
 ${slotRequests.join("\n")}
 
 ${preferences ? `Family preferences: ${preferences}` : ""}
-${excludeMeals?.length ? `Please avoid these meals we've had recently: ${excludeMeals.join(", ")}` : ""}
-
-Remember: Focus on practical, family-friendly meals. Include some variety but prioritise reliability. Tag each meal with its slot_type.`;
+${recentMealsSection}
+Remember: Focus on practical, family-friendly meals with good variety. Avoid any meals similar to recent_meals. Tag each meal with its slot_type.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
