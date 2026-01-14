@@ -180,9 +180,21 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
       {/* Status banner for approved plans */}
       {isPlanFinalised && (
         <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
-          <CardContent className="py-3 flex items-center justify-center gap-2 text-green-700 dark:text-green-300">
-            <Check className="h-5 w-5" />
-            <span className="font-medium">Meal plan approved! Check the Shopping tab for your list.</span>
+          <CardContent className="py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+              <Check className="h-5 w-5" />
+              <span className="font-medium">Meal plan approved! Check the Shopping tab for your list.</span>
+            </div>
+            <Button 
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              disabled={isDeleting}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
           </CardContent>
         </Card>
       )}
