@@ -4,6 +4,12 @@ import { Recipe, Ingredient, RecipeSourceType } from '@/types/meal';
 import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
 
+async function getCurrentUserId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useRecipes() {
   const queryClient = useQueryClient();
 
@@ -28,10 +34,12 @@ export function useRecipes() {
 
   const createRecipe = useMutation({
     mutationFn: async (recipe: Omit<Recipe, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+      const userId = await getCurrentUserId();
       const { data, error } = await supabase
         .from('recipes')
         .insert([{
           ...recipe,
+          user_id: userId,
           ingredients: recipe.ingredients as unknown as Json,
           steps: recipe.steps as unknown as Json
         }])

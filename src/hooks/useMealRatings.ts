@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { MealRating } from '@/types/meal';
 import { toast } from 'sonner';
 
+async function getCurrentUserId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useMealRatings() {
   const queryClient = useQueryClient();
 
@@ -25,6 +31,8 @@ export function useMealRatings() {
 
   const upsertRating = useMutation({
     mutationFn: async ({ mealId, rating, notes }: { mealId: string; rating: number; notes?: string }) => {
+      const userId = await getCurrentUserId();
+      
       const { data: existing } = await supabase
         .from('meal_ratings')
         .select('id')
@@ -35,7 +43,7 @@ export function useMealRatings() {
         const { error } = await supabase.from('meal_ratings').update({ rating, notes }).eq('id', existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('meal_ratings').insert([{ meal_id: mealId, rating, notes }]);
+        const { error } = await supabase.from('meal_ratings').insert([{ meal_id: mealId, rating, notes, user_id: userId }]);
         if (error) throw error;
       }
     },

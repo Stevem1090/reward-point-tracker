@@ -4,6 +4,12 @@ import { MealPlan, Meal, MealPlanWithMeals, DayOfWeek, MealStatus, MealPlanStatu
 import { toast } from 'sonner';
 import { getWeekStartDate } from '@/utils/getWeekBounds';
 
+async function getCurrentUserId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useMealPlans() {
   const queryClient = useQueryClient();
 
@@ -45,9 +51,10 @@ export function useMealPlans() {
 
   const createMealPlan = useMutation({
     mutationFn: async (weekStartDate: string): Promise<MealPlan> => {
+      const userId = await getCurrentUserId();
       const { data, error } = await supabase
         .from('meal_plans')
-        .insert([{ week_start_date: weekStartDate }])
+        .insert([{ week_start_date: weekStartDate, user_id: userId }])
         .select()
         .single();
 
