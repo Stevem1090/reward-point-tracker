@@ -3,8 +3,8 @@ import { useAIMealGeneration } from '@/hooks/useAIMealGeneration';
 import { MealSlot } from './MealSlot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Sparkles, Check } from 'lucide-react';
-import { DAYS_OF_WEEK, MealWithRecipeCard } from '@/types/meal';
+import { Loader2, Sparkles, Check, RefreshCw } from 'lucide-react';
+import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek } from '@/types/meal';
 import { toast } from 'sonner';
 
 interface MealPlanViewProps {
@@ -38,6 +38,29 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
     }
   };
 
+  const handleRegenerateRejected = async () => {
+    if (!mealPlan) return;
+    
+    const rejectedDays = mealPlan.meals
+      .filter(m => m.status === 'rejected')
+      .map(m => m.day_of_week);
+    
+    if (rejectedDays.length === 0) {
+      toast.info('No rejected meals to regenerate');
+      return;
+    }
+
+    try {
+      await generateMealPlan.mutateAsync({
+        mealPlanId: mealPlan.id,
+        weekStartDate,
+        daysToRegenerate: rejectedDays,
+      });
+    } catch (error) {
+      console.error('Failed to regenerate rejected meals:', error);
+    }
+  };
+
   const handleFinalisePlan = async () => {
     if (!mealPlan) return;
     try {
@@ -55,6 +78,9 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   // Check if all meals are approved
   const allMealsApproved = mealPlan?.meals.length === 7 && 
     mealPlan.meals.every(m => m.status === 'approved');
+
+  // Check if there are rejected meals
+  const hasRejectedMeals = mealPlan?.meals.some(m => m.status === 'rejected');
 
   // Check if plan is already finalised
   const isPlanFinalised = mealPlan?.status === 'approved';
@@ -138,38 +164,60 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
         ))}
       </div>
 
-      {/* Finalise button */}
-      {!isPlanFinalised && allMealsApproved && (
-        <div className="pt-4 flex justify-center">
-          <Button 
-            size="lg" 
-            onClick={handleFinalisePlan}
-            disabled={approveMealPlan.isPending}
-            className="min-h-[48px] gap-2"
-          >
-            {approveMealPlan.isPending ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Finalising...
-              </>
-            ) : (
-              <>
-                <Check className="h-5 w-5" />
-                Finalise Meal Plan
-              </>
-            )}
-          </Button>
-        </div>
-      )}
-
-      {/* Regenerate button for draft plans */}
+      {/* Action buttons for draft plans */}
       {!isPlanFinalised && mealPlan.meals.length > 0 && (
-        <div className="pt-2 flex justify-center">
+        <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+          {/* Finalise button - only when all approved */}
+          {allMealsApproved && (
+            <Button 
+              size="lg" 
+              onClick={handleFinalisePlan}
+              disabled={approveMealPlan.isPending}
+              className="min-h-[48px] gap-2 w-full sm:w-auto"
+            >
+              {approveMealPlan.isPending ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Finalising...
+                </>
+              ) : (
+                <>
+                  <Check className="h-5 w-5" />
+                  Finalise Meal Plan
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Regenerate rejected button */}
+          {hasRejectedMeals && (
+            <Button 
+              variant="secondary"
+              size="lg"
+              onClick={handleRegenerateRejected}
+              disabled={isGenerating}
+              className="min-h-[48px] gap-2 w-full sm:w-auto"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Regenerating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Regenerate Rejected
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Regenerate all button */}
           <Button 
             variant="outline"
             onClick={handleGeneratePlan}
             disabled={isGenerating}
-            className="gap-2"
+            className="gap-2 w-full sm:w-auto"
           >
             {isGenerating ? (
               <>
@@ -179,7 +227,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Regenerate Plan
+                Regenerate All
               </>
             )}
           </Button>

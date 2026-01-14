@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { AISuggestedMeal, DayOfWeek, MealSourceType } from '@/types/meal';
+import { DayOfWeek, MealSourceType } from '@/types/meal';
 import { toast } from 'sonner';
 
 interface GenerateMealPlanParams {
@@ -8,6 +8,7 @@ interface GenerateMealPlanParams {
   weekStartDate: string;
   preferences?: string;
   excludeMeals?: string[];
+  daysToRegenerate?: DayOfWeek[];
 }
 
 interface GeneratedMeal {
@@ -26,7 +27,7 @@ export function useAIMealGeneration() {
   const queryClient = useQueryClient();
 
   const generateMealPlan = useMutation({
-    mutationFn: async ({ mealPlanId, weekStartDate, preferences, excludeMeals }: GenerateMealPlanParams) => {
+    mutationFn: async ({ mealPlanId, weekStartDate, preferences, excludeMeals, daysToRegenerate }: GenerateMealPlanParams) => {
       // Get auth token for edge function
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
@@ -40,7 +41,7 @@ export function useAIMealGeneration() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ preferences, excludeMeals }),
+          body: JSON.stringify({ preferences, excludeMeals, daysToRegenerate }),
         }
       );
 
@@ -57,11 +58,33 @@ export function useAIMealGeneration() {
 
       const { meals }: { meals: GeneratedMeal[] } = await response.json();
 
-      // Clear existing meals for this plan
-      await supabase
+      // Only delete meals for the days being regenerated (or all if regenerating whole plan)
+      if (daysToRegenerate && daysToRegenerate.length > 0) {
+        // Delete only meals for specific days
+        for (const day of daysToRegenerate) {
+          await supabase
+            .from('meals')
+            .delete()
+            .eq('meal_plan_id', mealPlanId)
+            .eq('day_of_week', day);
+        }
+      } else {
+        // Full regeneration - delete all meals
+        await supabase
+          .from('meals')
+          .delete()
+          .eq('meal_plan_id', mealPlanId);
+      }
+
+      // Get current max sort_order
+      const { data: existingMeals } = await supabase
         .from('meals')
-        .delete()
-        .eq('meal_plan_id', mealPlanId);
+        .select('sort_order')
+        .eq('meal_plan_id', mealPlanId)
+        .order('sort_order', { ascending: false })
+        .limit(1);
+
+      const startSortOrder = (existingMeals?.[0]?.sort_order ?? -1) + 1;
 
       // Insert the new meals
       const mealsToInsert = meals.map((meal, index) => ({
@@ -74,7 +97,7 @@ export function useAIMealGeneration() {
         estimated_cook_minutes: meal.estimated_cook_minutes,
         servings: meal.servings,
         status: 'pending' as const,
-        sort_order: index,
+        sort_order: startSortOrder + index,
       }));
 
       const { error: insertError } = await supabase
@@ -85,9 +108,12 @@ export function useAIMealGeneration() {
 
       return meals;
     },
-    onSuccess: (_, { weekStartDate }) => {
+    onSuccess: (_, { weekStartDate, daysToRegenerate }) => {
       queryClient.invalidateQueries({ queryKey: ['mealPlan', weekStartDate] });
-      toast.success('Meal plan generated!');
+      const message = daysToRegenerate?.length 
+        ? `Regenerated ${daysToRegenerate.length} meal${daysToRegenerate.length > 1 ? 's' : ''}!`
+        : 'Meal plan generated!';
+      toast.success(message);
     },
     onError: (error: Error) => {
       toast.error(error.message);
