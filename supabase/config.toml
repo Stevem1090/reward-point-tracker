@@ -6,3 +6,15 @@ verify_jwt = true
 
 [functions.send-email]
 verify_jwt = true
+
+[functions.generate-meal-plan]
+verify_jwt = true
+
+[functions.extract-recipe-from-url]
+verify_jwt = true
+
+[functions.process-cookbook-recipe]
+verify_jwt = true
+
+[functions.generate-shopping-list]
+verify_jwt = true
