@@ -1,10 +1,10 @@
 import { useMealPlans } from '@/hooks/useMealPlans';
+import { useAIMealGeneration } from '@/hooks/useAIMealGeneration';
 import { MealSlot } from './MealSlot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Sparkles, Check } from 'lucide-react';
 import { DAYS_OF_WEEK, MealWithRecipeCard } from '@/types/meal';
-import { useState } from 'react';
 import { toast } from 'sonner';
 
 interface MealPlanViewProps {
@@ -14,21 +14,27 @@ interface MealPlanViewProps {
 export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   const { useMealPlanForWeek, createMealPlan, approveMealPlan } = useMealPlans();
   const { data: mealPlan, isLoading, error } = useMealPlanForWeek(weekStartDate);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { generateMealPlan } = useAIMealGeneration();
+
+  const isGenerating = generateMealPlan.isPending;
 
   const handleGeneratePlan = async () => {
-    setIsGenerating(true);
     try {
+      let planId = mealPlan?.id;
+      
       // First create the meal plan if it doesn't exist
-      if (!mealPlan) {
-        await createMealPlan.mutateAsync(weekStartDate);
+      if (!planId) {
+        const newPlan = await createMealPlan.mutateAsync(weekStartDate);
+        planId = newPlan.id;
       }
-      // TODO: Call generate-meal-plan edge function
-      toast.info('AI meal generation coming soon!');
+      
+      // Call AI to generate meals
+      await generateMealPlan.mutateAsync({
+        mealPlanId: planId,
+        weekStartDate,
+      });
     } catch (error) {
       console.error('Failed to generate plan:', error);
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -165,8 +171,17 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
             disabled={isGenerating}
             className="gap-2"
           >
-            <Sparkles className="h-4 w-4" />
-            Regenerate Plan
+            {isGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Regenerating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Regenerate Plan
+              </>
+            )}
           </Button>
         </div>
       )}

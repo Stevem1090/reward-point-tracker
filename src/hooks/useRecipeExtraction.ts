@@ -1,0 +1,145 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Ingredient } from '@/types/meal';
+import { Json } from '@/integrations/supabase/types';
+import { toast } from 'sonner';
+
+interface ExtractedRecipe {
+  name: string;
+  description: string;
+  servings: number;
+  estimated_cook_minutes?: number;
+  ingredients: Ingredient[];
+  steps: string[];
+  image_url?: string;
+}
+
+interface ExtractFromUrlParams {
+  mealId: string;
+  url: string;
+  mealName: string;
+}
+
+interface ProcessCookbookParams {
+  recipeText: string;
+  cookbookTitle?: string;
+  recipeName?: string;
+}
+
+export function useRecipeExtraction() {
+  const queryClient = useQueryClient();
+
+  const extractFromUrl = useMutation({
+    mutationFn: async ({ mealId, url, mealName }: ExtractFromUrlParams) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-recipe-from-url`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ url, mealName }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded. Please try again in a moment.');
+        }
+        if (response.status === 402) {
+          throw new Error('AI credits exhausted. Please add funds to continue.');
+        }
+        throw new Error(errorData.error || 'Failed to extract recipe');
+      }
+
+      const { recipe }: { recipe: ExtractedRecipe } = await response.json();
+
+      // Create the recipe card - first try to get existing
+      const { data: existing } = await supabase
+        .from('recipe_cards')
+        .select('id')
+        .eq('meal_id', mealId)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing
+        const { error: updateError } = await supabase
+          .from('recipe_cards')
+          .update({
+            meal_name: recipe.name,
+            image_url: recipe.image_url || null,
+            ingredients: recipe.ingredients as unknown as Json,
+            steps: recipe.steps as unknown as Json,
+            base_servings: recipe.servings,
+          })
+          .eq('id', existing.id);
+        if (updateError) throw updateError;
+      } else {
+        // Insert new
+        const { error: insertError } = await supabase
+          .from('recipe_cards')
+          .insert([{
+            meal_id: mealId,
+            meal_name: recipe.name,
+            image_url: recipe.image_url || null,
+            ingredients: recipe.ingredients as unknown as Json,
+            steps: recipe.steps as unknown as Json,
+            base_servings: recipe.servings,
+          }]);
+        if (insertError) throw insertError;
+      }
+
+      return recipe;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+      toast.success('Recipe extracted!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const processCookbook = useMutation({
+    mutationFn: async ({ recipeText, cookbookTitle, recipeName }: ProcessCookbookParams) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-cookbook-recipe`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ recipeText, cookbookTitle, recipeName }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded. Please try again in a moment.');
+        }
+        if (response.status === 402) {
+          throw new Error('AI credits exhausted. Please add funds to continue.');
+        }
+        throw new Error(errorData.error || 'Failed to process recipe');
+      }
+
+      const { recipe }: { recipe: ExtractedRecipe } = await response.json();
+      return recipe;
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  return { extractFromUrl, processCookbook };
+}
