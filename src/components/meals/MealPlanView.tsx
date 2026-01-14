@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { useAIMealGeneration } from '@/hooks/useAIMealGeneration';
 import { useShoppingListGeneration } from '@/hooks/useShoppingListGeneration';
+import { useRecipeExtraction } from '@/hooks/useRecipeExtraction';
 import { MealSlot } from './MealSlot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Sparkles, Check, RefreshCw, Trash2 } from 'lucide-react';
 import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek, Ingredient } from '@/types/meal';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,14 +27,17 @@ interface MealPlanViewProps {
 }
 
 export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
+  const queryClient = useQueryClient();
   const { useMealPlanForWeek, createMealPlan, approveMealPlan, deleteMealPlan } = useMealPlans();
-  const { data: mealPlan, isLoading, error } = useMealPlanForWeek(weekStartDate);
+  const { data: mealPlan, isLoading, error, refetch } = useMealPlanForWeek(weekStartDate);
   const { generateMealPlan } = useAIMealGeneration();
   const { generateShoppingList } = useShoppingListGeneration();
+  const { extractFromUrl } = useRecipeExtraction();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [finalisingStep, setFinalisingStep] = useState<string | null>(null);
 
   const isGenerating = generateMealPlan.isPending;
-  const isFinalising = approveMealPlan.isPending || generateShoppingList.isPending;
+  const isFinalising = finalisingStep !== null;
   const isDeleting = deleteMealPlan.isPending;
 
   const handleGeneratePlan = async () => {
@@ -79,14 +85,51 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
 
   const handleFinalisePlan = async () => {
     if (!mealPlan) return;
+    
     try {
-      // First approve the meal plan
-      await approveMealPlan.mutateAsync(mealPlan.id);
-      
-      // Then generate shopping list from approved meals
       const approvedMeals = mealPlan.meals.filter(m => m.status === 'approved');
-      const mealsWithIngredients = approvedMeals
-        .filter(m => m.recipe_card?.ingredients)
+      
+      // Step 1: Extract recipes from URLs for all approved meals
+      setFinalisingStep(`Extracting recipes... (0/${approvedMeals.length})`);
+      
+      let successCount = 0;
+      for (const meal of approvedMeals) {
+        try {
+          // Call extractFromUrl for each meal - it handles both URL scraping
+          // and fallback generation if URL fails or is empty
+          await extractFromUrl.mutateAsync(
+            {
+              mealId: meal.id,
+              url: meal.recipe_url || '',
+              mealName: meal.meal_name,
+            },
+            {
+              // Suppress individual toasts during bulk extraction
+              onSuccess: () => {},
+              onError: () => {},
+            }
+          );
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to extract recipe for ${meal.meal_name}:`, error);
+          // Continue with other meals even if one fails
+        }
+        setFinalisingStep(`Extracting recipes... (${successCount}/${approvedMeals.length})`);
+      }
+      
+      // Step 2: Refetch to get the newly created recipe_cards
+      setFinalisingStep('Loading extracted recipes...');
+      await queryClient.invalidateQueries({ queryKey: ['mealPlan', weekStartDate] });
+      const { data: updatedPlan } = await refetch();
+      
+      if (!updatedPlan) {
+        throw new Error('Failed to reload meal plan');
+      }
+      
+      // Step 3: Generate shopping list from the extracted ingredients
+      setFinalisingStep('Creating shopping list...');
+      const mealsWithIngredients = updatedPlan.meals
+        .filter(m => m.status === 'approved' && m.recipe_card?.ingredients)
         .map(m => ({
           mealName: m.meal_name,
           servings: m.servings,
@@ -98,10 +141,18 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
           mealPlanId: mealPlan.id,
           meals: mealsWithIngredients,
         });
-        toast.success('Shopping list generated!');
       }
+      
+      // Step 4: Mark plan as approved
+      setFinalisingStep('Finalising...');
+      await approveMealPlan.mutateAsync(mealPlan.id);
+      
+      toast.success('Meal plan approved! Shopping list ready.');
     } catch (error) {
       console.error('Failed to finalise plan:', error);
+      toast.error('Failed to finalise meal plan');
+    } finally {
+      setFinalisingStep(null);
     }
   };
 
@@ -226,7 +277,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
               {isFinalising ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  {generateShoppingList.isPending ? 'Creating shopping list...' : 'Finalising...'}
+                  {finalisingStep || 'Finalising...'}
                 </>
               ) : (
                 <>
