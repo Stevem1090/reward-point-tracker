@@ -164,7 +164,7 @@ export function useMealPlans() {
           servings,
           estimated_cook_minutes: estimatedCookMinutes || null,
           recipe_id: recipeId || null,
-          source_type: recipeId ? 'library' : 'manual',
+          source_type: recipeId ? 'user_library' : 'user_custom',
           status: 'pending' // Reset to pending for re-approval
         })
         .eq('id', mealId);
@@ -208,7 +208,7 @@ export function useMealPlans() {
           servings,
           estimated_cook_minutes: estimatedCookMinutes || null,
           recipe_id: recipeId || null,
-          source_type: recipeId ? 'library' : 'manual',
+          source_type: recipeId ? 'user_library' : 'user_custom',
           status: 'pending'
         }]);
       if (error) throw error;
