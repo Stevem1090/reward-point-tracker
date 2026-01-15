@@ -63,7 +63,7 @@ export function RecipeCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-xl">{recipeCard.meal_name}</DialogTitle>
           <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -100,7 +100,7 @@ export function RecipeCardDialog({
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 min-h-0 pr-4">
           <div className="space-y-6 pb-4">
             {/* Image */}
             {recipeCard.image_url && (
