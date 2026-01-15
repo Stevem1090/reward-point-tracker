@@ -8,10 +8,12 @@ const corsHeaders = {
 const SYSTEM_PROMPT = `You are a recipe extraction assistant. Extract recipe details from the provided HTML content.
 
 STEP RULES (CRITICAL):
-- Use EXACT wording from the recipe - do not paraphrase or rewrite
-- Only split steps at sensible points (e.g., between distinct cooking actions)
-- Only merge steps if they are clearly one action split across lines
-- Prefer 6 steps maximum, 8 absolute max
+- Extract ALL steps from the recipe - do not skip any
+- Use the EXACT wording from the recipe - do not paraphrase or rewrite
+- If the recipe has more than 8 steps, combine ONLY where it makes logical sense (e.g., two very short related actions)
+- Never drop important cooking instructions to meet a step limit
+- Preserve cooking times, temperatures, and techniques exactly as written
+- If steps are numbered in the original, respect that structure
 - Keep step instructions clear and actionable
 
 INGREDIENT RULES (CRITICAL):
@@ -87,7 +89,7 @@ Create an authentic version of this dish with proper technique.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },

@@ -5,10 +5,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { RecipeCard, Ingredient } from '@/types/meal';
-import { Clock, Users, ExternalLink } from 'lucide-react';
+import { Clock, Users, ExternalLink, Printer } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { scaleIngredients } from '@/utils/scaleIngredients';
+import { generateRecipeCardHtml, RecipeCardData } from '@/utils/generateRecipeCardHtml';
 
 interface RecipeCardDialogProps {
   open: boolean;
@@ -33,6 +35,31 @@ export function RecipeCardDialog({
     recipeCard.base_servings,
     currentServings
   );
+
+  const handlePrint = () => {
+    const recipeData: RecipeCardData = {
+      title: recipeCard.meal_name,
+      servings: currentServings,
+      cookMinutes: estimatedCookMinutes || null,
+      imageUrl: recipeCard.image_url,
+      ingredients: scaledIngredients,
+      steps: recipeCard.steps,
+      sourceUrl: recipeUrl,
+      baseServings: recipeCard.base_servings,
+    };
+    
+    const htmlContent = generateRecipeCardHtml(recipeData);
+    
+    // Open in new window and trigger print
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -61,6 +88,15 @@ export function RecipeCardDialog({
                 View original
               </a>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5"
+              onClick={handlePrint}
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Print A4
+            </Button>
           </div>
         </DialogHeader>
 
