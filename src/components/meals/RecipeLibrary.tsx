@@ -2,18 +2,43 @@ import { useRecipes } from '@/hooks/useRecipes';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Plus, Search, BookOpen, Clock, Users } from 'lucide-react';
+import { Loader2, Plus, Search, BookOpen, Clock, Users, MoreVertical, Trash2, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { Recipe } from '@/types/meal';
+import { AddRecipeDialog } from './AddRecipeDialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 export function RecipeLibrary() {
   const { recipes, isLoading, deleteRecipe } = useRecipes();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [defaultTab, setDefaultTab] = useState<'website' | 'cookbook'>('website');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const filteredRecipes = recipes.filter(recipe =>
     recipe.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     recipe.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleOpenAddDialog = (tab: 'website' | 'cookbook' = 'website') => {
+    setDefaultTab(tab);
+    setIsAddDialogOpen(true);
+  };
+
+  const handleDeleteRecipe = async () => {
+    if (!deleteConfirmId) return;
+    
+    try {
+      await deleteRecipe.mutateAsync(deleteConfirmId);
+      toast.success('Recipe deleted');
+    } catch {
+      toast.error('Failed to delete recipe');
+    } finally {
+      setDeleteConfirmId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -36,7 +61,7 @@ export function RecipeLibrary() {
             className="pl-10"
           />
         </div>
-        <Button className="gap-2 min-h-[44px]">
+        <Button className="gap-2 min-h-[44px]" onClick={() => handleOpenAddDialog('website')}>
           <Plus className="h-5 w-5" />
           <span className="hidden sm:inline">Add Recipe</span>
         </Button>
@@ -53,10 +78,10 @@ export function RecipeLibrary() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col sm:flex-row gap-2 justify-center pb-8">
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => handleOpenAddDialog('website')}>
               From Website
             </Button>
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => handleOpenAddDialog('cookbook')}>
               From Cookbook Photo
             </Button>
           </CardContent>
@@ -76,19 +101,49 @@ export function RecipeLibrary() {
       {filteredRecipes.length > 0 && (
         <div className="space-y-3">
           {filteredRecipes.map((recipe) => (
-            <RecipeCard key={recipe.id} recipe={recipe} />
+            <RecipeCard 
+              key={recipe.id} 
+              recipe={recipe} 
+              onDelete={() => setDeleteConfirmId(recipe.id)}
+            />
           ))}
         </div>
       )}
+
+      {/* Add Recipe Dialog */}
+      <AddRecipeDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        defaultTab={defaultTab}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Recipe?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this recipe from your library. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteRecipe} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 interface RecipeCardProps {
   recipe: Recipe;
+  onDelete: () => void;
 }
 
-function RecipeCard({ recipe }: RecipeCardProps) {
+function RecipeCard({ recipe, onDelete }: RecipeCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow overflow-hidden">
       <CardContent className="p-3 sm:py-4 sm:px-6">
@@ -108,7 +163,26 @@ function RecipeCard({ recipe }: RecipeCardProps) {
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-base truncate">{recipe.name}</h3>
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-medium text-base truncate flex-1">{recipe.name}</h3>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem className="gap-2">
+                    <Eye className="h-4 w-4" />
+                    View Details
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2 text-destructive" onClick={onDelete}>
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             {recipe.description && (
               <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
                 {recipe.description}
