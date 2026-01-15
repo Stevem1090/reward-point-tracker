@@ -49,15 +49,22 @@ export function useDirectRecipeExtraction() {
         throw new Error('No recipe data returned');
       }
 
+      // The edge function returns { recipe: {...}, sourceUrl: "..." }
+      const recipe = data.recipe;
+
+      if (!recipe) {
+        throw new Error('No recipe data in response');
+      }
+
       return {
-        name: data.name || 'Untitled Recipe',
-        description: data.description,
-        servings: data.servings || 4,
-        estimated_cook_minutes: data.estimated_cook_minutes,
-        ingredients: mapIngredients(data.ingredients || []),
-        steps: data.steps || [],
-        image_url: data.image_url,
-        source_url: data.source_url || url
+        name: recipe.name || 'Untitled Recipe',
+        description: recipe.description,
+        servings: recipe.servings || 4,
+        estimated_cook_minutes: recipe.estimated_cook_minutes,
+        ingredients: mapIngredients(recipe.ingredients || []),
+        steps: recipe.steps || [],
+        image_url: recipe.image_url,
+        source_url: data.sourceUrl || url
       };
     },
     onError: (error: Error) => {
