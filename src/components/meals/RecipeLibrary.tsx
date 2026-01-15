@@ -90,18 +90,18 @@ interface RecipeCardProps {
 
 function RecipeCard({ recipe }: RecipeCardProps) {
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="py-4">
-        <div className="flex gap-4">
+    <Card className="hover:shadow-md transition-shadow overflow-hidden">
+      <CardContent className="p-3 sm:py-4 sm:px-6">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           {/* Thumbnail */}
           {recipe.image_url ? (
             <img
               src={recipe.image_url}
               alt={recipe.name}
-              className="w-20 h-20 rounded-lg object-cover shrink-0"
+              className="w-full h-32 sm:w-20 sm:h-20 rounded-lg object-cover shrink-0"
             />
           ) : (
-            <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <div className="w-full h-32 sm:w-20 sm:h-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
               <BookOpen className="h-8 w-8 text-muted-foreground" />
             </div>
           )}
@@ -115,7 +115,7 @@ function RecipeCard({ recipe }: RecipeCardProps) {
               </p>
             )}
             
-            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-sm text-muted-foreground">
               {recipe.estimated_cook_minutes && (
                 <span className="flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />
