@@ -27,8 +27,8 @@ interface MealPlanViewProps {
 }
 
 export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
-  const queryClient = useQueryClient();
-  const { useMealPlanForWeek, createMealPlan, approveMealPlan, deleteMealPlan } = useMealPlans();
+const queryClient = useQueryClient();
+  const { useMealPlanForWeek, createMealPlan, approveMealPlan, deleteMealPlan, saveAIRecipesToLibrary } = useMealPlans();
   const { data: mealPlan, isLoading, error, refetch } = useMealPlanForWeek(weekStartDate);
   const { generateMealPlan } = useAIMealGeneration();
   const { generateShoppingList } = useShoppingListGeneration();
@@ -149,11 +149,34 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
         });
       }
       
-      // Step 4: Mark plan as approved
+      // Step 4: Save AI-generated recipes to library for reuse
+      setFinalisingStep('Saving recipes to library...');
+      const mealsToSave = updatedPlan.meals
+        .filter(m => m.status === 'approved')
+        .map(m => ({
+          meal_name: m.meal_name,
+          description: m.description,
+          recipe_url: m.recipe_url,
+          source_type: m.source_type,
+          recipe_id: m.recipe_id,
+          estimated_cook_minutes: m.estimated_cook_minutes,
+          recipe_card: m.recipe_card ? {
+            ingredients: m.recipe_card.ingredients as Ingredient[],
+            steps: m.recipe_card.steps,
+            base_servings: m.recipe_card.base_servings,
+          } : undefined,
+        }));
+      
+      const savedCount = await saveAIRecipesToLibrary(mealsToSave);
+      
+      // Step 5: Mark plan as approved
       setFinalisingStep('Finalising...');
       await approveMealPlan.mutateAsync(mealPlan.id);
       
-      toast.success('Meal plan approved! Shopping list ready.');
+      const savedMessage = savedCount > 0 
+        ? ` ${savedCount} recipe${savedCount > 1 ? 's' : ''} saved to library.`
+        : '';
+      toast.success(`Meal plan approved! Shopping list ready.${savedMessage}`);
     } catch (error) {
       console.error('Failed to finalise plan:', error);
       toast.error('Failed to finalise meal plan');

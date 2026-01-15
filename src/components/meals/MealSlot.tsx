@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { MealWithRecipeCard, DayOfWeek } from '@/types/meal';
-import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen } from 'lucide-react';
+import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen, Search, Loader2 } from 'lucide-react';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { cn } from '@/lib/utils';
 import {
@@ -62,8 +62,23 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
   };
 
   const handleSaveUrl = () => {
+    if (meal && editedUrl) {
+      updateMealUrl.mutate({ 
+        mealId: meal.id, 
+        recipeUrl: editedUrl,
+        mealName: meal.meal_name 
+      });
+      setEditedUrl('');
+    }
+  };
+
+  const handleSaveUrlFromDialog = () => {
     if (meal) {
-      updateMealUrl.mutate({ mealId: meal.id, recipeUrl: editedUrl });
+      updateMealUrl.mutate({ 
+        mealId: meal.id, 
+        recipeUrl: editedUrl,
+        mealName: meal.meal_name 
+      });
       setIsEditUrlOpen(false);
     }
   };
@@ -98,6 +113,14 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
     setIsSwapDialogOpen(false);
   };
 
+  // Open Google search for the recipe
+  const handleSearchRecipe = () => {
+    if (meal) {
+      const searchQuery = encodeURIComponent(`${meal.meal_name} recipe`);
+      window.open(`https://www.google.com/search?q=${searchQuery}`, '_blank');
+    }
+  };
+
   // Extract domain from URL for display
   const getUrlDomain = (url: string) => {
     try {
@@ -107,6 +130,11 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
       return url;
     }
   };
+
+  // Check if we should show cook time:
+  // Only show for finalised plans, meals with URLs, or meals from library (has recipe_id)
+  const shouldShowCookTime = meal && meal.estimated_cook_minutes && 
+    (isPlanFinalised || meal.recipe_url || meal.recipe_id);
 
   // Empty slot
   if (!meal) {
@@ -176,7 +204,21 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-medium text-base leading-snug">{meal.meal_name}</h3>
+                    {/* Meal name with search button */}
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-medium text-base leading-snug">{meal.meal_name}</h3>
+                      {!isPlanFinalised && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+                          onClick={handleSearchRecipe}
+                          title="Search for recipe on Google"
+                        >
+                          <Search className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
                     {meal.description && (
                       <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
                         {meal.description}
@@ -225,10 +267,6 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={handleEditUrl}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit Recipe URL
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setIsSwapDialogOpen(true)}>
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Replace Meal
@@ -260,10 +298,6 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                               Reject
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem onClick={handleEditUrl}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit Recipe URL
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setIsSwapDialogOpen(true)}>
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Replace Meal
@@ -276,7 +310,8 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
 
                 {/* Meta info */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
-                  {meal.estimated_cook_minutes && (
+                  {/* Only show cook time for finalised plans, meals with URLs, or library meals */}
+                  {shouldShowCookTime && (
                     <span className="flex items-center gap-1">
                       <Clock className="h-3.5 w-3.5" />
                       {meal.estimated_cook_minutes} mins
@@ -338,7 +373,32 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                   )}
                 </div>
 
-                {/* Recipe URL */}
+                {/* Inline Recipe URL Input - visible before finalisation when no URL */}
+                {!isPlanFinalised && !meal.recipe_url && (
+                  <div className="flex items-center gap-2 mt-3">
+                    <Input
+                      value={editedUrl}
+                      onChange={(e) => setEditedUrl(e.target.value)}
+                      placeholder="Paste recipe URL..."
+                      type="url"
+                      className="h-9 text-sm"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSaveUrl}
+                      disabled={!editedUrl || updateMealUrl.isPending}
+                      className="h-9 shrink-0"
+                    >
+                      {updateMealUrl.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Save'
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Existing URL display - show when URL exists */}
                 {meal.recipe_url && (
                   <div className="flex items-center gap-2 mt-2">
                     <a
@@ -393,10 +453,6 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleEditUrl}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit Recipe URL
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setIsSwapDialogOpen(true)}>
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Replace Meal
@@ -446,7 +502,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
           </div>
         </CardContent>
       </Card>
-      {/* Edit URL Dialog */}
+      {/* Edit URL Dialog - for editing existing URL */}
       <Dialog open={isEditUrlOpen} onOpenChange={setIsEditUrlOpen}>
         <DialogContent>
           <DialogHeader>
@@ -462,7 +518,10 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
             <Button variant="outline" onClick={() => setIsEditUrlOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveUrl} disabled={updateMealUrl.isPending}>
+            <Button onClick={handleSaveUrlFromDialog} disabled={updateMealUrl.isPending}>
+              {updateMealUrl.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               Save
             </Button>
           </DialogFooter>

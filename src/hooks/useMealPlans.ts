@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { MealPlan, Meal, MealPlanWithMeals, DayOfWeek, MealStatus, MealPlanStatus } from '@/types/meal';
+import { MealPlan, Meal, MealPlanWithMeals, DayOfWeek, MealStatus, MealPlanStatus, RecipeSourceType, Ingredient } from '@/types/meal';
 import { toast } from 'sonner';
 import { getWeekStartDate } from '@/utils/getWeekBounds';
 
@@ -93,16 +93,46 @@ export function useMealPlans() {
   });
 
   const updateMealUrl = useMutation({
-    mutationFn: async ({ mealId, recipeUrl }: { mealId: string; recipeUrl: string }) => {
+    mutationFn: async ({ mealId, recipeUrl, mealName }: { mealId: string; recipeUrl: string; mealName: string }) => {
+      // If URL is provided, extract recipe data to get name, description, and cook time
+      if (recipeUrl) {
+        try {
+          const { data: extractData, error: extractError } = await supabase.functions
+            .invoke('extract-recipe-from-url', {
+              body: { url: recipeUrl, mealName }
+            });
+          
+          if (!extractError && extractData?.recipe) {
+            const recipe = extractData.recipe;
+            // Update meal with extracted data
+            const { error } = await supabase
+              .from('meals')
+              .update({ 
+                recipe_url: recipeUrl,
+                meal_name: recipe.name || mealName,
+                description: recipe.description || null,
+                estimated_cook_minutes: recipe.estimated_cook_minutes || null,
+              })
+              .eq('id', mealId);
+            if (error) throw error;
+            return { extracted: true };
+          }
+        } catch (e) {
+          console.warn('Could not extract recipe, saving URL only:', e);
+        }
+      }
+      
+      // Fallback: just update the URL
       const { error } = await supabase
         .from('meals')
         .update({ recipe_url: recipeUrl })
         .eq('id', mealId);
       if (error) throw error;
+      return { extracted: false };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
-      toast.success('Recipe URL updated');
+      toast.success(result?.extracted ? 'Recipe details extracted!' : 'Recipe URL updated');
     },
     onError: () => toast.error('Failed to update recipe URL')
   });
@@ -190,6 +220,59 @@ export function useMealPlans() {
     onError: () => toast.error('Failed to add meal')
   });
 
+  const saveAIRecipesToLibrary = async (meals: Array<{
+    meal_name: string;
+    description: string | null;
+    recipe_url: string | null;
+    source_type: string;
+    recipe_id: string | null;
+    estimated_cook_minutes: number | null;
+    recipe_card?: {
+      ingredients: Ingredient[];
+      steps: string[];
+      base_servings: number;
+    };
+  }>) => {
+    const userId = await getCurrentUserId();
+    
+    // Filter to AI-generated meals with recipe cards that aren't already from library
+    const aiMealsToSave = meals.filter(m => 
+      m.source_type === 'ai_generated' && 
+      m.recipe_card && 
+      !m.recipe_id
+    );
+
+    let savedCount = 0;
+    for (const meal of aiMealsToSave) {
+      // Cast ingredients to JSON-compatible format for Supabase
+      const ingredientsJson = meal.recipe_card!.ingredients.map(ing => ({
+        quantity: ing.quantity,
+        unit: ing.unit,
+        name: ing.name,
+      }));
+      
+      const { error } = await supabase.from('recipes').insert([{
+        user_id: userId,
+        name: meal.meal_name,
+        description: meal.description,
+        source_type: (meal.recipe_url ? 'website' : 'cookbook') as RecipeSourceType,
+        recipe_url: meal.recipe_url,
+        ingredients: ingredientsJson,
+        steps: meal.recipe_card!.steps,
+        servings: meal.recipe_card!.base_servings,
+        estimated_cook_minutes: meal.estimated_cook_minutes,
+      }]);
+      
+      if (error) {
+        console.error('Failed to save recipe:', error);
+      } else {
+        savedCount++;
+      }
+    }
+    
+    return savedCount;
+  };
+
   const approveMealPlan = useMutation({
     mutationFn: async (mealPlanId: string) => {
       const { error } = await supabase
@@ -200,6 +283,7 @@ export function useMealPlans() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
       toast.success('Meal plan approved!');
     },
     onError: () => toast.error('Failed to approve meal plan')
@@ -245,6 +329,7 @@ export function useMealPlans() {
     replaceMeal,
     addMealToDay,
     approveMealPlan,
-    deleteMealPlan
+    deleteMealPlan,
+    saveAIRecipesToLibrary
   };
 }
