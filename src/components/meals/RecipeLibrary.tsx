@@ -61,9 +61,9 @@ export function RecipeLibrary() {
             className="pl-10"
           />
         </div>
-        <Button className="gap-2 min-h-[44px]" onClick={() => handleOpenAddDialog('website')}>
+        <Button className="gap-2 min-h-[44px] px-3 sm:px-4" onClick={() => handleOpenAddDialog('website')}>
           <Plus className="h-5 w-5" />
-          <span className="hidden sm:inline">Add Recipe</span>
+          <span>Add</span>
         </Button>
       </div>
 
@@ -146,18 +146,18 @@ interface RecipeCardProps {
 function RecipeCard({ recipe, onDelete }: RecipeCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow overflow-hidden">
-      <CardContent className="p-3 sm:py-4 sm:px-6">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+      <CardContent className="p-2.5 sm:py-4 sm:px-6">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
           {/* Thumbnail */}
           {recipe.image_url ? (
             <img
               src={recipe.image_url}
               alt={recipe.name}
-              className="w-full h-32 sm:w-20 sm:h-20 rounded-lg object-cover shrink-0"
+              className="w-full h-20 sm:w-20 sm:h-20 rounded-lg object-cover shrink-0"
             />
           ) : (
-            <div className="w-full h-32 sm:w-20 sm:h-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              <BookOpen className="h-8 w-8 text-muted-foreground" />
+            <div className="w-full h-20 sm:w-20 sm:h-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <BookOpen className="h-6 w-6 text-muted-foreground" />
             </div>
           )}
 
