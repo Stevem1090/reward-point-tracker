@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Sparkles, Check, RefreshCw, Trash2 } from 'lucide-react';
 import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek, Ingredient } from '@/types/meal';
+import { scaleIngredients } from '@/utils/scaleIngredients';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -136,11 +137,20 @@ const queryClient = useQueryClient();
       setFinalisingStep('Creating shopping list...');
       const mealsWithIngredients = updatedPlan.meals
         .filter(m => m.status === 'approved' && m.recipe_card?.ingredients)
-        .map(m => ({
-          mealName: m.meal_name,
-          servings: m.servings,
-          ingredients: (m.recipe_card?.ingredients || []) as Ingredient[],
-        }));
+        .map(m => {
+          const baseServings = m.recipe_card?.base_servings || 4;
+          const targetServings = m.servings;
+          const rawIngredients = (m.recipe_card?.ingredients || []) as Ingredient[];
+          
+          // Scale ingredients from base servings to user's target servings
+          const scaledIngredients = scaleIngredients(rawIngredients, baseServings, targetServings);
+          
+          return {
+            mealName: m.meal_name,
+            servings: targetServings,
+            ingredients: scaledIngredients,
+          };
+        });
       
       if (mealsWithIngredients.length > 0) {
         await generateShoppingList.mutateAsync({
