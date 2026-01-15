@@ -51,14 +51,20 @@ NOVELTY TARGET:
 - At least 5 of the 7 meals must be clearly different from recent_meals in: (1) core protein, (2) cuisine style, and (3) format (pasta vs traybake vs bowls vs pie etc.).
 - Include at least 3 "less common but still UK-family-friendly" meals (recognisable, no hard-to-find ingredients).
 
+CURRENT WEEK MEALS (CRITICAL):
+You may also receive a list called current_week_meals (already approved for this week).
+These are ABSOLUTE EXCLUSIONS - do not suggest anything identical or very similar.
+Unlike recent_meals (strong avoidance), current_week_meals must NEVER be duplicated.
+
 TWO-PASS PLANNING (important):
-1) Silently generate a candidate pool of 20–25 dinners that fit all rules and avoid recent_meals.
-2) Select the final 7 that maximise variety across protein, carb, cuisine, and method.
+1) Silently generate a candidate pool of 20–25 dinners that fit all rules, exclude current_week_meals, and avoid recent_meals.
+2) Select the final meals that maximise variety across protein, carb, cuisine, and method.
 
 If constraints conflict, prioritise:
-1) Avoid repeats vs recent_meals
-2) Keep weekday meals under 30 mins
-3) Keep the plan family-friendly and practical
+1) Never duplicate current_week_meals
+2) Avoid repeats vs recent_meals
+3) Keep weekday meals under 30 mins
+4) Keep the plan family-friendly and practical
 
 URL INSTRUCTIONS:
 - Leave suggested_url as empty string ""
@@ -143,8 +149,8 @@ serve(async (req) => {
       recentMeals = await fetchRecentMeals(supabase);
     }
 
-    // Combine database recent meals with any explicitly excluded meals
-    const allExcludedMeals = [...new Set([...recentMeals, ...(excludeMeals || [])])];
+    // Note: excludeMeals contains current week's approved meals (absolute exclusion)
+    // recentMeals contains historical meals from last 4 weeks (strong avoidance)
 
     // Determine which days to generate
     const allDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -177,17 +183,29 @@ serve(async (req) => {
       slotRequests.push(`- ${slotCounts.WEEKEND} WEEKEND meal${slotCounts.WEEKEND > 1 ? 's' : ''} (relaxed cooking, can be 60+ mins)`);
     }
 
-    // Build the recent meals section for the prompt
-    const recentMealsSection = allExcludedMeals.length > 0
-      ? `\nrecent_meals (DO NOT REPEAT or use similar variants):\n${allExcludedMeals.map(m => `- ${m}`).join('\n')}\n`
+    // Build the current week exclusions (passed from frontend - absolute exclusion)
+    const currentWeekMeals = excludeMeals || [];
+    const currentWeekSection = currentWeekMeals.length > 0
+      ? `\ncurrent_week_meals (ABSOLUTE EXCLUSION - already in this week's plan):\n${currentWeekMeals.map(m => `- ${m}`).join('\n')}\n`
+      : '';
+
+    // Build the recent meals section (from database, excluding current week to avoid duplication)
+    const historicalMeals = recentMeals.filter(m => !currentWeekMeals.includes(m));
+    const recentMealsSection = historicalMeals.length > 0
+      ? `\nrecent_meals (avoid repeats from past 4 weeks):\n${historicalMeals.map(m => `- ${m}`).join('\n')}\n`
+      : '';
+
+    // Adjust variety guidance for partial regeneration
+    const varietyNote = totalMeals < 7 
+      ? `\nIMPORTANT: You are generating ${totalMeals} replacement meal${totalMeals > 1 ? 's' : ''} only. Ensure ${totalMeals > 1 ? 'each meal is distinct from the others and all are' : 'it is'} clearly different from current_week_meals in protein, cuisine, and cooking method. The variety guidelines (4 proteins, 4 carbs, 4 methods) apply to the full week including current_week_meals, not just these replacements.`
       : '';
 
     const userPrompt = `Generate exactly ${totalMeals} meals for these slots:
 ${slotRequests.join("\n")}
 
 ${preferences ? `Family preferences: ${preferences}` : ""}
-${recentMealsSection}
-Remember: Focus on practical, family-friendly meals with good variety. Avoid any meals similar to recent_meals. Tag each meal with its slot_type.`;
+${currentWeekSection}${recentMealsSection}${varietyNote}
+Remember: Focus on practical, family-friendly meals. NEVER duplicate current_week_meals. Avoid meals similar to recent_meals. Tag each meal with its slot_type.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

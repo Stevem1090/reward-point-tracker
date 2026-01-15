@@ -67,6 +67,11 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
       .filter(m => m.status === 'rejected')
       .map(m => m.day_of_week);
     
+    // Collect approved meal names to exclude from suggestions
+    const approvedMealNames = mealPlan.meals
+      .filter(m => m.status === 'approved')
+      .map(m => m.meal_name);
+    
     if (rejectedDays.length === 0) {
       toast.info('No rejected meals to regenerate');
       return;
@@ -77,6 +82,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
         mealPlanId: mealPlan.id,
         weekStartDate,
         daysToRegenerate: rejectedDays,
+        excludeMeals: approvedMealNames,
       });
     } catch (error) {
       console.error('Failed to regenerate rejected meals:', error);
