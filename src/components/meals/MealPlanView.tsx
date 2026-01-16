@@ -7,7 +7,7 @@ import { useRecipeExtraction } from '@/hooks/useRecipeExtraction';
 import { MealSlot } from './MealSlot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Sparkles, Check, RefreshCw, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, Check, RefreshCw, Trash2, PenLine } from 'lucide-react';
 import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek, Ingredient } from '@/types/meal';
 import { scaleIngredients } from '@/utils/scaleIngredients';
 import { toast } from 'sonner';
@@ -28,8 +28,8 @@ interface MealPlanViewProps {
 }
 
 export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
-const queryClient = useQueryClient();
-  const { useMealPlanForWeek, createMealPlan, approveMealPlan, deleteMealPlan, saveAIRecipesToLibrary } = useMealPlans();
+  const queryClient = useQueryClient();
+  const { useMealPlanForWeek, createMealPlan, createBlankMealPlan, approveMealPlan, deleteMealPlan, saveAIRecipesToLibrary } = useMealPlans();
   const { data: mealPlan, isLoading, error, refetch } = useMealPlanForWeek(weekStartDate);
   const { generateMealPlan } = useAIMealGeneration();
   const { generateShoppingList } = useShoppingListGeneration();
@@ -38,6 +38,7 @@ const queryClient = useQueryClient();
   const [finalisingStep, setFinalisingStep] = useState<string | null>(null);
 
   const isGenerating = generateMealPlan.isPending;
+  const isCreatingBlank = createBlankMealPlan.isPending;
   const isFinalising = finalisingStep !== null;
   const isDeleting = deleteMealPlan.isPending;
 
@@ -58,6 +59,14 @@ const queryClient = useQueryClient();
       });
     } catch (error) {
       console.error('Failed to generate plan:', error);
+    }
+  };
+
+  const handleCreateBlankPlan = async () => {
+    try {
+      await createBlankMealPlan.mutateAsync(weekStartDate);
+    } catch (error) {
+      console.error('Failed to create blank plan:', error);
     }
   };
 
@@ -87,6 +96,36 @@ const queryClient = useQueryClient();
       });
     } catch (error) {
       console.error('Failed to regenerate rejected meals:', error);
+    }
+  };
+
+  const handleFillEmptySlots = async () => {
+    if (!mealPlan) return;
+    
+    // Find days with blank meals (empty meal_name)
+    const blankDays = mealPlan.meals
+      .filter(m => !m.meal_name || m.meal_name.trim() === '')
+      .map(m => m.day_of_week);
+    
+    // Collect filled meal names to exclude from suggestions
+    const filledMealNames = mealPlan.meals
+      .filter(m => m.meal_name && m.meal_name.trim() !== '')
+      .map(m => m.meal_name);
+    
+    if (blankDays.length === 0) {
+      toast.info('No empty slots to fill');
+      return;
+    }
+
+    try {
+      await generateMealPlan.mutateAsync({
+        mealPlanId: mealPlan.id,
+        weekStartDate,
+        daysToRegenerate: blankDays,
+        excludeMeals: filledMealNames,
+      });
+    } catch (error) {
+      console.error('Failed to fill empty slots:', error);
     }
   };
 
@@ -200,12 +239,15 @@ const queryClient = useQueryClient();
     return mealPlan?.meals.find(m => m.day_of_week === day);
   };
 
-  // Check if all meals are approved
+  // Check if all meals are approved (and have names - not blank)
   const allMealsApproved = mealPlan?.meals.length === 7 && 
-    mealPlan.meals.every(m => m.status === 'approved');
+    mealPlan.meals.every(m => m.status === 'approved' && m.meal_name && m.meal_name.trim() !== '');
 
   // Check if there are rejected meals
   const hasRejectedMeals = mealPlan?.meals.some(m => m.status === 'rejected');
+
+  // Check if there are blank slots (empty meal_name)
+  const hasBlankSlots = mealPlan?.meals.some(m => !m.meal_name || m.meal_name.trim() === '');
 
   // Check if plan is already finalised
   const isPlanFinalised = mealPlan?.status === 'approved';
@@ -238,14 +280,14 @@ const queryClient = useQueryClient();
         <CardHeader className="text-center">
           <CardTitle className="text-xl">No meal plan yet</CardTitle>
           <CardDescription>
-            Generate an AI-powered meal plan for your family
+            Generate an AI-powered plan or create your own from scratch
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex justify-center pb-8">
+        <CardContent className="flex flex-col sm:flex-row justify-center gap-3 pb-8">
           <Button 
             size="lg" 
             onClick={handleGeneratePlan}
-            disabled={isGenerating || createMealPlan.isPending}
+            disabled={isGenerating || isCreatingBlank || createMealPlan.isPending}
             className="min-h-[48px] gap-2"
           >
             {isGenerating ? (
@@ -257,6 +299,25 @@ const queryClient = useQueryClient();
               <>
                 <Sparkles className="h-5 w-5" />
                 Generate Meal Plan
+              </>
+            )}
+          </Button>
+          <Button 
+            variant="outline"
+            size="lg" 
+            onClick={handleCreateBlankPlan}
+            disabled={isGenerating || isCreatingBlank || createMealPlan.isPending}
+            className="min-h-[48px] gap-2"
+          >
+            {isCreatingBlank ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <PenLine className="h-5 w-5" />
+                Create from Scratch
               </>
             )}
           </Button>
@@ -322,6 +383,29 @@ const queryClient = useQueryClient();
                 <>
                   <Check className="h-5 w-5" />
                   Finalise Meal Plan
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Fill empty slots with AI button */}
+          {hasBlankSlots && (
+            <Button 
+              variant="secondary"
+              size="lg"
+              onClick={handleFillEmptySlots}
+              disabled={isGenerating}
+              className="min-h-[48px] gap-2 w-full sm:w-auto"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Fill Empty with AI
                 </>
               )}
             </Button>

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { MealPlan, Meal, MealPlanWithMeals, DayOfWeek, MealStatus, MealPlanStatus, RecipeSourceType, Ingredient } from '@/types/meal';
+import { MealPlan, Meal, MealPlanWithMeals, DayOfWeek, MealStatus, MealPlanStatus, RecipeSourceType, Ingredient, DAYS_OF_WEEK } from '@/types/meal';
 import { toast } from 'sonner';
 import { getWeekStartDate } from '@/utils/getWeekBounds';
 
@@ -66,6 +66,45 @@ export function useMealPlans() {
       toast.success('Meal plan created');
     },
     onError: () => toast.error('Failed to create meal plan')
+  });
+
+  const createBlankMealPlan = useMutation({
+    mutationFn: async (weekStartDate: string): Promise<MealPlan> => {
+      const userId = await getCurrentUserId();
+      
+      // Create the meal plan
+      const { data: plan, error: planError } = await supabase
+        .from('meal_plans')
+        .insert([{ week_start_date: weekStartDate, user_id: userId }])
+        .select()
+        .single();
+      
+      if (planError) throw planError;
+      
+      // Create 7 blank placeholder meals (one per day)
+      const blankMeals = DAYS_OF_WEEK.map((day, index) => ({
+        meal_plan_id: plan.id,
+        day_of_week: day,
+        meal_name: '', // Empty - will be filled by URL extraction
+        source_type: 'user_custom',
+        status: 'pending',
+        servings: 4,
+        sort_order: index,
+      }));
+      
+      const { error: mealsError } = await supabase
+        .from('meals')
+        .insert(blankMeals);
+      
+      if (mealsError) throw mealsError;
+      
+      return { ...plan, status: plan.status as MealPlanStatus };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['mealPlan', data.week_start_date] });
+      toast.success('Blank meal plan created');
+    },
+    onError: () => toast.error('Failed to create blank meal plan')
   });
 
   const updateMealStatus = useMutation({
@@ -323,6 +362,7 @@ export function useMealPlans() {
     useMealPlanForWeek,
     usePreviousMealPlans,
     createMealPlan,
+    createBlankMealPlan,
     updateMealStatus,
     updateMealServings,
     updateMealUrl,
