@@ -136,6 +136,9 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
   const shouldShowCookTime = meal && meal.estimated_cook_minutes && 
     (isPlanFinalised || meal.recipe_url || meal.recipe_id);
 
+  // Check if this is a blank placeholder meal (created via "Create from Scratch")
+  const isBlankMeal = meal && (!meal.meal_name || meal.meal_name.trim() === '');
+
   // Empty slot
   if (!meal) {
     return (
@@ -206,8 +209,14 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                   <div className="min-w-0 flex-1">
                     {/* Meal name with search button */}
                     <div className="flex items-center gap-1.5">
-                      <h3 className="font-medium text-base leading-snug">{meal.meal_name}</h3>
-                      {!isPlanFinalised && (
+                      <h3 className="font-medium text-base leading-snug">
+                        {isBlankMeal ? (
+                          <span className="text-muted-foreground italic">Add a recipe</span>
+                        ) : (
+                          meal.meal_name
+                        )}
+                      </h3>
+                      {!isPlanFinalised && !isBlankMeal && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -219,7 +228,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                         </Button>
                       )}
                     </div>
-                    {meal.description && (
+                    {!isBlankMeal && meal.description && (
                       <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
                         {meal.description}
                       </p>
@@ -308,78 +317,84 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                   )}
                 </div>
 
-                {/* Meta info */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
-                  {/* Only show cook time for finalised plans, meals with URLs, or library meals */}
-                  {shouldShowCookTime && (
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5" />
-                      {meal.estimated_cook_minutes} mins
-                    </span>
-                  )}
-                  
-                  {/* Editable servings - only before finalisation */}
-                  {!isPlanFinalised ? (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer">
-                          <Users className="h-3.5 w-3.5" />
-                          {meal.servings} servings
-                          <Pencil className="h-3 w-3 ml-0.5 opacity-50" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-2" align="start">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleServingsChange(-1)}
-                            disabled={meal.servings <= 1 || updateMealServings.isPending}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="w-12 text-center font-medium">
-                            {meal.servings}
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleServingsChange(1)}
-                            disabled={updateMealServings.isPending}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <Users className="h-3.5 w-3.5" />
-                      {meal.servings} servings
-                    </span>
-                  )}
+                {/* Meta info - hide for blank meals */}
+                {!isBlankMeal && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
+                    {/* Only show cook time for finalised plans, meals with URLs, or library meals */}
+                    {shouldShowCookTime && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        {meal.estimated_cook_minutes} mins
+                      </span>
+                    )}
+                    
+                    {/* Editable servings - only before finalisation */}
+                    {!isPlanFinalised ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer">
+                            <Users className="h-3.5 w-3.5" />
+                            {meal.servings} servings
+                            <Pencil className="h-3 w-3 ml-0.5 opacity-50" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-2" align="start">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleServingsChange(-1)}
+                              disabled={meal.servings <= 1 || updateMealServings.isPending}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-12 text-center font-medium">
+                              {meal.servings}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleServingsChange(1)}
+                              disabled={updateMealServings.isPending}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3.5 w-3.5" />
+                        {meal.servings} servings
+                      </span>
+                    )}
 
-                  {/* View Recipe button - only for finalised meals with recipe card */}
-                  {isPlanFinalised && meal.recipe_card && (
-                    <button
-                      onClick={() => setIsRecipeCardOpen(true)}
-                      className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
-                    >
-                      <BookOpen className="h-3.5 w-3.5" />
-                      View Recipe
-                    </button>
-                  )}
-                </div>
+                    {/* View Recipe button - only for finalised meals with recipe card */}
+                    {isPlanFinalised && meal.recipe_card && (
+                      <button
+                        onClick={() => setIsRecipeCardOpen(true)}
+                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+                      >
+                        <BookOpen className="h-3.5 w-3.5" />
+                        View Recipe
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* Inline Recipe URL Input - visible before finalisation when no URL */}
+                {/* For blank meals, always show prominently */}
                 {!isPlanFinalised && !meal.recipe_url && (
-                  <div className="flex items-center gap-2 mt-3">
+                  <div className={cn(
+                    "flex items-center gap-2",
+                    isBlankMeal ? "mt-1" : "mt-3"
+                  )}>
                     <Input
                       value={editedUrl}
                       onChange={(e) => setEditedUrl(e.target.value)}
-                      placeholder="Paste recipe URL..."
+                      placeholder={isBlankMeal ? "Paste recipe URL to add meal..." : "Paste recipe URL..."}
                       type="url"
                       className="h-9 text-sm"
                     />
