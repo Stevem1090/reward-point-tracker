@@ -49,19 +49,19 @@ export function RecipeLibrary() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-hidden">
       {/* Search and add */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-2 min-w-0">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search recipes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 w-full"
           />
         </div>
-        <Button className="gap-2 min-h-[44px] px-3 sm:px-4" onClick={() => handleOpenAddDialog('website')}>
+        <Button className="gap-2 min-h-[44px] w-full sm:w-auto shrink-0" onClick={() => handleOpenAddDialog('website')}>
           <Plus className="h-5 w-5" />
           <span>Add</span>
         </Button>
@@ -153,10 +153,10 @@ function RecipeCard({ recipe, onDelete }: RecipeCardProps) {
             <img
               src={recipe.image_url}
               alt={recipe.name}
-              className="w-full h-20 sm:w-20 sm:h-20 rounded-lg object-cover shrink-0"
+              className="w-full h-16 sm:w-20 sm:h-20 rounded-lg object-cover shrink-0"
             />
           ) : (
-            <div className="w-full h-20 sm:w-20 sm:h-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <div className="w-full h-16 sm:w-20 sm:h-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
               <BookOpen className="h-6 w-6 text-muted-foreground" />
             </div>
           )}
@@ -164,7 +164,7 @@ function RecipeCard({ recipe, onDelete }: RecipeCardProps) {
           {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-medium text-base truncate flex-1">{recipe.name}</h3>
+              <h3 className="font-medium text-sm sm:text-base truncate flex-1">{recipe.name}</h3>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
@@ -184,7 +184,7 @@ function RecipeCard({ recipe, onDelete }: RecipeCardProps) {
               </DropdownMenu>
             </div>
             {recipe.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
+              <p className="text-sm text-muted-foreground line-clamp-1 sm:line-clamp-2 mt-0.5">
                 {recipe.description}
               </p>
             )}
