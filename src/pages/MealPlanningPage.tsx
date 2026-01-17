@@ -16,7 +16,7 @@ export default function MealPlanningPage() {
     : getWeekStartDate(addWeeks(new Date(), 1));
 
   return (
-    <div className="container mx-auto p-4 md:p-6 max-w-4xl">
+    <div className="container mx-auto p-4 md:p-6 max-w-4xl overflow-x-hidden">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Meal Planning</h1>
         <p className="text-muted-foreground">
@@ -44,7 +44,7 @@ export default function MealPlanningPage() {
           <ShoppingListView weekStartDate={weekStartDate} />
         </TabsContent>
 
-        <TabsContent value="recipes" className="mt-6">
+        <TabsContent value="recipes" className="mt-6 overflow-hidden">
           <RecipeLibrary />
         </TabsContent>
 
