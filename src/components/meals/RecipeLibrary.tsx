@@ -185,10 +185,10 @@ function RecipeCardItem({ recipe, onDelete, onView }: RecipeCardItemProps) {
             <img
               src={recipe.image_url}
               alt={recipe.name}
-              className="w-full h-16 sm:w-20 sm:h-20 rounded-lg object-cover shrink-0"
+              className="h-16 w-20 sm:w-20 sm:h-20 rounded-lg object-cover shrink-0"
             />
           ) : (
-            <div className="w-full h-16 sm:w-20 sm:h-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <div className="h-16 w-20 sm:w-20 sm:h-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
               <BookOpen className="h-6 w-6 text-muted-foreground" />
             </div>
           )}
