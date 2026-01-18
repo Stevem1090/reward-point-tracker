@@ -260,14 +260,13 @@ export function AddRecipeDialog({ open, onOpenChange, defaultTab = 'website' }: 
                     <Camera className="h-8 w-8 text-muted-foreground mb-2" />
                     <span className="text-sm text-muted-foreground">Tap to upload photo</span>
                     <span className="text-xs text-muted-foreground mt-1">or take a picture</span>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      capture="environment"
-                      className="hidden" 
-                      onChange={handleImageUpload}
-                      disabled={isExtracting}
-                    />
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleImageUpload}
+                  disabled={isExtracting}
+                />
                   </label>
                 )}
                 <p className="text-xs text-muted-foreground">
