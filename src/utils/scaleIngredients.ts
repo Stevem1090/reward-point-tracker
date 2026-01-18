@@ -67,19 +67,74 @@ function parseQuantity(quantity: string): number | null {
 }
 
 /**
+ * Round to cooking-friendly values
+ * Small values round to quarters, larger values round to 5s or 10s
+ */
+function roundToCookingFriendly(value: number): number {
+  // For values under 10, round to nearest 0.25 (quarter)
+  if (value < 10) {
+    return Math.round(value * 4) / 4;
+  }
+  // For values 10-100, round to nearest 5
+  if (value < 100) {
+    return Math.round(value / 5) * 5;
+  }
+  // For larger values, round to nearest 10
+  return Math.round(value / 10) * 10;
+}
+
+/**
+ * Convert decimal to unicode fraction if possible
+ */
+function toFraction(value: number): string | null {
+  const fractionMap: Record<number, string> = {
+    0.25: '¼',
+    0.5: '½',
+    0.75: '¾',
+  };
+  
+  const decimal = value % 1;
+  const whole = Math.floor(value);
+  
+  // Check if decimal matches a known fraction (with tolerance)
+  for (const [key, symbol] of Object.entries(fractionMap)) {
+    if (Math.abs(decimal - parseFloat(key)) < 0.05) {
+      return whole > 0 ? `${whole}${symbol}` : symbol;
+    }
+  }
+  
+  // Handle thirds with slightly wider tolerance
+  if (Math.abs(decimal - 0.33) < 0.08 || Math.abs(decimal - 1/3) < 0.08) {
+    return whole > 0 ? `${whole}⅓` : '⅓';
+  }
+  if (Math.abs(decimal - 0.67) < 0.08 || Math.abs(decimal - 2/3) < 0.08) {
+    return whole > 0 ? `${whole}⅔` : '⅔';
+  }
+  
+  return null;
+}
+
+/**
  * Format a scaled quantity for display
- * Keeps up to 2 decimal places, removes trailing zeros
+ * Uses cooking-friendly rounding and unicode fractions where possible
  */
 function formatQuantity(value: number): string {
-  // Round to 2 decimal places
-  const rounded = Math.round(value * 100) / 100;
+  // Round to cooking-friendly value
+  const rounded = roundToCookingFriendly(value);
   
-  // Convert to string and remove trailing zeros
+  // If it's a whole number, return as integer
   if (Number.isInteger(rounded)) {
     return rounded.toString();
   }
   
-  return rounded.toFixed(2).replace(/\.?0+$/, '');
+  // Try to express as a nice fraction for small values
+  const fraction = toFraction(rounded);
+  if (fraction) {
+    return fraction;
+  }
+  
+  // Otherwise round to 1 decimal place max
+  return rounded.toFixed(1).replace(/\.0$/, '');
 }
 
 /**
