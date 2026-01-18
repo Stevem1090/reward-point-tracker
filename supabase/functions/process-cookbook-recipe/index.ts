@@ -30,22 +30,18 @@ serve(async (req) => {
   }
 
   try {
-    const { recipeText, cookbookTitle, recipeName } = await req.json();
+    const { imageData, cookbookTitle, recipeName } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    if (!recipeText) {
-      throw new Error("Recipe text is required");
+    if (!imageData) {
+      throw new Error("Cookbook photo is required");
     }
 
-    const userPrompt = `Format this recipe from "${cookbookTitle || "a cookbook"}" into a structured format:
-
-Recipe Name: ${recipeName || "Unknown"}
-
-${recipeText}`;
+    const textPrompt = `Extract the recipe from this cookbook page photo.${cookbookTitle ? ` Cookbook: "${cookbookTitle}".` : ''}${recipeName ? ` Recipe name hint: "${recipeName}".` : ''}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -54,10 +50,16 @@ ${recipeText}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
+          { 
+            role: "user", 
+            content: [
+              { type: "text", text: textPrompt },
+              { type: "image_url", image_url: { url: imageData } }
+            ]
+          },
         ],
         tools: [
           {

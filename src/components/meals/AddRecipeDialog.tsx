@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Loader2, Globe, BookOpen, Clock, Users, ChevronLeft } from 'lucide-react';
+import { Loader2, Globe, BookOpen, Clock, Users, ChevronLeft, Camera, X } from 'lucide-react';
 import { useDirectRecipeExtraction, ExtractedRecipe } from '@/hooks/useDirectRecipeExtraction';
 import { useRecipes } from '@/hooks/useRecipes';
 import { toast } from 'sonner';
@@ -26,8 +26,9 @@ export function AddRecipeDialog({ open, onOpenChange, defaultTab = 'website' }: 
   // Website tab state
   const [url, setUrl] = useState('');
   
-  // Cookbook tab state
-  const [recipeText, setRecipeText] = useState('');
+  // Cookbook tab state - image upload
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [cookbookTitle, setCookbookTitle] = useState('');
   const [recipeName, setRecipeName] = useState('');
   
@@ -41,9 +42,29 @@ export function AddRecipeDialog({ open, onOpenChange, defaultTab = 'website' }: 
   const { extractFromUrl, processCookbook } = useDirectRecipeExtraction();
   const { createRecipe } = useRecipes();
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('Image too large. Please use an image under 10MB.');
+        return;
+      }
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setImagePreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+  };
+
   const resetForm = () => {
     setUrl('');
-    setRecipeText('');
+    setImageFile(null);
+    setImagePreview(null);
     setCookbookTitle('');
     setRecipeName('');
     setExtractedRecipe(null);
@@ -82,14 +103,14 @@ export function AddRecipeDialog({ open, onOpenChange, defaultTab = 'website' }: 
   };
 
   const handleProcessCookbook = async () => {
-    if (!recipeText.trim()) {
-      toast.error('Please enter the recipe text');
+    if (!imagePreview) {
+      toast.error('Please upload a cookbook photo');
       return;
     }
 
     try {
       const recipe = await processCookbook.mutateAsync({
-        recipeText: recipeText.trim(),
+        imageData: imagePreview,
         cookbookTitle: cookbookTitle.trim() || undefined,
         recipeName: recipeName.trim() || undefined
       });
@@ -216,32 +237,56 @@ export function AddRecipeDialog({ open, onOpenChange, defaultTab = 'website' }: 
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="recipe-text">Recipe Text</Label>
-                <Textarea
-                  id="recipe-text"
-                  placeholder="Paste the recipe text from your cookbook or photo..."
-                  value={recipeText}
-                  onChange={(e) => setRecipeText(e.target.value)}
-                  disabled={isExtracting}
-                  className="min-h-[150px]"
-                />
+                <Label>Cookbook Photo</Label>
+                {imagePreview ? (
+                  <div className="relative">
+                    <img 
+                      src={imagePreview} 
+                      alt="Cookbook page" 
+                      className="w-full rounded-lg border max-h-[200px] object-contain bg-muted"
+                    />
+                    <Button 
+                      variant="destructive" 
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8"
+                      onClick={clearImage}
+                      disabled={isExtracting}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                    <Camera className="h-8 w-8 text-muted-foreground mb-2" />
+                    <span className="text-sm text-muted-foreground">Tap to upload photo</span>
+                    <span className="text-xs text-muted-foreground mt-1">or take a picture</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="environment"
+                      className="hidden" 
+                      onChange={handleImageUpload}
+                      disabled={isExtracting}
+                    />
+                  </label>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Copy text from a photo using your phone's OCR feature, or type the recipe manually.
+                  Take a photo of your cookbook recipe page
                 </p>
               </div>
 
               <Button 
                 onClick={handleProcessCookbook} 
-                disabled={isExtracting || !recipeText.trim()}
+                disabled={isExtracting || !imagePreview}
                 className="w-full min-h-[44px]"
               >
                 {processCookbook.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processing Recipe...
+                    Extracting Recipe...
                   </>
                 ) : (
-                  'Process Recipe'
+                  'Extract Recipe'
                 )}
               </Button>
             </TabsContent>

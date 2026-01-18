@@ -19,7 +19,7 @@ interface ExtractFromUrlParams {
 }
 
 interface ProcessCookbookParams {
-  recipeText: string;
+  imageData: string;
   cookbookTitle?: string;
   recipeName?: string;
 }
@@ -76,9 +76,9 @@ export function useDirectRecipeExtraction() {
   });
 
   const processCookbook = useMutation({
-    mutationFn: async ({ recipeText, cookbookTitle, recipeName }: ProcessCookbookParams): Promise<ExtractedRecipe> => {
+    mutationFn: async ({ imageData, cookbookTitle, recipeName }: ProcessCookbookParams): Promise<ExtractedRecipe> => {
       const { data, error } = await supabase.functions.invoke('process-cookbook-recipe', {
-        body: { recipeText, cookbookTitle, recipeName }
+        body: { imageData, cookbookTitle, recipeName }
       });
 
       if (error) {
