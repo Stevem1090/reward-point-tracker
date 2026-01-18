@@ -5,6 +5,7 @@ import { useAIMealGeneration } from '@/hooks/useAIMealGeneration';
 import { useShoppingListGeneration } from '@/hooks/useShoppingListGeneration';
 import { useRecipeExtraction } from '@/hooks/useRecipeExtraction';
 import { MealSlot } from './MealSlot';
+import { SortableMealSlot } from './SortableMealSlot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Sparkles, Check, RefreshCw, Trash2, PenLine } from 'lucide-react';
@@ -22,6 +23,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
 
 interface MealPlanViewProps {
   weekStartDate: string;
@@ -29,13 +44,19 @@ interface MealPlanViewProps {
 
 export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   const queryClient = useQueryClient();
-  const { useMealPlanForWeek, createMealPlan, createBlankMealPlan, approveMealPlan, deleteMealPlan, saveAIRecipesToLibrary } = useMealPlans();
+  const { useMealPlanForWeek, createMealPlan, createBlankMealPlan, approveMealPlan, deleteMealPlan, saveAIRecipesToLibrary, reorderMeals } = useMealPlans();
   const { data: mealPlan, isLoading, error, refetch } = useMealPlanForWeek(weekStartDate);
   const { generateMealPlan } = useAIMealGeneration();
   const { generateShoppingList } = useShoppingListGeneration();
   const { extractFromUrl } = useRecipeExtraction();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [finalisingStep, setFinalisingStep] = useState<string | null>(null);
+
+  // Drag and drop sensors with activation constraints
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  );
 
   const isGenerating = generateMealPlan.isPending;
   const isCreatingBlank = createBlankMealPlan.isPending;
@@ -239,6 +260,35 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
     return mealPlan?.meals.find(m => m.day_of_week === day);
   };
 
+  // Get meals sorted by their current day positions (for drag-and-drop)
+  const getSortedMeals = (): MealWithRecipeCard[] => {
+    if (!mealPlan?.meals) return [];
+    return DAYS_OF_WEEK.map(day => getMealForDay(day)).filter((m): m is MealWithRecipeCard => !!m);
+  };
+
+  // Handle drag end - reorder meals by updating their day_of_week
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !mealPlan) return;
+
+    const sortedMeals = getSortedMeals();
+    const oldIndex = sortedMeals.findIndex(m => m.id === active.id);
+    const newIndex = sortedMeals.findIndex(m => m.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Reorder the array
+    const reorderedMeals = arrayMove(sortedMeals, oldIndex, newIndex);
+
+    // Create updates: assign each meal the day corresponding to its new position
+    const updates = reorderedMeals.map((meal, index) => ({
+      mealId: meal.id,
+      dayOfWeek: DAYS_OF_WEEK[index]
+    }));
+
+    await reorderMeals.mutateAsync(updates);
+  };
+
   // Check if all meals are approved (and have names - not blank)
   const allMealsApproved = mealPlan?.meals.length === 7 && 
     mealPlan.meals.every(m => m.status === 'approved' && m.meal_name && m.meal_name.trim() !== '');
@@ -350,18 +400,46 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
         </Card>
       )}
 
-      {/* Meal slots for each day */}
-      <div className="space-y-3">
-        {DAYS_OF_WEEK.map((day) => (
-          <MealSlot
-            key={day}
-            day={day}
-            meal={getMealForDay(day)}
-            isPlanFinalised={isPlanFinalised}
-            mealPlanId={mealPlan.id}
-          />
-        ))}
-      </div>
+      {/* Meal slots for each day - with drag-and-drop for finalized plans */}
+      {isPlanFinalised ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={getSortedMeals().map(m => m.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-3">
+              {DAYS_OF_WEEK.map((day) => {
+                const meal = getMealForDay(day);
+                return meal ? (
+                  <SortableMealSlot
+                    key={meal.id}
+                    meal={meal}
+                    day={day}
+                    isPlanFinalised={isPlanFinalised}
+                    mealPlanId={mealPlan.id}
+                  />
+                ) : null;
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+      ) : (
+        <div className="space-y-3">
+          {DAYS_OF_WEEK.map((day) => (
+            <MealSlot
+              key={day}
+              day={day}
+              meal={getMealForDay(day)}
+              isPlanFinalised={isPlanFinalised}
+              mealPlanId={mealPlan.id}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Action buttons for draft plans */}
       {!isPlanFinalised && mealPlan.meals.length > 0 && (

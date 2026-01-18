@@ -358,6 +358,24 @@ export function useMealPlans() {
     });
   };
 
+  const reorderMeals = useMutation({
+    mutationFn: async (updates: { mealId: string; dayOfWeek: DayOfWeek }[]) => {
+      // Update each meal's day_of_week in sequence
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('meals')
+          .update({ day_of_week: update.dayOfWeek })
+          .eq('id', update.mealId);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+      toast.success('Meals reordered');
+    },
+    onError: () => toast.error('Failed to reorder meals')
+  });
+
   return {
     useMealPlanForWeek,
     usePreviousMealPlans,
@@ -370,6 +388,7 @@ export function useMealPlans() {
     addMealToDay,
     approveMealPlan,
     deleteMealPlan,
-    saveAIRecipesToLibrary
+    saveAIRecipesToLibrary,
+    reorderMeals
   };
 }
