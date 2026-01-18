@@ -4,11 +4,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Plus, Search, BookOpen, Clock, Users, MoreVertical, Trash2, Eye } from 'lucide-react';
 import { useState } from 'react';
-import { Recipe } from '@/types/meal';
+import { Recipe, RecipeCard as RecipeCardType } from '@/types/meal';
 import { AddRecipeDialog } from './AddRecipeDialog';
+import { RecipeCardDialog } from './RecipeCardDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+
+// Convert Recipe to RecipeCard format for the dialog
+const recipeToRecipeCard = (recipe: Recipe): RecipeCardType => ({
+  id: recipe.id,
+  meal_id: recipe.id,
+  meal_name: recipe.name,
+  image_url: recipe.image_url || null,
+  ingredients: recipe.ingredients,
+  steps: recipe.steps,
+  base_servings: recipe.servings,
+  html_content: null,
+  created_at: recipe.created_at,
+});
 
 export function RecipeLibrary() {
   const { recipes, isLoading, deleteRecipe } = useRecipes();
@@ -16,6 +30,7 @@ export function RecipeLibrary() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [defaultTab, setDefaultTab] = useState<'website' | 'cookbook'>('website');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
   const filteredRecipes = recipes.filter(recipe =>
     recipe.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -101,10 +116,11 @@ export function RecipeLibrary() {
       {filteredRecipes.length > 0 && (
         <div className="space-y-3">
           {filteredRecipes.map((recipe) => (
-            <RecipeCard 
+            <RecipeCardItem 
               key={recipe.id} 
               recipe={recipe} 
               onDelete={() => setDeleteConfirmId(recipe.id)}
+              onView={() => setSelectedRecipe(recipe)}
             />
           ))}
         </div>
@@ -134,18 +150,34 @@ export function RecipeLibrary() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Recipe Detail Dialog */}
+      {selectedRecipe && (
+        <RecipeCardDialog
+          open={!!selectedRecipe}
+          onOpenChange={(open) => !open && setSelectedRecipe(null)}
+          recipeCard={recipeToRecipeCard(selectedRecipe)}
+          currentServings={selectedRecipe.servings}
+          recipeUrl={selectedRecipe.recipe_url}
+          estimatedCookMinutes={selectedRecipe.estimated_cook_minutes}
+        />
+      )}
     </div>
   );
 }
 
-interface RecipeCardProps {
+interface RecipeCardItemProps {
   recipe: Recipe;
   onDelete: () => void;
+  onView: () => void;
 }
 
-function RecipeCard({ recipe, onDelete }: RecipeCardProps) {
+function RecipeCardItem({ recipe, onDelete, onView }: RecipeCardItemProps) {
   return (
-    <Card className="hover:shadow-md transition-shadow overflow-hidden">
+    <Card 
+      className="hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
+      onClick={onView}
+    >
       <CardContent className="p-2.5 sm:py-4 sm:px-6">
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
           {/* Thumbnail */}
@@ -166,17 +198,17 @@ function RecipeCard({ recipe, onDelete }: RecipeCardProps) {
             <div className="flex items-start justify-between gap-2">
               <h3 className="font-medium text-sm sm:text-base truncate flex-1">{recipe.name}</h3>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                   <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem className="gap-2">
+                  <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); onView(); }}>
                     <Eye className="h-4 w-4" />
                     View Details
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2 text-destructive" onClick={onDelete}>
+                  <DropdownMenuItem className="gap-2 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
                     <Trash2 className="h-4 w-4" />
                     Delete
                   </DropdownMenuItem>
