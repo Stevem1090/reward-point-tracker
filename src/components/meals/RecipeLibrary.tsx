@@ -2,11 +2,12 @@ import { useRecipes } from '@/hooks/useRecipes';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Plus, Search, BookOpen, Clock, Users, MoreVertical, Trash2, Eye } from 'lucide-react';
+import { Loader2, Plus, Search, BookOpen, Clock, Users, MoreVertical, Trash2, Eye, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { Recipe, RecipeCard as RecipeCardType } from '@/types/meal';
 import { AddRecipeDialog } from './AddRecipeDialog';
 import { RecipeCardDialog } from './RecipeCardDialog';
+import { EditRecipeDialog } from './EditRecipeDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
@@ -31,6 +32,7 @@ export function RecipeLibrary() {
   const [defaultTab, setDefaultTab] = useState<'website' | 'cookbook'>('website');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
 
   const filteredRecipes = recipes.filter(recipe =>
     recipe.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -121,6 +123,7 @@ export function RecipeLibrary() {
               recipe={recipe} 
               onDelete={() => setDeleteConfirmId(recipe.id)}
               onView={() => setSelectedRecipe(recipe)}
+              onEdit={() => setEditingRecipe(recipe)}
             />
           ))}
         </div>
@@ -162,6 +165,15 @@ export function RecipeLibrary() {
           estimatedCookMinutes={selectedRecipe.estimated_cook_minutes}
         />
       )}
+
+      {/* Edit Recipe Dialog */}
+      {editingRecipe && (
+        <EditRecipeDialog
+          open={!!editingRecipe}
+          onOpenChange={(open) => !open && setEditingRecipe(null)}
+          recipe={editingRecipe}
+        />
+      )}
     </div>
   );
 }
@@ -170,9 +182,10 @@ interface RecipeCardItemProps {
   recipe: Recipe;
   onDelete: () => void;
   onView: () => void;
+  onEdit: () => void;
 }
 
-function RecipeCardItem({ recipe, onDelete, onView }: RecipeCardItemProps) {
+function RecipeCardItem({ recipe, onDelete, onView, onEdit }: RecipeCardItemProps) {
   return (
     <Card 
       className="hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
@@ -207,6 +220,10 @@ function RecipeCardItem({ recipe, onDelete, onView }: RecipeCardItemProps) {
                   <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); onView(); }}>
                     <Eye className="h-4 w-4" />
                     View Details
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+                    <Pencil className="h-4 w-4" />
+                    Edit Recipe
                   </DropdownMenuItem>
                   <DropdownMenuItem className="gap-2 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
                     <Trash2 className="h-4 w-4" />
