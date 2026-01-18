@@ -56,15 +56,23 @@ You may also receive a list called current_week_meals (already approved for this
 These are ABSOLUTE EXCLUSIONS - do not suggest anything identical or very similar.
 Unlike recent_meals (strong avoidance), current_week_meals must NEVER be duplicated.
 
+FAMILY RATINGS FEEDBACK (IMPORTANT):
+You may receive ratings_context with past meal ratings (1-5 stars) and notes.
+- FAVOR: Meals similar to 4-5 star rated dishes (same cuisine, protein style, or cooking method)
+- AVOID: Meals similar to 1-2 star rated dishes - the family didn't enjoy these
+- CONSIDER NOTES: User notes explain WHY they liked/disliked meals (e.g., "too spicy", "kids loved it")
+- Use this feedback to personalize suggestions without repeating exact meals
+
 TWO-PASS PLANNING (important):
 1) Silently generate a candidate pool of 20–25 dinners that fit all rules, exclude current_week_meals, and avoid recent_meals.
-2) Select the final meals that maximise variety across protein, carb, cuisine, and method.
+2) Select the final meals that maximise variety across protein, carb, cuisine, and method, while favoring highly-rated meal styles.
 
 If constraints conflict, prioritise:
 1) Never duplicate current_week_meals
 2) Avoid repeats vs recent_meals
-3) Keep weekday meals under 30 mins
-4) Keep the plan family-friendly and practical
+3) Favor highly-rated meal styles, avoid low-rated styles
+4) Keep weekday meals under 30 mins
+5) Keep the plan family-friendly and practical
 
 URL INSTRUCTIONS:
 - Leave suggested_url as empty string ""
@@ -127,6 +135,54 @@ async function fetchRecentMeals(supabase: ReturnType<typeof createClient>): Prom
   return mealNames;
 }
 
+interface RatingContext {
+  meal_name: string;
+  rating: number;
+  notes: string | null;
+}
+
+async function fetchRatingsContext(supabase: ReturnType<typeof createClient>): Promise<RatingContext[]> {
+  // Fetch meal ratings with meal names (last 50 ratings)
+  const { data: ratings, error } = await supabase
+    .from('meal_ratings')
+    .select('rating, notes, meal_id')
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error || !ratings?.length) {
+    console.log('No ratings found or error:', error);
+    return [];
+  }
+
+  // Fetch meal names for these ratings
+  const mealIds = ratings.map(r => r.meal_id);
+  const { data: meals, error: mealsError } = await supabase
+    .from('meals')
+    .select('id, meal_name')
+    .in('id', mealIds);
+
+  if (mealsError || !meals?.length) {
+    console.log('Could not fetch meal names for ratings:', mealsError);
+    return [];
+  }
+
+  // Create a map of meal_id to meal_name
+  const mealNameMap = new Map<string, string>();
+  meals.forEach(m => mealNameMap.set(m.id, m.meal_name));
+
+  // Build ratings context with meal names
+  const ratingsContext: RatingContext[] = ratings
+    .filter(r => mealNameMap.has(r.meal_id))
+    .map(r => ({
+      meal_name: mealNameMap.get(r.meal_id)!,
+      rating: r.rating,
+      notes: r.notes
+    }));
+
+  console.log(`Found ${ratingsContext.length} ratings for context`);
+  return ratingsContext;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -142,11 +198,15 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Fetch recent meals from database
+    // Fetch recent meals and ratings from database
     let recentMeals: string[] = [];
+    let ratingsContext: RatingContext[] = [];
     if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-      recentMeals = await fetchRecentMeals(supabase);
+      [recentMeals, ratingsContext] = await Promise.all([
+        fetchRecentMeals(supabase),
+        fetchRatingsContext(supabase)
+      ]);
     }
 
     // Note: excludeMeals contains current week's approved meals (absolute exclusion)
@@ -195,6 +255,15 @@ serve(async (req) => {
       ? `\nrecent_meals (avoid repeats from past 4 weeks):\n${historicalMeals.map(m => `- ${m}`).join('\n')}\n`
       : '';
 
+    // Build ratings context section
+    const ratingsSection = ratingsContext.length > 0
+      ? `\nratings_context (family feedback on past meals):\n${ratingsContext.map(r => {
+          const stars = '⭐'.repeat(r.rating);
+          const noteText = r.notes ? ` - "${r.notes}"` : '';
+          return `- ${r.meal_name}: ${stars}${noteText}`;
+        }).join('\n')}\n`
+      : '';
+
     // Adjust variety guidance for partial regeneration
     const varietyNote = totalMeals < 7 
       ? `\nIMPORTANT: You are generating ${totalMeals} replacement meal${totalMeals > 1 ? 's' : ''} only. Ensure ${totalMeals > 1 ? 'each meal is distinct from the others and all are' : 'it is'} clearly different from current_week_meals in protein, cuisine, and cooking method. The variety guidelines (4 proteins, 4 carbs, 4 methods) apply to the full week including current_week_meals, not just these replacements.`
@@ -204,8 +273,8 @@ serve(async (req) => {
 ${slotRequests.join("\n")}
 
 ${preferences ? `Family preferences: ${preferences}` : ""}
-${currentWeekSection}${recentMealsSection}${varietyNote}
-Remember: Focus on practical, family-friendly meals. NEVER duplicate current_week_meals. Avoid meals similar to recent_meals. Tag each meal with its slot_type.`;
+${currentWeekSection}${recentMealsSection}${ratingsSection}${varietyNote}
+Remember: Focus on practical, family-friendly meals. NEVER duplicate current_week_meals. Avoid meals similar to recent_meals. Use ratings_context to favor highly-rated meal styles and avoid poorly-rated ones. Tag each meal with its slot_type.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

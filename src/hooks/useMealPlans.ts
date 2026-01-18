@@ -358,6 +358,53 @@ export function useMealPlans() {
     });
   };
 
+  // Fetch all meal plans (current + previous) with meals for history view
+  const useAllMealPlansWithMeals = () => {
+    return useQuery({
+      queryKey: ['allMealPlansWithMeals'],
+      queryFn: async (): Promise<(MealPlan & { meals: Meal[] })[]> => {
+        // Fetch meal plans (current week and previous)
+        const { data: plans, error: plansError } = await supabase
+          .from('meal_plans')
+          .select('*')
+          .order('week_start_date', { ascending: false })
+          .limit(13); // Current + 12 previous
+
+        if (plansError) throw plansError;
+        if (!plans || plans.length === 0) return [];
+
+        // Fetch all meals for these plans
+        const planIds = plans.map(p => p.id);
+        const { data: meals, error: mealsError } = await supabase
+          .from('meals')
+          .select('*')
+          .in('meal_plan_id', planIds)
+          .order('sort_order');
+
+        if (mealsError) throw mealsError;
+
+        // Group meals by plan
+        const mealsByPlan = new Map<string, Meal[]>();
+        (meals || []).forEach(meal => {
+          const list = mealsByPlan.get(meal.meal_plan_id) || [];
+          list.push({
+            ...meal,
+            day_of_week: meal.day_of_week as DayOfWeek,
+            status: meal.status as MealStatus,
+            source_type: meal.source_type as Meal['source_type'],
+          });
+          mealsByPlan.set(meal.meal_plan_id, list);
+        });
+
+        return plans.map(p => ({
+          ...p,
+          status: p.status as MealPlanStatus,
+          meals: mealsByPlan.get(p.id) || []
+        }));
+      }
+    });
+  };
+
   const reorderMeals = useMutation({
     mutationFn: async (updates: { mealId: string; dayOfWeek: DayOfWeek }[]) => {
       // Update each meal's day_of_week in sequence
@@ -379,6 +426,7 @@ export function useMealPlans() {
   return {
     useMealPlanForWeek,
     usePreviousMealPlans,
+    useAllMealPlansWithMeals,
     createMealPlan,
     createBlankMealPlan,
     updateMealStatus,
