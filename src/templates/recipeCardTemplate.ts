@@ -11,7 +11,7 @@ export const recipeCardTemplate = `<!doctype html>
        ========= */
     @page {
       size: A4;
-      margin: 12mm;
+      margin: 10mm;
     }
 
     html, body {
@@ -28,10 +28,10 @@ export const recipeCardTemplate = `<!doctype html>
     /* Make everything fit cleanly on 1 page */
     .page {
       width: 100%;
-      height: calc(297mm - 24mm); /* A4 height minus @page margins (12mm top+bottom) */
+      max-height: calc(297mm - 20mm); /* A4 height minus @page margins */
       display: flex;
       flex-direction: column;
-      gap: 6mm;
+      gap: 4mm;
     }
 
     /* Prevent awkward splitting */
@@ -44,30 +44,24 @@ export const recipeCardTemplate = `<!doctype html>
        TYPOGRAPHY
        ========= */
     .title {
-      font-size: 20pt;
+      font-size: 18pt;
       font-weight: 700;
       line-height: 1.1;
       margin: 0;
-      color: #d32f2f; /* Gousto-ish red */
+      color: #d32f2f;
     }
 
     .meta {
-      font-size: 9.5pt;
+      font-size: 9pt;
       color: #666;
       margin: 1mm 0 0 0;
     }
 
     .section-heading {
-      font-size: 12pt;
+      font-size: 11pt;
       font-weight: 700;
       color: #d32f2f;
-      margin: 0;
-    }
-
-    .small {
-      font-size: 9pt;
-      line-height: 1.25;
-      margin: 0;
+      margin: 0 0 2mm 0;
     }
 
     /* =========
@@ -79,12 +73,12 @@ export const recipeCardTemplate = `<!doctype html>
       gap: 1mm;
     }
 
-    /* Top half: Image + Ingredients */
+    /* Top section: Image + Ingredients side by side */
     .top {
       display: grid;
-      grid-template-columns: 95mm 1fr;
-      gap: 6mm;
-      align-items: stretch;
+      grid-template-columns: 70mm 1fr;
+      gap: 5mm;
+      align-items: start;
     }
 
     .box {
@@ -96,21 +90,21 @@ export const recipeCardTemplate = `<!doctype html>
 
     .box-header {
       background: #f2f2f2;
-      padding: 3mm 4mm;
+      padding: 2.5mm 4mm;
       border-bottom: 0.35mm solid #111;
     }
 
     .box-body {
-      padding: 4mm;
+      padding: 3mm 4mm;
     }
 
-    /* Image box is a fixed square-ish area */
+    /* Smaller image box */
     .image-box {
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 80mm;           /* fixed to keep single-page layout stable */
-      width: 95mm;
+      height: 55mm;
+      width: 70mm;
       padding: 0;
     }
 
@@ -128,7 +122,7 @@ export const recipeCardTemplate = `<!doctype html>
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 10pt;
+      font-size: 9pt;
       color: #555;
       letter-spacing: 0.5px;
       text-transform: uppercase;
@@ -136,8 +130,8 @@ export const recipeCardTemplate = `<!doctype html>
 
     /* Ingredients formatting */
     .ingredients-list {
-      font-size: 9pt;
-      line-height: 1.25;
+      font-size: 8.5pt;
+      line-height: 1.2;
     }
 
     .ingredients-list ul {
@@ -146,90 +140,78 @@ export const recipeCardTemplate = `<!doctype html>
     }
 
     .ingredients-list li {
-      margin: 0 0 1.2mm 0;
+      margin: 0 0 1mm 0;
     }
 
-    .ingredients-section-title {
-      font-weight: 700;
-      margin: 0 0 2mm 0;
-    }
-
-    /* Steps section */
+    /* Steps section - dynamic list */
     .steps-wrap {
+      flex: 1;
+    }
+
+    .steps-list {
       display: flex;
       flex-direction: column;
-      gap: 3mm;
-      flex: 1; /* take remaining page space */
+      gap: 2mm;
     }
 
-    /* 2 columns × 4 rows fixed grid */
-    .steps-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: repeat(4, 1fr);
-      gap: 0;
-      border: 0.5mm solid #111;
-      border-radius: 2mm;
-      overflow: hidden;
-      flex: 1;
-      min-height: 128mm; /* tuned to fit with top section + header */
-    }
-
-    .step-cell {
-      border-right: 0.35mm solid #111;
-      border-bottom: 0.35mm solid #111;
-      padding: 4mm;
-      font-size: 9pt;
-      line-height: 1.25;
+    .step-row {
       display: flex;
       gap: 3mm;
       align-items: flex-start;
-      background: #fff;
-    }
-
-    /* remove right border on right column */
-    .step-cell:nth-child(2n) {
-      border-right: none;
-    }
-
-    /* remove bottom border on last row */
-    .step-cell:nth-last-child(-n + 2) {
-      border-bottom: none;
+      padding: 2.5mm 3mm;
+      border: 0.35mm solid #ddd;
+      border-radius: 2mm;
+      background: #fafafa;
     }
 
     .step-num {
-      width: 7mm;
-      height: 7mm;
-      min-width: 7mm;
-      border-radius: 2mm;
-      background: #f2f2f2;
-      border: 0.35mm solid #111;
+      width: 5.5mm;
+      height: 5.5mm;
+      min-width: 5.5mm;
+      border-radius: 50%;
+      background: #d32f2f;
+      color: white;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 700;
-      font-size: 9pt;
+      font-size: 8pt;
       line-height: 1;
     }
 
     .step-text {
       margin: 0;
       flex: 1;
+      font-size: 8.5pt;
+      line-height: 1.3;
     }
 
-    /* Optional footer */
+    .no-steps {
+      font-size: 9pt;
+      color: #666;
+      font-style: italic;
+    }
+
+    /* Footer */
     .footer {
-      font-size: 8.5pt;
+      font-size: 8pt;
       color: #777;
       display: flex;
       justify-content: space-between;
-      margin-top: 1mm;
+      margin-top: 2mm;
+      padding-top: 2mm;
+      border-top: 0.35mm solid #eee;
+    }
+
+    .footer a {
+      color: #d32f2f;
+      text-decoration: none;
     }
 
     /* Print refinements */
     @media print {
       a { color: inherit; text-decoration: none; }
-      .page { gap: 6mm; }
+      .footer a { color: #d32f2f; }
     }
   </style>
 </head>
@@ -243,9 +225,8 @@ export const recipeCardTemplate = `<!doctype html>
       <p class="meta">{{meta}}</p>
     </div>
 
-    <!-- TOP HALF: IMAGE + INGREDIENTS -->
+    <!-- TOP: IMAGE + INGREDIENTS -->
     <div class="top no-break">
-
       <!-- Image (or placeholder fallback) -->
       <div class="box image-box">
         {{image_block}}
@@ -254,59 +235,26 @@ export const recipeCardTemplate = `<!doctype html>
       <!-- Ingredients -->
       <div class="box">
         <div class="box-header">
-          <p class="section-heading">Ingredients</p>
+          <p class="section-heading" style="margin:0;">Ingredients</p>
         </div>
         <div class="box-body ingredients-list">
           {{ingredients_html}}
         </div>
       </div>
-
     </div>
 
-    <!-- BOTTOM HALF: STEPS -->
+    <!-- STEPS - Dynamic list -->
     <div class="steps-wrap no-break">
-      <p class="section-heading">Steps</p>
-
-      <div class="steps-grid">
-        <!-- Up to 8 steps. Empty cells allowed. -->
-        <div class="step-cell">
-          <div class="step-num">1</div>
-          <p class="step-text">{{step_1}}</p>
-        </div>
-        <div class="step-cell">
-          <div class="step-num">2</div>
-          <p class="step-text">{{step_2}}</p>
-        </div>
-        <div class="step-cell">
-          <div class="step-num">3</div>
-          <p class="step-text">{{step_3}}</p>
-        </div>
-        <div class="step-cell">
-          <div class="step-num">4</div>
-          <p class="step-text">{{step_4}}</p>
-        </div>
-        <div class="step-cell">
-          <div class="step-num">5</div>
-          <p class="step-text">{{step_5}}</p>
-        </div>
-        <div class="step-cell">
-          <div class="step-num">6</div>
-          <p class="step-text">{{step_6}}</p>
-        </div>
-        <div class="step-cell">
-          <div class="step-num">7</div>
-          <p class="step-text">{{step_7}}</p>
-        </div>
-        <div class="step-cell">
-          <div class="step-num">8</div>
-          <p class="step-text">{{step_8}}</p>
-        </div>
+      <p class="section-heading">Method</p>
+      <div class="steps-list">
+        {{steps_html}}
       </div>
+    </div>
 
-      <div class="footer">
-        <span>{{footer_left}}</span>
-        <span>{{footer_right}}</span>
-      </div>
+    <!-- FOOTER -->
+    <div class="footer">
+      <span>{{footer_left}}</span>
+      <span>{{footer_right}}</span>
     </div>
 
   </div>

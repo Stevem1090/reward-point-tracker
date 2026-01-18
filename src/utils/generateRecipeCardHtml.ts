@@ -65,12 +65,17 @@ export function generateRecipeCardHtml(data: RecipeCardData): string {
         .join('')}</ul>`
     : '<p>No ingredients listed</p>';
 
-  // Build steps (pad to 8 with empty strings)
-  const paddedSteps = [...data.steps];
-  while (paddedSteps.length < 8) {
-    paddedSteps.push('');
-  }
-  const stepsToUse = paddedSteps.slice(0, 8);
+  // Build steps HTML dynamically - only render steps that exist
+  const stepsHtml = data.steps.length > 0
+    ? data.steps
+        .map((step, index) => 
+          `<div class="step-row">
+            <div class="step-num">${index + 1}</div>
+            <p class="step-text">${escapeHtml(step)}</p>
+          </div>`
+        )
+        .join('')
+    : '<p class="no-steps">No steps listed</p>';
 
   // Footer
   const footerLeft = data.dayOfWeek || '';
@@ -82,14 +87,7 @@ export function generateRecipeCardHtml(data: RecipeCardData): string {
     .replace(/\{\{meta\}\}/g, escapeHtml(meta))
     .replace(/\{\{image_block\}\}/g, imageBlock)
     .replace(/\{\{ingredients_html\}\}/g, ingredientsHtml)
-    .replace(/\{\{step_1\}\}/g, escapeHtml(stepsToUse[0]))
-    .replace(/\{\{step_2\}\}/g, escapeHtml(stepsToUse[1]))
-    .replace(/\{\{step_3\}\}/g, escapeHtml(stepsToUse[2]))
-    .replace(/\{\{step_4\}\}/g, escapeHtml(stepsToUse[3]))
-    .replace(/\{\{step_5\}\}/g, escapeHtml(stepsToUse[4]))
-    .replace(/\{\{step_6\}\}/g, escapeHtml(stepsToUse[5]))
-    .replace(/\{\{step_7\}\}/g, escapeHtml(stepsToUse[6]))
-    .replace(/\{\{step_8\}\}/g, escapeHtml(stepsToUse[7]))
+    .replace(/\{\{steps_html\}\}/g, stepsHtml)
     .replace(/\{\{footer_left\}\}/g, escapeHtml(footerLeft))
     .replace(/\{\{footer_right\}\}/g, escapeHtml(footerRight));
 }
