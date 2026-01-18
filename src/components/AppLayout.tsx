@@ -92,7 +92,7 @@ const AppLayout = () => {
         </aside>
         
         {/* Main content */}
-        <main className="flex-1 pt-4">
+        <main className="flex-1 pt-4 min-w-0 overflow-x-hidden">
           <Outlet />
         </main>
       </div>

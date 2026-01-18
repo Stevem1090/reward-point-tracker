@@ -24,7 +24,7 @@ export default function MealPlanningPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="plan" className="w-full">
+      <Tabs defaultValue="plan" className="w-full min-w-0">
         <TabsList className="grid w-full grid-cols-4 text-xs md:text-sm">
           <TabsTrigger value="plan">Plan</TabsTrigger>
           <TabsTrigger value="shopping">Shopping</TabsTrigger>
