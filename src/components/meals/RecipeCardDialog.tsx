@@ -37,12 +37,13 @@ export function RecipeCardDialog({
   );
 
   const handlePrint = () => {
+    // Pass ORIGINAL ingredients - generateRecipeCardHtml will scale them
     const recipeData: RecipeCardData = {
       title: recipeCard.meal_name,
       servings: currentServings,
       cookMinutes: estimatedCookMinutes || null,
       imageUrl: recipeCard.image_url,
-      ingredients: scaledIngredients,
+      ingredients: recipeCard.ingredients,
       steps: recipeCard.steps,
       sourceUrl: recipeUrl,
       baseServings: recipeCard.base_servings,
