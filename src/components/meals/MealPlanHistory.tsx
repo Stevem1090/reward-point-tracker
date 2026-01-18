@@ -4,7 +4,7 @@ import { useMealRatings } from '@/hooks/useMealRatings';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Calendar, ChevronDown, ChevronUp, Star } from 'lucide-react';
 import { formatWeekRange, isThisWeek, isNextWeek, getWeekStartDate } from '@/utils/getWeekBounds';
-import { MealPlan, Meal, MealRating } from '@/types/meal';
+import { MealPlan, Meal, MealRating, DAYS_OF_WEEK } from '@/types/meal';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { HistoryMealItem } from './HistoryMealItem';
 import { Badge } from '@/components/ui/badge';
@@ -128,15 +128,21 @@ function HistoryWeekCard({ plan }: HistoryWeekCardProps) {
         <CollapsibleContent>
           <div className="border-t px-4 pb-4">
             {plan.meals && plan.meals.length > 0 ? (
-              plan.meals.map((meal) => (
-                <HistoryMealItem
-                  key={meal.id}
-                  meal={meal}
-                  rating={ratingsMap.get(meal.id) || null}
-                  onRate={(rating, notes) => handleRate(meal.id, rating, notes)}
-                  isRating={upsertRating.isPending}
-                />
-              ))
+              [...plan.meals]
+                .sort((a, b) => {
+                  const aIndex = DAYS_OF_WEEK.indexOf(a.day_of_week);
+                  const bIndex = DAYS_OF_WEEK.indexOf(b.day_of_week);
+                  return aIndex - bIndex;
+                })
+                .map((meal) => (
+                  <HistoryMealItem
+                    key={meal.id}
+                    meal={meal}
+                    rating={ratingsMap.get(meal.id) || null}
+                    onRate={(rating, notes) => handleRate(meal.id, rating, notes)}
+                    isRating={upsertRating.isPending}
+                  />
+                ))
             ) : (
               <p className="text-sm text-muted-foreground py-4 text-center">
                 No meals in this plan

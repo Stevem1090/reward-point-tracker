@@ -63,43 +63,46 @@ export function HistoryMealItem({ meal, rating, onRate, isRating }: HistoryMealI
 
   return (
     <div className="border-b last:border-b-0 py-3">
-      <div className="flex items-start gap-3">
-        {/* Day badge */}
-        <Badge 
-          variant="outline" 
-          className="shrink-0 w-10 justify-center text-xs font-medium"
-        >
-          {DAY_ABBR[meal.day_of_week] || meal.day_of_week.slice(0, 3)}
-        </Badge>
+      <div className="flex flex-col gap-2">
+        {/* Top row: day badge + meal info */}
+        <div className="flex items-start gap-3">
+          <Badge 
+            variant="outline" 
+            className="shrink-0 w-10 justify-center text-xs font-medium"
+          >
+            {DAY_ABBR[meal.day_of_week] || meal.day_of_week.slice(0, 3)}
+          </Badge>
 
-        {/* Meal info */}
-        <div className="flex-1 min-w-0">
-          <h4 className={cn(
-            "font-medium text-sm truncate",
-            !meal.meal_name && "text-muted-foreground italic"
-          )}>
-            {meal.meal_name || 'No meal planned'}
-          </h4>
-          {meal.estimated_cook_minutes && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-              <Clock className="h-3 w-3" />
-              <span>{meal.estimated_cook_minutes} mins</span>
-            </div>
-          )}
+          <div className="flex-1 min-w-0">
+            <h4 className={cn(
+              "font-medium text-sm truncate",
+              !meal.meal_name && "text-muted-foreground italic"
+            )}>
+              {meal.meal_name || 'No meal planned'}
+            </h4>
+            {meal.estimated_cook_minutes && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                <Clock className="h-3 w-3" />
+                <span>{meal.estimated_cook_minutes} mins</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Rating */}
-        <div className="shrink-0">
-          {meal.meal_name ? (
+        {/* Rating row: aligned right */}
+        {meal.meal_name ? (
+          <div className="flex justify-end">
             <StarRating
               rating={displayRating}
               onRatingChange={handleRatingChange}
               size="sm"
             />
-          ) : (
+          </div>
+        ) : (
+          <div className="flex justify-end">
             <span className="text-xs text-muted-foreground">-</span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Notes section */}
