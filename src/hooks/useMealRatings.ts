@@ -29,9 +29,36 @@ export function useMealRatings() {
     });
   };
 
+  // Batch fetch ratings for multiple meals
+  const useRatingsForMeals = (mealIds: string[]) => {
+    return useQuery({
+      queryKey: ['mealRatings', mealIds],
+      queryFn: async (): Promise<MealRating[]> => {
+        if (mealIds.length === 0) return [];
+        const { data, error } = await supabase
+          .from('meal_ratings')
+          .select('*')
+          .in('meal_id', mealIds);
+        if (error) throw error;
+        return data || [];
+      },
+      enabled: mealIds.length > 0
+    });
+  };
+
   const upsertRating = useMutation({
     mutationFn: async ({ mealId, rating, notes }: { mealId: string; rating: number; notes?: string }) => {
       const userId = await getCurrentUserId();
+      
+      // If rating is 0, delete the rating
+      if (rating === 0) {
+        const { error } = await supabase
+          .from('meal_ratings')
+          .delete()
+          .eq('meal_id', mealId);
+        if (error) throw error;
+        return;
+      }
       
       const { data: existing } = await supabase
         .from('meal_ratings')
@@ -49,10 +76,11 @@ export function useMealRatings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealRating'] });
+      queryClient.invalidateQueries({ queryKey: ['mealRatings'] });
       toast.success('Rating saved!');
     },
     onError: () => toast.error('Failed to save rating')
   });
 
-  return { useRatingForMeal, upsertRating };
+  return { useRatingForMeal, useRatingsForMeals, upsertRating };
 }
