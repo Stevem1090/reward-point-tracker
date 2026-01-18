@@ -57,7 +57,44 @@ export function useRecipeExtraction() {
         throw new Error(errorData.error || 'Failed to extract recipe');
       }
 
-      const { recipe }: { recipe: ExtractedRecipe } = await response.json();
+      const responseData = await response.json();
+
+      // Handle extraction failure - create a placeholder recipe card with empty data
+      if (responseData.extraction_failed) {
+        // Create/update the recipe card with failed state (empty ingredients/steps)
+        const { data: existing } = await supabase
+          .from('recipe_cards')
+          .select('id')
+          .eq('meal_id', mealId)
+          .maybeSingle();
+
+        const failedCardData = {
+          meal_id: mealId,
+          meal_name: mealName,
+          image_url: null,
+          ingredients: [] as unknown as Json,
+          steps: [] as unknown as Json,
+          base_servings: 4,
+        };
+
+        if (existing) {
+          const { error: updateError } = await supabase
+            .from('recipe_cards')
+            .update(failedCardData)
+            .eq('id', existing.id);
+          if (updateError) throw updateError;
+        } else {
+          const { error: insertError } = await supabase
+            .from('recipe_cards')
+            .insert([failedCardData]);
+          if (insertError) throw insertError;
+        }
+
+        // Return a marker so the UI knows extraction failed
+        return { extraction_failed: true, sourceUrl: responseData.sourceUrl };
+      }
+
+      const { recipe }: { recipe: ExtractedRecipe } = responseData;
 
       // Create the recipe card - first try to get existing
       const { data: existing } = await supabase
@@ -110,9 +147,13 @@ export function useRecipeExtraction() {
 
       return recipe;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
-      toast.success('Recipe extracted!');
+      if (result && 'extraction_failed' in result) {
+        toast.warning('Could not extract recipe from URL');
+      } else {
+        toast.success('Recipe extracted!');
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message);

@@ -64,23 +64,23 @@ serve(async (req) => {
           .slice(0, 15000); // Limit content size
       }
     } catch (fetchError) {
-      console.log("Could not fetch URL, will generate generic recipe:", fetchError);
+      console.log("Could not fetch URL:", fetchError);
     }
 
-    const userPrompt = htmlContent 
-      ? `Extract the recipe for "${mealName}" from this webpage content:\n\n${htmlContent}`
-      : `Generate a detailed, authentic recipe for "${mealName}".
+    // If we couldn't fetch any HTML content, return extraction failure
+    if (!htmlContent) {
+      console.log("Could not fetch URL content - returning extraction failure");
+      return new Response(
+        JSON.stringify({ 
+          extraction_failed: true,
+          sourceUrl: url,
+          error: "Unable to access recipe content from this URL"
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-REQUIREMENTS:
-- Use realistic ingredient quantities for 4 servings
-- Include ALL necessary ingredients (don't skip basics like oil, salt, garlic, etc.)
-- Steps should be detailed and actionable (e.g., "dice the onion finely" not just "add onion")
-- Include prep techniques where relevant
-- Estimate realistic cooking time based on the dish
-- Use UK measurements (grams, ml, tbsp, tsp)
-- Make it a complete, cookable recipe that a home cook could follow successfully
-
-Create an authentic version of this dish with proper technique.`;
+    const userPrompt = `Extract the recipe for "${mealName}" from this webpage content:\n\n${htmlContent}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

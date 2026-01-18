@@ -378,7 +378,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                         className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
                       >
                         <BookOpen className="h-3.5 w-3.5" />
-                        View Recipe
+                        {meal.recipe_card.ingredients.length === 0 ? 'View Link' : 'View Recipe'}
                       </button>
                     )}
                   </div>
