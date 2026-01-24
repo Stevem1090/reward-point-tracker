@@ -22,7 +22,66 @@ INGREDIENT RULES (CRITICAL):
 - Convert measurements to UK metrics only (grams, ml, etc.)
 - Format: { "quantity": "200", "unit": "g", "name": "chicken breast" }
 
-You MUST use the extract_recipe function to return your response.`;
+You MUST use the extract_recipe function to return your response. Do NOT include image_url - images are extracted separately.`;
+
+// Extract potential recipe images from HTML before stripping tags
+function extractRecipeImage(html: string, baseUrl: string): string | null {
+  const imgPatterns = [
+    // Schema.org recipe image (JSON-LD)
+    /"image"\s*:\s*"([^"]+)"/i,
+    /"image"\s*:\s*\[\s*"([^"]+)"/i,
+    // Open Graph image (commonly used for recipe cards)
+    /<meta\s+property="og:image"\s+content="([^"]+)"/i,
+    /<meta\s+content="([^"]+)"\s+property="og:image"/i,
+    // Twitter card image
+    /<meta\s+name="twitter:image"\s+content="([^"]+)"/i,
+    // Large images in article/main content with recipe-related classes
+    /<img[^>]+src="([^"]+)"[^>]+class="[^"]*(?:hero|featured|recipe|main|primary)[^"]*"/i,
+    /<img[^>]+class="[^"]*(?:hero|featured|recipe|main|primary)[^"]*"[^>]+src="([^"]+)"/i,
+  ];
+
+  for (const pattern of imgPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      let imageUrl = match[1];
+      // Skip placeholder or data URLs
+      if (imageUrl.includes('placeholder') || imageUrl.startsWith('data:')) {
+        continue;
+      }
+      // Handle relative URLs
+      if (imageUrl.startsWith('/')) {
+        try {
+          const urlObj = new URL(baseUrl);
+          imageUrl = `${urlObj.origin}${imageUrl}`;
+        } catch {
+          continue;
+        }
+      }
+      // Ensure it's a valid URL
+      if (imageUrl.startsWith('http')) {
+        return imageUrl;
+      }
+    }
+  }
+  
+  return null;
+}
+
+// Validate the extracted image URL exists
+async function validateImageUrl(imageUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(imageUrl, { 
+      method: 'HEAD',
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; RecipeBot/1.0)",
+      },
+    });
+    const contentType = response.headers.get('content-type');
+    return response.ok && (contentType?.startsWith('image/') ?? false);
+  } catch {
+    return false;
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -39,6 +98,8 @@ serve(async (req) => {
 
     // Fetch the webpage content
     let htmlContent = "";
+    let extractedImageUrl: string | null = null;
+    
     try {
       const pageResponse = await fetch(url, {
         headers: {
@@ -49,6 +110,11 @@ serve(async (req) => {
       
       if (pageResponse.ok) {
         htmlContent = await pageResponse.text();
+        
+        // Extract real image URL BEFORE cleaning HTML
+        extractedImageUrl = extractRecipeImage(htmlContent, url);
+        console.log("Extracted image URL:", extractedImageUrl);
+        
         // Clean HTML - remove scripts, styles, and limit size
         htmlContent = htmlContent
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
@@ -99,7 +165,7 @@ serve(async (req) => {
             type: "function",
             function: {
               name: "extract_recipe",
-              description: "Return the extracted recipe details",
+              description: "Return the extracted recipe details (image is extracted separately, do not include)",
               parameters: {
                 type: "object",
                 properties: {
@@ -123,7 +189,6 @@ serve(async (req) => {
                     type: "array",
                     items: { type: "string" },
                   },
-                  image_url: { type: "string" },
                 },
                 required: ["name", "description", "servings", "ingredients", "steps"],
               },
@@ -160,6 +225,15 @@ serve(async (req) => {
     }
 
     const recipe = JSON.parse(toolCall.function.arguments);
+
+    // Add the real extracted image (validated) - not AI-generated
+    if (extractedImageUrl) {
+      const isValid = await validateImageUrl(extractedImageUrl);
+      console.log("Image validation result:", isValid, "for URL:", extractedImageUrl);
+      if (isValid) {
+        recipe.image_url = extractedImageUrl;
+      }
+    }
 
     return new Response(
       JSON.stringify({ recipe, sourceUrl: url }),
