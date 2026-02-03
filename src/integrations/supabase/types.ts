@@ -169,6 +169,39 @@ export type Database = {
         }
         Relationships: []
       }
+      family_preferences: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          evidence_count: number | null
+          id: string
+          last_updated: string | null
+          preference_type: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string | null
+          evidence_count?: number | null
+          id?: string
+          last_updated?: string | null
+          preference_type: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string | null
+          evidence_count?: number | null
+          id?: string
+          last_updated?: string | null
+          preference_type?: string
+          user_id?: string
+          value?: string
+        }
+        Relationships: []
+      }
       meal_plans: {
         Row: {
           approved_at: string | null

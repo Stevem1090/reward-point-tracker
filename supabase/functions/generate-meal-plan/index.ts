@@ -19,6 +19,20 @@ VARIETY GUIDELINES:
 - Across 7 meals: use at least 4 different main proteins and at least 4 different carb bases (e.g. rice, pasta, potatoes, wraps, noodles, couscous/bulgur, bread, low-carb bowl)
 - Across 7 meals: use at least 4 cooking methods (traybake, one-pan, oven-bake, simmer/curry, grill, slow-cook, stir-fry, build-your-own)
 
+HARD VARIETY RULES (MUST follow - verify before responding):
+1. Maximum 2 chicken dishes per week
+2. Maximum 2 pasta/noodle dishes per week
+3. Never same main protein on consecutive days
+4. At least 1 vegetarian option per week (when generating 7 meals)
+5. At least 1 fish/seafood option per week (when generating 7 meals)
+6. Maximum 2 dishes from the same cuisine per week
+
+SELF-CHECK before responding:
+- Count chicken dishes (must be ≤2)
+- Count pasta dishes (must be ≤2)
+- Check consecutive days have different proteins
+- Verify vegetarian and fish requirements met (for full week plans)
+
 SLOT TIMING:
 - WEEKDAY: Quick, practical meals under 30 mins
 - FRIDAY: Treat meal or takeaway-style dish
@@ -74,6 +88,19 @@ You may receive ratings_context with past meal ratings (1-5 stars) and notes.
 - CONSIDER NOTES: User notes explain WHY they liked/disliked meals (e.g., "too spicy", "kids loved it")
 - Use this feedback to personalize suggestions without repeating exact meals
 
+FAMILY PREFERENCES (learned patterns):
+You may receive family_preferences with learned likes/dislikes extracted from ratings.
+- FAVORITES: Cuisines, proteins, or methods the family consistently rates highly
+- AVOID: Cuisines, proteins, or ingredients the family consistently dislikes
+- These are stronger signals than individual ratings - respect them
+
+SAVED RECIPES (from family recipe library):
+You may receive saved_recipes - these are family favorites from their recipe library.
+- You MAY include 1-2 saved recipes per week (especially for weekend meals)
+- When suggesting a saved recipe, use EXACTLY the name provided (case-sensitive match required)
+- Saved recipes help reduce "cooking fatigue" - families love revisiting favorites
+- Only suggest saved recipes that fit the slot type (don't suggest complex recipes for weekday slots)
+
 TWO-PASS PLANNING (important):
 1) Silently generate a candidate pool of 20–25 dinners that fit all rules, exclude current_week_meals and rejected_this_week, and avoid recent_meals.
 2) Select the final meals that maximise variety across protein, carb, cuisine, and method, while favoring highly-rated meal styles.
@@ -81,7 +108,7 @@ TWO-PASS PLANNING (important):
 If constraints conflict, prioritise:
 1) Never duplicate current_week_meals or rejected_this_week
 2) Avoid repeats vs recent_meals
-3) Favor highly-rated meal styles, avoid low-rated styles
+3) Favor highly-rated meal styles and family preferences
 4) Keep weekday meals under 30 mins
 5) Keep the plan family-friendly and practical
 
@@ -105,14 +132,85 @@ interface MealSuggestion {
   kid_friendly_notes?: string;
 }
 
+interface RatingContext {
+  meal_name: string;
+  rating: number;
+  notes: string | null;
+}
+
+interface SavedRecipe {
+  name: string;
+  description: string;
+  recipe_id: string;
+  cook_time: number | null;
+}
+
+interface ValidationResult {
+  valid: boolean;
+  issues: string[];
+}
+
 function getSlotType(day: string): SlotType {
   if (["Saturday", "Sunday"].includes(day)) return "WEEKEND";
   if (day === "Friday") return "FRIDAY";
   return "WEEKDAY";
 }
 
+// Validate meal plan for variety rules
+function validateMealPlan(meals: MealSuggestion[]): ValidationResult {
+  const issues: string[] = [];
+  const mealNames = meals.map(m => m.meal_name.toLowerCase());
+  
+  // Rule 1: Max 2 chicken dishes
+  const chickenCount = mealNames.filter(n => 
+    n.includes('chicken') || n.includes('poultry')
+  ).length;
+  if (chickenCount > 2) {
+    issues.push(`Too many chicken dishes: ${chickenCount} (max 2)`);
+  }
+  
+  // Rule 2: Max 2 pasta/noodle dishes
+  const pastaCount = mealNames.filter(n => 
+    n.includes('pasta') || n.includes('spaghetti') || 
+    n.includes('noodle') || n.includes('lasagne') || n.includes('penne') ||
+    n.includes('linguine') || n.includes('tagliatelle')
+  ).length;
+  if (pastaCount > 2) {
+    issues.push(`Too many pasta dishes: ${pastaCount} (max 2)`);
+  }
+  
+  // Rule 3: No consecutive same protein (only check if we have sequential meals)
+  const proteinKeywords = ['chicken', 'beef', 'pork', 'lamb', 'fish', 'salmon', 'prawn', 'cod', 'tuna'];
+  for (let i = 0; i < mealNames.length - 1; i++) {
+    for (const protein of proteinKeywords) {
+      if (mealNames[i].includes(protein) && mealNames[i + 1].includes(protein)) {
+        issues.push(`Consecutive ${protein} on days ${i + 1} and ${i + 2}`);
+      }
+    }
+  }
+  
+  // Rule 4: At least 1 vegetarian (only for full week plans)
+  if (meals.length >= 7) {
+    const vegKeywords = ['vegetarian', 'veggie', 'veg ', 'tofu', 'halloumi', 'paneer', 'mushroom risotto', 'vegetable'];
+    const hasVeg = mealNames.some(n => vegKeywords.some(kw => n.includes(kw)));
+    if (!hasVeg) {
+      issues.push('No vegetarian option found (recommend including at least 1)');
+    }
+  }
+  
+  // Rule 5: At least 1 fish/seafood (only for full week plans)
+  if (meals.length >= 7) {
+    const fishKeywords = ['fish', 'salmon', 'cod', 'tuna', 'prawn', 'shrimp', 'seafood', 'haddock', 'mackerel'];
+    const hasFish = mealNames.some(n => fishKeywords.some(kw => n.includes(kw)));
+    if (!hasFish) {
+      issues.push('No fish/seafood option found (recommend including at least 1)');
+    }
+  }
+  
+  return { valid: issues.length === 0, issues };
+}
+
 async function fetchRecentMeals(supabase: ReturnType<typeof createClient>): Promise<string[]> {
-  // Get meals from the last 4 weeks
   const fourWeeksAgo = new Date();
   fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
   const fourWeeksAgoStr = fourWeeksAgo.toISOString().split('T')[0];
@@ -140,20 +238,12 @@ async function fetchRecentMeals(supabase: ReturnType<typeof createClient>): Prom
     return [];
   }
 
-  // Return unique meal names
   const mealNames = [...new Set(meals?.map(m => m.meal_name) || [])];
-  console.log(`Found ${mealNames.length} unique meals from last 4 weeks:`, mealNames);
+  console.log(`Found ${mealNames.length} unique meals from last 4 weeks`);
   return mealNames;
 }
 
-interface RatingContext {
-  meal_name: string;
-  rating: number;
-  notes: string | null;
-}
-
 async function fetchRatingsContext(supabase: ReturnType<typeof createClient>): Promise<RatingContext[]> {
-  // Fetch meal ratings with meal names (last 50 ratings)
   const { data: ratings, error } = await supabase
     .from('meal_ratings')
     .select('rating, notes, meal_id')
@@ -165,7 +255,6 @@ async function fetchRatingsContext(supabase: ReturnType<typeof createClient>): P
     return [];
   }
 
-  // Fetch meal names for these ratings
   const mealIds = ratings.map(r => r.meal_id);
   const { data: meals, error: mealsError } = await supabase
     .from('meals')
@@ -177,11 +266,9 @@ async function fetchRatingsContext(supabase: ReturnType<typeof createClient>): P
     return [];
   }
 
-  // Create a map of meal_id to meal_name
   const mealNameMap = new Map<string, string>();
   meals.forEach(m => mealNameMap.set(m.id, m.meal_name));
 
-  // Build ratings context with meal names
   const ratingsContext: RatingContext[] = ratings
     .filter(r => mealNameMap.has(r.meal_id))
     .map(r => ({
@@ -192,6 +279,99 @@ async function fetchRatingsContext(supabase: ReturnType<typeof createClient>): P
 
   console.log(`Found ${ratingsContext.length} ratings for context`);
   return ratingsContext;
+}
+
+async function fetchFamilyPreferences(supabase: ReturnType<typeof createClient>): Promise<string> {
+  const { data, error } = await supabase
+    .from('family_preferences')
+    .select('preference_type, value, confidence')
+    .order('confidence', { ascending: false })
+    .limit(30);
+  
+  if (error || !data?.length) {
+    console.log('No family preferences found or error:', error);
+    return '';
+  }
+  
+  const liked: Record<string, string[]> = {};
+  const avoid: Record<string, string[]> = {};
+  
+  for (const pref of data) {
+    if (pref.confidence < 2) continue; // Only use confident preferences
+    
+    if (pref.preference_type.startsWith('liked_')) {
+      const category = pref.preference_type.replace('liked_', '');
+      liked[category] = liked[category] || [];
+      liked[category].push(pref.value);
+    } else if (pref.preference_type.startsWith('avoid_')) {
+      const category = pref.preference_type.replace('avoid_', '');
+      avoid[category] = avoid[category] || [];
+      avoid[category].push(pref.value);
+    }
+  }
+  
+  if (Object.keys(liked).length === 0 && Object.keys(avoid).length === 0) {
+    return '';
+  }
+  
+  let section = '\nfamily_preferences (learned patterns from ratings):\n';
+  
+  if (Object.keys(liked).length > 0) {
+    section += 'FAVORITES:\n';
+    for (const [cat, values] of Object.entries(liked)) {
+      section += `- ${cat}: ${values.join(', ')}\n`;
+    }
+  }
+  
+  if (Object.keys(avoid).length > 0) {
+    section += 'AVOID:\n';
+    for (const [cat, values] of Object.entries(avoid)) {
+      section += `- ${cat}: ${values.join(', ')}\n`;
+    }
+  }
+  
+  console.log('Family preferences section generated');
+  return section;
+}
+
+async function fetchSavedRecipes(supabase: ReturnType<typeof createClient>): Promise<SavedRecipe[]> {
+  // Get recipes not used in last 4 weeks
+  const fourWeeksAgo = new Date();
+  fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+  
+  // First get recently used recipe_ids from meals
+  const { data: recentMeals } = await supabase
+    .from('meals')
+    .select('recipe_id')
+    .not('recipe_id', 'is', null)
+    .gte('created_at', fourWeeksAgo.toISOString());
+  
+  const recentRecipeIds = (recentMeals?.map(m => m.recipe_id).filter(Boolean) || []) as string[];
+  
+  // Fetch recipes - we'll filter in memory since Supabase query builder has limitations
+  const { data: recipes, error } = await supabase
+    .from('recipes')
+    .select('id, name, description, estimated_cook_minutes')
+    .order('created_at', { ascending: false })
+    .limit(30);
+  
+  if (error || !recipes?.length) {
+    console.log('No saved recipes found or error:', error);
+    return [];
+  }
+  
+  // Filter out recently used recipes
+  const recentIdSet = new Set(recentRecipeIds);
+  const availableRecipes = recipes.filter(r => !recentIdSet.has(r.id));
+  
+  console.log(`Found ${availableRecipes.length} saved recipes not used in last 4 weeks`);
+  
+  return availableRecipes.slice(0, 20).map(r => ({
+    name: r.name,
+    description: r.description || '',
+    recipe_id: r.id,
+    cook_time: r.estimated_cook_minutes
+  }));
 }
 
 serve(async (req) => {
@@ -209,25 +389,34 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Fetch recent meals and ratings from database
+    // Fetch all context data from database
     let recentMeals: string[] = [];
     let ratingsContext: RatingContext[] = [];
+    let familyPreferencesSection = '';
+    let savedRecipes: SavedRecipe[] = [];
+    
     if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-      [recentMeals, ratingsContext] = await Promise.all([
+      
+      // Fetch all context in parallel
+      const [recentMealsResult, ratingsResult, preferencesResult, savedRecipesResult] = await Promise.all([
         fetchRecentMeals(supabase),
-        fetchRatingsContext(supabase)
+        fetchRatingsContext(supabase),
+        fetchFamilyPreferences(supabase),
+        fetchSavedRecipes(supabase)
       ]);
+      
+      recentMeals = recentMealsResult;
+      ratingsContext = ratingsResult;
+      familyPreferencesSection = preferencesResult;
+      savedRecipes = savedRecipesResult;
     }
-
-    // Note: excludeMeals contains current week's approved meals (absolute exclusion)
-    // recentMeals contains historical meals from last 4 weeks (strong avoidance)
 
     // Determine which days to generate
     const allDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     const daysToGenerate: string[] = daysToRegenerate?.length > 0 ? daysToRegenerate : allDays;
     
-    // Map days to abstract slot types (AI doesn't see actual day names)
+    // Map days to abstract slot types
     const daySlotMapping = daysToGenerate.map(day => ({
       day,
       slotType: getSlotType(day)
@@ -242,7 +431,7 @@ serve(async (req) => {
 
     const totalMeals = daysToGenerate.length;
 
-    // Build user prompt with slot types instead of day names
+    // Build user prompt with slot types
     const slotRequests = [];
     if (slotCounts.WEEKDAY > 0) {
       slotRequests.push(`- ${slotCounts.WEEKDAY} WEEKDAY meal${slotCounts.WEEKDAY > 1 ? 's' : ''} (quick, under 30 mins active cooking)`);
@@ -254,13 +443,13 @@ serve(async (req) => {
       slotRequests.push(`- ${slotCounts.WEEKEND} WEEKEND meal${slotCounts.WEEKEND > 1 ? 's' : ''} (relaxed cooking, can be 60+ mins)`);
     }
 
-    // Build the current week exclusions (passed from frontend - absolute exclusion)
+    // Build the current week exclusions (absolute exclusion)
     const currentWeekMeals = excludeMeals || [];
     const currentWeekSection = currentWeekMeals.length > 0
       ? `\ncurrent_week_meals (ABSOLUTE EXCLUSION - already in this week's plan):\n${currentWeekMeals.map((m: string) => `- ${m}`).join('\n')}\n`
       : '';
 
-    // Build the rejected meals section (passed from frontend - absolute exclusion with reasons)
+    // Build the rejected meals section (absolute exclusion with reasons)
     const rejectedMealsList = rejectedMeals || [];
     const rejectedMealsSection = rejectedMealsList.length > 0
       ? `\nrejected_this_week (ABSOLUTE EXCLUSION - user rejected these, consider reasons for replacements):\n${
@@ -268,7 +457,7 @@ serve(async (req) => {
         }\n`
       : '';
 
-    // Build the recent meals section (from database, excluding current week to avoid duplication)
+    // Build the recent meals section (excluding current week to avoid duplication)
     const historicalMeals = recentMeals.filter(m => !currentWeekMeals.includes(m));
     const recentMealsSection = historicalMeals.length > 0
       ? `\nrecent_meals (avoid repeats from past 4 weeks):\n${historicalMeals.map(m => `- ${m}`).join('\n')}\n`
@@ -283,6 +472,13 @@ serve(async (req) => {
         }).join('\n')}\n`
       : '';
 
+    // Build saved recipes section
+    const savedRecipesSection = savedRecipes.length > 0
+      ? `\nsaved_recipes (family favorites you can include 1-2 of, use EXACT names):\n${
+          savedRecipes.map(r => `- "${r.name}" (${r.cook_time || '?'} mins)`).join('\n')
+        }\n`
+      : '';
+
     // Adjust variety guidance for partial regeneration
     const varietyNote = totalMeals < 7 
       ? `\nIMPORTANT: You are generating ${totalMeals} replacement meal${totalMeals > 1 ? 's' : ''} only. Ensure ${totalMeals > 1 ? 'each meal is distinct from the others and all are' : 'it is'} clearly different from current_week_meals and rejected_this_week in protein, cuisine, and cooking method. The variety guidelines (4 proteins, 4 carbs, 4 methods) apply to the full week including current_week_meals, not just these replacements.`
@@ -292,8 +488,18 @@ serve(async (req) => {
 ${slotRequests.join("\n")}
 
 ${preferences ? `Family preferences: ${preferences}` : ""}
-${currentWeekSection}${rejectedMealsSection}${recentMealsSection}${ratingsSection}${varietyNote}
-Remember: Focus on practical, family-friendly meals. NEVER duplicate current_week_meals or rejected_this_week. Consider rejection reasons when generating replacements. Avoid meals similar to recent_meals. Use ratings_context to favor highly-rated meal styles and avoid poorly-rated ones. Tag each meal with its slot_type.`;
+${currentWeekSection}${rejectedMealsSection}${recentMealsSection}${ratingsSection}${familyPreferencesSection}${savedRecipesSection}${varietyNote}
+Remember: Focus on practical, family-friendly meals. NEVER duplicate current_week_meals or rejected_this_week. Consider rejection reasons when generating replacements. Avoid meals similar to recent_meals. Use ratings_context and family_preferences to favor highly-rated meal styles and avoid poorly-rated ones. You may include 1-2 saved_recipes if appropriate for the slot type. Tag each meal with its slot_type.`;
+
+    console.log('Sending request to AI with context:', {
+      totalMeals,
+      currentWeekCount: currentWeekMeals.length,
+      rejectedCount: rejectedMealsList.length,
+      recentMealsCount: historicalMeals.length,
+      ratingsCount: ratingsContext.length,
+      hasPreferences: familyPreferencesSection.length > 0,
+      savedRecipesCount: savedRecipes.length
+    });
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -374,6 +580,16 @@ Remember: Focus on practical, family-friendly meals. NEVER duplicate current_wee
 
     const aiMeals: MealSuggestion[] = JSON.parse(toolCall.function.arguments).meals;
 
+    // Validate the generated plan
+    const validation = validateMealPlan(aiMeals);
+    if (!validation.valid) {
+      console.warn('Meal plan validation issues:', validation.issues);
+      // We log but still return the plan - could implement retry in future
+    }
+
+    // Create a map of saved recipe names to their IDs for matching
+    const savedRecipeMap = new Map(savedRecipes.map(r => [r.name.toLowerCase(), r.recipe_id]));
+
     // Map AI meals (by slot_type) back to actual days
     const slotQueues: Record<SlotType, MealSuggestion[]> = {
       WEEKDAY: aiMeals.filter(m => m.slot_type === "WEEKDAY"),
@@ -390,7 +606,6 @@ Remember: Focus on practical, family-friendly meals. NEVER duplicate current_wee
       
       const meal = queue[index];
       if (!meal) {
-        // Fallback if AI didn't return enough meals for this slot type
         console.warn(`Missing meal for ${slotType} slot, day ${day}`);
         return {
           day_of_week: day,
@@ -401,8 +616,13 @@ Remember: Focus on practical, family-friendly meals. NEVER duplicate current_wee
           estimated_cook_minutes: 30,
           servings: 4,
           is_spicy: false,
+          recipe_id: null,
+          source_type: 'ai_generated',
         };
       }
+
+      // Check if this meal matches a saved recipe
+      const matchedRecipeId = savedRecipeMap.get(meal.meal_name.toLowerCase()) || null;
 
       return {
         day_of_week: day,
@@ -414,11 +634,15 @@ Remember: Focus on practical, family-friendly meals. NEVER duplicate current_wee
         servings: meal.servings,
         is_spicy: meal.is_spicy,
         kid_friendly_notes: meal.kid_friendly_notes,
+        recipe_id: matchedRecipeId,
+        source_type: matchedRecipeId ? 'user_library' : 'ai_generated',
       };
     });
 
+    console.log('Generated meals:', mappedMeals.map(m => `${m.day_of_week}: ${m.meal_name} (${m.source_type})`));
+
     return new Response(
-      JSON.stringify({ meals: mappedMeals }),
+      JSON.stringify({ meals: mappedMeals, validation_issues: validation.issues }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
