@@ -242,6 +242,7 @@ export type Database = {
           meal_plan_id: string
           recipe_id: string | null
           recipe_url: string | null
+          rejection_reason: string | null
           servings: number
           sort_order: number
           source_type: string
@@ -258,6 +259,7 @@ export type Database = {
           meal_plan_id: string
           recipe_id?: string | null
           recipe_url?: string | null
+          rejection_reason?: string | null
           servings?: number
           sort_order?: number
           source_type?: string
@@ -274,6 +276,7 @@ export type Database = {
           meal_plan_id?: string
           recipe_id?: string | null
           recipe_url?: string | null
+          rejection_reason?: string | null
           servings?: number
           sort_order?: number
           source_type?: string

@@ -3,7 +3,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { MealWithRecipeCard, DayOfWeek } from '@/types/meal';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { MealWithRecipeCard, DayOfWeek, REJECTION_REASONS, RejectionReasonCode } from '@/types/meal';
 import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen, Search, Loader2 } from 'lucide-react';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { cn } from '@/lib/utils';
@@ -19,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Popover,
@@ -41,6 +44,11 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
   const [editedUrl, setEditedUrl] = useState('');
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
   const [isRecipeCardOpen, setIsRecipeCardOpen] = useState(false);
+  
+  // Rejection reason dialog state
+  const [isRejectReasonOpen, setIsRejectReasonOpen] = useState(false);
+  const [selectedReason, setSelectedReason] = useState<RejectionReasonCode | null>(null);
+  const [otherReasonText, setOtherReasonText] = useState('');
 
   const isWeekend = day === 'Saturday' || day === 'Sunday';
 
@@ -50,9 +58,37 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
     }
   };
 
-  const handleReject = () => {
+  // Open the rejection reason dialog instead of directly rejecting
+  const handleRejectClick = () => {
+    setIsRejectReasonOpen(true);
+    setSelectedReason(null);
+    setOtherReasonText('');
+  };
+
+  // Confirm rejection with the selected reason
+  const handleConfirmReject = () => {
     if (meal) {
-      updateMealStatus.mutate({ mealId: meal.id, status: 'rejected' });
+      const reason = selectedReason === 'other' ? otherReasonText : selectedReason;
+      updateMealStatus.mutate({ 
+        mealId: meal.id, 
+        status: 'rejected',
+        rejectionReason: reason || null
+      });
+      setIsRejectReasonOpen(false);
+      setSelectedReason(null);
+      setOtherReasonText('');
+    }
+  };
+
+  // Skip reason and just reject
+  const handleSkipReason = () => {
+    if (meal) {
+      updateMealStatus.mutate({ 
+        mealId: meal.id, 
+        status: 'rejected',
+        rejectionReason: null
+      });
+      setIsRejectReasonOpen(false);
     }
   };
 
@@ -263,7 +299,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                         variant="ghost"
                         size="icon"
                         className="h-10 w-10 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={handleReject}
+                        onClick={handleRejectClick}
                         disabled={updateMealStatus.isPending}
                       >
                         <X className="h-5 w-5" />
@@ -302,7 +338,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                             </DropdownMenuItem>
                           )}
                           {meal.status === 'approved' && (
-                            <DropdownMenuItem onClick={handleReject}>
+                            <DropdownMenuItem onClick={handleRejectClick}>
                               <X className="h-4 w-4 mr-2" />
                               Reject
                             </DropdownMenuItem>
@@ -455,7 +491,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                 <Button
                   variant="outline"
                   className="flex-1 min-h-[44px] text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                  onClick={handleReject}
+                  onClick={handleRejectClick}
                   disabled={updateMealStatus.isPending}
                 >
                   <X className="h-4 w-4 mr-2" />
@@ -504,7 +540,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                       variant="outline"
                       size="sm"
                       className="min-h-[44px] text-red-600 border-red-200"
-                      onClick={handleReject}
+                      onClick={handleRejectClick}
                       disabled={updateMealStatus.isPending}
                     >
                       <X className="h-4 w-4 mr-1" />
@@ -517,6 +553,66 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
           </div>
         </CardContent>
       </Card>
+      
+      {/* Rejection Reason Dialog */}
+      <Dialog open={isRejectReasonOpen} onOpenChange={setIsRejectReasonOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Why are you rejecting this meal?</DialogTitle>
+            <DialogDescription>
+              This helps us suggest better alternatives
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <RadioGroup 
+              value={selectedReason || ''} 
+              onValueChange={(value) => setSelectedReason(value as RejectionReasonCode)}
+              className="space-y-3"
+            >
+              {REJECTION_REASONS.map((reason) => (
+                <div key={reason.code} className="flex items-center space-x-3">
+                  <RadioGroupItem value={reason.code} id={reason.code} />
+                  <Label htmlFor={reason.code} className="cursor-pointer flex-1">
+                    {reason.label}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+            
+            {/* Other reason text input */}
+            {selectedReason === 'other' && (
+              <div className="mt-3 pl-7">
+                <Input
+                  value={otherReasonText}
+                  onChange={(e) => setOtherReasonText(e.target.value)}
+                  placeholder="Tell us why..."
+                  className="w-full"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex-row gap-2 sm:gap-0">
+            <Button 
+              variant="ghost" 
+              onClick={handleSkipReason}
+              className="flex-1 sm:flex-none"
+            >
+              Skip
+            </Button>
+            <Button 
+              onClick={handleConfirmReject}
+              disabled={updateMealStatus.isPending}
+              className="flex-1 sm:flex-none"
+            >
+              {updateMealStatus.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {/* Edit URL Dialog - for editing existing URL */}
       <Dialog open={isEditUrlOpen} onOpenChange={setIsEditUrlOpen}>
         <DialogContent>

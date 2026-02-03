@@ -108,11 +108,19 @@ export function useMealPlans() {
   });
 
   const updateMealStatus = useMutation({
-    mutationFn: async ({ mealId, status }: { mealId: string; status: MealStatus }) => {
+    mutationFn: async ({ mealId, status, rejectionReason }: { mealId: string; status: MealStatus; rejectionReason?: string | null }) => {
+      const updateData: { status: MealStatus; rejection_reason?: string | null } = { status };
+      
+      // Only include rejection_reason when rejecting
+      if (status === 'rejected') {
+        updateData.rejection_reason = rejectionReason || null;
+      }
+      
       const { error } = await supabase
         .from('meals')
-        .update({ status })
+        .update(updateData)
         .eq('id', mealId);
+
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mealPlan'] }),

@@ -52,6 +52,7 @@ export interface Meal {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  rejection_reason: string | null;
   recipe_card?: RecipeCard;
 }
 
@@ -141,3 +142,21 @@ export const DAYS_OF_WEEK: DayOfWeek[] = [
   'Saturday',
   'Sunday'
 ];
+
+// Rejection reason options for meal planning
+export const REJECTION_REASONS = [
+  { code: 'had_recently', label: 'Had it recently' },
+  { code: 'dont_fancy', label: "Don't fancy it" },
+  { code: 'too_complex', label: 'Too complex' },
+  { code: 'hard_to_find', label: 'Ingredients hard to find' },
+  { code: 'not_kid_friendly', label: 'Not kid-friendly' },
+  { code: 'other', label: 'Other reason' },
+] as const;
+
+export type RejectionReasonCode = typeof REJECTION_REASONS[number]['code'];
+export type RejectionReason = RejectionReasonCode | null;
+
+export interface RejectedMeal {
+  name: string;
+  reason: string;
+}

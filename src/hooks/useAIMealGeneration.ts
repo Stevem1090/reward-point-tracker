@@ -3,11 +3,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { DayOfWeek, MealSourceType } from '@/types/meal';
 import { toast } from 'sonner';
 
+interface RejectedMealInfo {
+  name: string;
+  reason: string;
+}
+
 interface GenerateMealPlanParams {
   mealPlanId: string;
   weekStartDate: string;
   preferences?: string;
   excludeMeals?: string[];
+  rejectedMeals?: RejectedMealInfo[];
   daysToRegenerate?: DayOfWeek[];
 }
 
@@ -27,7 +33,7 @@ export function useAIMealGeneration() {
   const queryClient = useQueryClient();
 
   const generateMealPlan = useMutation({
-    mutationFn: async ({ mealPlanId, weekStartDate, preferences, excludeMeals, daysToRegenerate }: GenerateMealPlanParams) => {
+    mutationFn: async ({ mealPlanId, weekStartDate, preferences, excludeMeals, rejectedMeals, daysToRegenerate }: GenerateMealPlanParams) => {
       // Get auth token for edge function
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
@@ -41,7 +47,7 @@ export function useAIMealGeneration() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ preferences, excludeMeals, daysToRegenerate }),
+          body: JSON.stringify({ preferences, excludeMeals, rejectedMeals, daysToRegenerate }),
         }
       );
 
