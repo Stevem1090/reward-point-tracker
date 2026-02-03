@@ -334,26 +334,49 @@ async function fetchFamilyPreferences(supabase: ReturnType<typeof createClient>)
   return section;
 }
 
+interface RecipeWithScore {
+  id: string;
+  name: string;
+  description: string | null;
+  estimated_cook_minutes: number | null;
+  avgRating: number;
+  useCount: number;
+  weight: number;
+}
+
 async function fetchSavedRecipes(supabase: ReturnType<typeof createClient>): Promise<SavedRecipe[]> {
-  // Get recipes not used in last 4 weeks
   const fourWeeksAgo = new Date();
   fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+  const fourWeeksAgoStr = fourWeeksAgo.toISOString().split('T')[0];
+
+  // Step 1: Get meal plans from last 4 weeks (by ACTUAL week date, not creation)
+  const { data: recentMealPlans } = await supabase
+    .from('meal_plans')
+    .select('id')
+    .gte('week_start_date', fourWeeksAgoStr);
+
+  const planIds = recentMealPlans?.map(p => p.id) || [];
   
-  // First get recently used recipe_ids from meals
-  const { data: recentMeals } = await supabase
-    .from('meals')
-    .select('recipe_id')
-    .not('recipe_id', 'is', null)
-    .gte('created_at', fourWeeksAgo.toISOString());
+  // Step 2: Get recipe_ids used in those plans
+  let recentRecipeIds: string[] = [];
+  if (planIds.length > 0) {
+    const { data: recentMeals } = await supabase
+      .from('meals')
+      .select('recipe_id')
+      .in('meal_plan_id', planIds)
+      .not('recipe_id', 'is', null);
+    
+    recentRecipeIds = (recentMeals?.map(m => m.recipe_id).filter(Boolean) || []) as string[];
+  }
   
-  const recentRecipeIds = (recentMeals?.map(m => m.recipe_id).filter(Boolean) || []) as string[];
+  const recentIdSet = new Set(recentRecipeIds);
   
-  // Fetch recipes - we'll filter in memory since Supabase query builder has limitations
+  // Step 3: Fetch all user recipes
   const { data: recipes, error } = await supabase
     .from('recipes')
     .select('id, name, description, estimated_cook_minutes')
     .order('created_at', { ascending: false })
-    .limit(30);
+    .limit(50);
   
   if (error || !recipes?.length) {
     console.log('No saved recipes found or error:', error);
@@ -361,17 +384,95 @@ async function fetchSavedRecipes(supabase: ReturnType<typeof createClient>): Pro
   }
   
   // Filter out recently used recipes
-  const recentIdSet = new Set(recentRecipeIds);
   const availableRecipes = recipes.filter(r => !recentIdSet.has(r.id));
   
-  console.log(`Found ${availableRecipes.length} saved recipes not used in last 4 weeks`);
+  if (availableRecipes.length === 0) {
+    console.log('All recipes used recently, none available');
+    return [];
+  }
+
+  // Step 4: Get ratings for these recipes (via meals that used them)
+  const recipeIds = availableRecipes.map(r => r.id);
+  const { data: mealsWithRatings } = await supabase
+    .from('meals')
+    .select('recipe_id, meal_ratings(rating)')
+    .in('recipe_id', recipeIds);
   
-  return availableRecipes.slice(0, 20).map(r => ({
-    name: r.name,
-    description: r.description || '',
-    recipe_id: r.id,
-    cook_time: r.estimated_cook_minutes
-  }));
+  // Build rating map: recipe_id -> { totalRating, count }
+  const ratingMap = new Map<string, { total: number; count: number }>();
+  for (const meal of (mealsWithRatings || [])) {
+    if (meal.recipe_id && meal.meal_ratings?.length) {
+      const existing = ratingMap.get(meal.recipe_id) || { total: 0, count: 0 };
+      for (const r of meal.meal_ratings) {
+        existing.total += r.rating;
+        existing.count += 1;
+      }
+      ratingMap.set(meal.recipe_id, existing);
+    }
+  }
+
+  // Step 5: Score and weight recipes - EXCLUDE low-rated ones entirely
+  const scoredRecipes: RecipeWithScore[] = availableRecipes
+    .map(r => {
+      const ratingData = ratingMap.get(r.id);
+      const avgRating = ratingData ? ratingData.total / ratingData.count : 0;
+      const useCount = ratingData?.count || 0;
+      
+      return { ...r, avgRating, useCount, weight: 0 };
+    })
+    .filter(r => {
+      // EXCLUDE recipes rated 1-2 stars (never suggest again)
+      if (r.avgRating > 0 && r.avgRating < 3) {
+        console.log(`Excluding low-rated recipe: ${r.name} (${r.avgRating.toFixed(1)} stars)`);
+        return false;
+      }
+      return true;
+    })
+    .map(r => {
+      // Weight formula for remaining recipes
+      let weight = 0.5; // Base weight for unrated recipes
+      
+      if (r.avgRating >= 4) {
+        weight = 3.0 + (r.avgRating - 4); // 4-star = 3.0, 5-star = 4.0
+      } else if (r.avgRating >= 3) {
+        weight = 1.5; // 3-star = modest weight
+      }
+      // Unrated (avgRating = 0) keeps base weight of 0.5
+      
+      // Bonus for frequently used (family favorite)
+      if (r.useCount >= 3) weight += 0.5;
+      
+      return { ...r, weight };
+    });
+
+  console.log(`Scored ${scoredRecipes.length} eligible recipes (excluded low-rated)`);
+
+  // Step 6: Weighted random selection of up to 5 recipes
+  const selected: SavedRecipe[] = [];
+  const pool = [...scoredRecipes];
+  
+  while (selected.length < 5 && pool.length > 0) {
+    const totalWeight = pool.reduce((sum, r) => sum + r.weight, 0);
+    let random = Math.random() * totalWeight;
+    
+    for (let i = 0; i < pool.length; i++) {
+      random -= pool[i].weight;
+      if (random <= 0) {
+        const chosen = pool.splice(i, 1)[0];
+        selected.push({
+          name: chosen.name,
+          description: chosen.description || '',
+          recipe_id: chosen.id,
+          cook_time: chosen.estimated_cook_minutes
+        });
+        console.log(`Selected recipe: ${chosen.name} (rating: ${chosen.avgRating.toFixed(1)}, weight: ${chosen.weight.toFixed(1)})`);
+        break;
+      }
+    }
+  }
+
+  console.log(`Selected ${selected.length} library recipes for AI consideration (weighted random)`);
+  return selected;
 }
 
 serve(async (req) => {
