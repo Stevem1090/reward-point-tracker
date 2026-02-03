@@ -27,6 +27,8 @@ interface GeneratedMeal {
   servings: number;
   is_spicy: boolean;
   kid_friendly_notes?: string;
+  recipe_id?: string | null;
+  source_type?: MealSourceType;
 }
 
 export function useAIMealGeneration() {
@@ -99,11 +101,12 @@ export function useAIMealGeneration() {
         meal_name: meal.meal_name,
         description: meal.description,
         recipe_url: meal.suggested_url,
-        source_type: 'ai_generated' as MealSourceType,
+        source_type: (meal.source_type || 'ai_generated') as MealSourceType,
         estimated_cook_minutes: meal.estimated_cook_minutes,
         servings: meal.servings,
         status: 'pending' as const,
         sort_order: startSortOrder + index,
+        recipe_id: meal.recipe_id || null,
       }));
 
       const { error: insertError } = await supabase

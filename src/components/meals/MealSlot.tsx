@@ -420,9 +420,19 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                   </div>
                 )}
 
-                {/* Inline Recipe URL Input - visible before finalisation when no URL */}
+                {/* Library Recipe indicator - when meal is from recipe library */}
+                {!isPlanFinalised && meal.recipe_id && !meal.recipe_url && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs gap-1">
+                      <BookOpen className="h-3 w-3" />
+                      Library Recipe
+                    </Badge>
+                  </div>
+                )}
+
+                {/* Inline Recipe URL Input - visible before finalisation when no URL and no library recipe */}
                 {/* For blank meals, always show prominently */}
-                {!isPlanFinalised && !meal.recipe_url && (
+                {!isPlanFinalised && !meal.recipe_url && !meal.recipe_id && (
                   <div className={cn(
                     "flex items-center gap-2",
                     isBlankMeal ? "mt-1" : "mt-3"
