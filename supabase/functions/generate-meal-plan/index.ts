@@ -56,6 +56,17 @@ You may also receive a list called current_week_meals (already approved for this
 These are ABSOLUTE EXCLUSIONS - do not suggest anything identical or very similar.
 Unlike recent_meals (strong avoidance), current_week_meals must NEVER be duplicated.
 
+REJECTED THIS WEEK (CRITICAL):
+You may also receive a list called rejected_this_week with meals the user has already rejected.
+These are ABSOLUTE EXCLUSIONS - NEVER re-suggest these or similar meals.
+Each rejected meal includes a reason code. Use these to inform your replacements:
+- "had_recently" → suggest completely different dish type
+- "dont_fancy" → suggest a different cuisine or style
+- "too_complex" → suggest simpler, quicker alternatives (max 20-25 mins)
+- "hard_to_find" → use only common supermarket ingredients
+- "not_kid_friendly" → suggest milder, more familiar options
+- "other" or "no_reason" → just avoid this specific meal
+
 FAMILY RATINGS FEEDBACK (IMPORTANT):
 You may receive ratings_context with past meal ratings (1-5 stars) and notes.
 - FAVOR: Meals similar to 4-5 star rated dishes (same cuisine, protein style, or cooking method)
@@ -64,11 +75,11 @@ You may receive ratings_context with past meal ratings (1-5 stars) and notes.
 - Use this feedback to personalize suggestions without repeating exact meals
 
 TWO-PASS PLANNING (important):
-1) Silently generate a candidate pool of 20–25 dinners that fit all rules, exclude current_week_meals, and avoid recent_meals.
+1) Silently generate a candidate pool of 20–25 dinners that fit all rules, exclude current_week_meals and rejected_this_week, and avoid recent_meals.
 2) Select the final meals that maximise variety across protein, carb, cuisine, and method, while favoring highly-rated meal styles.
 
 If constraints conflict, prioritise:
-1) Never duplicate current_week_meals
+1) Never duplicate current_week_meals or rejected_this_week
 2) Avoid repeats vs recent_meals
 3) Favor highly-rated meal styles, avoid low-rated styles
 4) Keep weekday meals under 30 mins
@@ -189,7 +200,7 @@ serve(async (req) => {
   }
 
   try {
-    const { preferences, excludeMeals, daysToRegenerate } = await req.json();
+    const { preferences, excludeMeals, rejectedMeals, daysToRegenerate } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -246,7 +257,15 @@ serve(async (req) => {
     // Build the current week exclusions (passed from frontend - absolute exclusion)
     const currentWeekMeals = excludeMeals || [];
     const currentWeekSection = currentWeekMeals.length > 0
-      ? `\ncurrent_week_meals (ABSOLUTE EXCLUSION - already in this week's plan):\n${currentWeekMeals.map(m => `- ${m}`).join('\n')}\n`
+      ? `\ncurrent_week_meals (ABSOLUTE EXCLUSION - already in this week's plan):\n${currentWeekMeals.map((m: string) => `- ${m}`).join('\n')}\n`
+      : '';
+
+    // Build the rejected meals section (passed from frontend - absolute exclusion with reasons)
+    const rejectedMealsList = rejectedMeals || [];
+    const rejectedMealsSection = rejectedMealsList.length > 0
+      ? `\nrejected_this_week (ABSOLUTE EXCLUSION - user rejected these, consider reasons for replacements):\n${
+          rejectedMealsList.map((m: { name: string; reason: string }) => `- ${m.name} (reason: ${m.reason})`).join('\n')
+        }\n`
       : '';
 
     // Build the recent meals section (from database, excluding current week to avoid duplication)
@@ -266,15 +285,15 @@ serve(async (req) => {
 
     // Adjust variety guidance for partial regeneration
     const varietyNote = totalMeals < 7 
-      ? `\nIMPORTANT: You are generating ${totalMeals} replacement meal${totalMeals > 1 ? 's' : ''} only. Ensure ${totalMeals > 1 ? 'each meal is distinct from the others and all are' : 'it is'} clearly different from current_week_meals in protein, cuisine, and cooking method. The variety guidelines (4 proteins, 4 carbs, 4 methods) apply to the full week including current_week_meals, not just these replacements.`
+      ? `\nIMPORTANT: You are generating ${totalMeals} replacement meal${totalMeals > 1 ? 's' : ''} only. Ensure ${totalMeals > 1 ? 'each meal is distinct from the others and all are' : 'it is'} clearly different from current_week_meals and rejected_this_week in protein, cuisine, and cooking method. The variety guidelines (4 proteins, 4 carbs, 4 methods) apply to the full week including current_week_meals, not just these replacements.`
       : '';
 
     const userPrompt = `Generate exactly ${totalMeals} meals for these slots:
 ${slotRequests.join("\n")}
 
 ${preferences ? `Family preferences: ${preferences}` : ""}
-${currentWeekSection}${recentMealsSection}${ratingsSection}${varietyNote}
-Remember: Focus on practical, family-friendly meals. NEVER duplicate current_week_meals. Avoid meals similar to recent_meals. Use ratings_context to favor highly-rated meal styles and avoid poorly-rated ones. Tag each meal with its slot_type.`;
+${currentWeekSection}${rejectedMealsSection}${recentMealsSection}${ratingsSection}${varietyNote}
+Remember: Focus on practical, family-friendly meals. NEVER duplicate current_week_meals or rejected_this_week. Consider rejection reasons when generating replacements. Avoid meals similar to recent_meals. Use ratings_context to favor highly-rated meal styles and avoid poorly-rated ones. Tag each meal with its slot_type.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
