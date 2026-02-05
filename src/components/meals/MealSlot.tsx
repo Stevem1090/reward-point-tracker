@@ -421,7 +421,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                 )}
 
                 {/* Library Recipe indicator - when meal is from recipe library */}
-                {!isPlanFinalised && meal.recipe_id && !meal.recipe_url && (
+                {meal.recipe_id && (
                   <div className="flex items-center gap-2 mt-2">
                     <Badge variant="secondary" className="text-xs gap-1">
                       <BookOpen className="h-3 w-3" />
