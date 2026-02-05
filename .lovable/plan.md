@@ -1,104 +1,86 @@
 
 
-# Fix Library Recipe Selection - Updated Plan
+# Fix Library Recipe Handling During Finalization
 
-## Changes from Previous Plan
+## Two Bugs Identified
 
-| Aspect | Previous | Updated |
-|--------|----------|---------|
-| **1-2 star recipes** | Low weight (0.3) - still possible | **Excluded entirely** |
-| All other logic | Same | Same |
+### Bug 1: Unnecessary Recipe Extraction for Library Meals
+In `MealPlanView.tsx`, `handleFinalisePlan` (line 166) runs `extractFromUrl` for **every** approved meal -- including library meals that already have full recipe data saved in the `recipes` table. This wastes AI credits, slows finalization, and can fail.
+
+**Fix:** Before the extraction loop, check if a meal has `recipe_id` set. If it does, skip the URL extraction and instead create a `recipe_card` directly from the existing recipe data in the `recipes` table.
+
+### Bug 2: Library Recipe Link Disappears After Finalization
+The "Library Recipe" badge (line 424) has a condition `!isPlanFinalised`, so it's hidden once the plan is approved. And the "View Recipe" button (line 411) requires `meal.recipe_card` to exist -- but if we skip extraction for library meals (Bug 1 fix), no recipe_card would be created unless we handle it.
+
+**Fix:** The Bug 1 fix will create recipe_cards from library data, so the "View Recipe" button will work. Additionally, show the "Library Recipe" badge on finalized plans too, so users can see which meals came from their library.
 
 ---
 
-## Updated Weight Logic
+## Technical Changes
 
-```typescript
-// Score and weight recipes - EXCLUDE low-rated ones entirely
-const scoredRecipes: SavedRecipeWithScore[] = availableRecipes
-  .map(r => {
-    const ratingData = ratingMap.get(r.id);
-    const avgRating = ratingData ? ratingData.total / ratingData.count : 0;
-    const useCount = ratingData?.count || 0;
-    
-    return { ...r, avgRating, useCount };
-  })
-  .filter(r => {
-    // EXCLUDE recipes rated 1-2 stars (never suggest again)
-    if (r.avgRating > 0 && r.avgRating < 3) {
-      console.log(`Excluding low-rated recipe: ${r.name} (${r.avgRating} stars)`);
-      return false;
-    }
-    return true;
-  })
-  .map(r => {
-    // Weight formula for remaining recipes
-    let weight = 0.5; // Base weight for unrated recipes
-    
-    if (r.avgRating >= 4) {
-      weight = 3.0 + (r.avgRating - 4); // 4-star = 3.0, 5-star = 4.0
-    } else if (r.avgRating >= 3) {
-      weight = 1.5; // 3-star = modest weight
-    }
-    // Unrated (avgRating = 0) keeps base weight of 0.5
-    
-    // Bonus for frequently used (family favorite)
-    if (r.useCount >= 3) weight += 0.5;
-    
-    return { ...r, weight };
-  });
+### File 1: `src/components/meals/MealPlanView.tsx`
+
+Update `handleFinalisePlan` to handle library meals differently:
+
 ```
-
----
-
-## Updated Weight Distribution Example
-
-| Recipe | Avg Rating | Use Count | Weight | Included? |
-|--------|-----------|-----------|--------|-----------|
-| Spaghetti Bolognese | 5.0 | 4 | 4.5 | Yes |
-| Chicken Tikka | 4.2 | 2 | 3.2 | Yes |
-| Fish Pie | 3.5 | 1 | 1.5 | Yes |
-| New Recipe (unrated) | 0 | 0 | 0.5 | Yes |
-| Beef Tacos | 1.5 | 2 | - | **No (excluded)** |
-| Lamb Tagine | 2.0 | 1 | - | **No (excluded)** |
-
----
-
-## Full Implementation Plan
-
-### 1. Edge Function (`supabase/functions/generate-meal-plan/index.ts`)
-
-**Update `fetchSavedRecipes`:**
-- Fix date check to use `meal_plans.week_start_date` instead of `meals.created_at`
-- Exclude recipes rated 1-2 stars entirely
-- Apply weighted random selection for remaining recipes
-- Return max 5 candidates to AI
-
-### 2. Frontend Hook (`src/hooks/useAIMealGeneration.ts`)
-
-**Update `GeneratedMeal` interface:**
-```typescript
-interface GeneratedMeal {
-  // ... existing fields ...
-  recipe_id?: string | null;
-  source_type?: MealSourceType;
+for (const meal of approvedMeals) {
+  // If meal has a recipe_id, it's from the library -- 
+  // create recipe_card from existing recipe data instead of extracting
+  if (meal.recipe_id) {
+    // Fetch the recipe from the library
+    const { data: recipe } = await supabase
+      .from('recipes')
+      .select('name, ingredients, steps, servings, image_url')
+      .eq('id', meal.recipe_id)
+      .single();
+    
+    if (recipe) {
+      // Create/update recipe_card from library data
+      const { data: existing } = await supabase
+        .from('recipe_cards')
+        .select('id')
+        .eq('meal_id', meal.id)
+        .maybeSingle();
+      
+      const cardData = {
+        meal_id: meal.id,
+        meal_name: recipe.name,
+        image_url: recipe.image_url,
+        ingredients: recipe.ingredients,
+        steps: recipe.steps,
+        base_servings: recipe.servings,
+      };
+      
+      if (existing) {
+        await supabase.from('recipe_cards').update(cardData).eq('id', existing.id);
+      } else {
+        await supabase.from('recipe_cards').insert([cardData]);
+      }
+      successCount++;
+    }
+  } else {
+    // Existing extraction logic for non-library meals
+    await extractFromUrl.mutateAsync({ ... });
+    successCount++;
+  }
 }
 ```
 
-**Update meal insertion to use these fields:**
-```typescript
-const mealsToInsert = meals.map((meal, index) => ({
-  // ... existing fields ...
-  recipe_id: meal.recipe_id || null,
-  source_type: (meal.source_type || 'ai_generated') as MealSourceType,
-}));
+### File 2: `src/components/meals/MealSlot.tsx`
+
+Update the Library Recipe badge to also show on finalized plans:
+
+**Current (line 424):**
+```
+{!isPlanFinalised && meal.recipe_id && !meal.recipe_url && (
 ```
 
-### 3. UI Component (`src/components/meals/MealSlot.tsx`)
+**Updated:**
+```
+{meal.recipe_id && (
+```
 
-**Show "Library Recipe" indicator:**
-- When `meal.recipe_id` is set, show a badge/link instead of URL input prompt
-- Allow clicking to view the saved recipe details
+This shows the "Library Recipe" badge both before and after finalization. The "View Recipe" button will also work because the recipe_card is now created from library data.
 
 ---
 
@@ -106,19 +88,16 @@ const mealsToInsert = meals.map((meal, index) => ({
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/generate-meal-plan/index.ts` | Fix date check, exclude 1-2 star recipes, weighted random selection |
-| `src/hooks/useAIMealGeneration.ts` | Add `recipe_id` and `source_type` to interface and insertion |
-| `src/components/meals/MealSlot.tsx` | Show library recipe indicator when `recipe_id` is present |
+| `src/components/meals/MealPlanView.tsx` | Skip extraction for library meals; create recipe_card from `recipes` table instead |
+| `src/components/meals/MealSlot.tsx` | Show "Library Recipe" badge on finalized plans too |
 
 ---
 
-## Recipe Eligibility Summary
+## How It Works After the Fix
 
-| Rating | Eligible for AI Suggestions? |
-|--------|------------------------------|
-| 5 stars | Yes - highest weight (4.0-4.5) |
-| 4 stars | Yes - high weight (3.0-3.5) |
-| 3 stars | Yes - modest weight (1.5) |
-| Unrated | Yes - low weight (0.5) for discovery |
-| 1-2 stars | **No - excluded entirely** |
+| Meal Type | During Finalization | After Finalization |
+|-----------|--------------------|--------------------|
+| AI-generated (with URL) | Extracts recipe from URL, creates recipe_card | Shows "View Recipe" link |
+| AI-generated (no URL) | Creates placeholder recipe_card via AI fallback | Shows "View Link" |
+| Library recipe | Creates recipe_card from saved recipe data (no extraction needed) | Shows "Library Recipe" badge + "View Recipe" link |
 
