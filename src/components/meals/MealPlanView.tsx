@@ -171,21 +171,53 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
       let successCount = 0;
       for (const meal of approvedMeals) {
         try {
-          // Call extractFromUrl for each meal - it handles both URL scraping
-          // and fallback generation if URL fails or is empty
-          await extractFromUrl.mutateAsync(
-            {
-              mealId: meal.id,
-              url: meal.recipe_url || '',
-              mealName: meal.meal_name,
-            },
-            {
-              // Suppress individual toasts during bulk extraction
-              onSuccess: () => {},
-              onError: () => {},
+          if (meal.recipe_id) {
+            // Library meal - create recipe_card directly from saved recipe data
+            const { data: recipe } = await supabase
+              .from('recipes')
+              .select('name, ingredients, steps, servings, image_url')
+              .eq('id', meal.recipe_id)
+              .single();
+
+            if (recipe) {
+              const { data: existing } = await supabase
+                .from('recipe_cards')
+                .select('id')
+                .eq('meal_id', meal.id)
+                .maybeSingle();
+
+              const cardData = {
+                meal_id: meal.id,
+                meal_name: recipe.name,
+                image_url: recipe.image_url,
+                ingredients: recipe.ingredients,
+                steps: recipe.steps,
+                base_servings: recipe.servings,
+              };
+
+              if (existing) {
+                await supabase.from('recipe_cards').update(cardData).eq('id', existing.id);
+              } else {
+                await supabase.from('recipe_cards').insert([cardData]);
+              }
+              successCount++;
             }
-          );
-          successCount++;
+          } else {
+            // Non-library meal - extract recipe from URL (with AI fallback)
+            await extractFromUrl.mutateAsync(
+              {
+                mealId: meal.id,
+                url: meal.recipe_url || '',
+                mealName: meal.meal_name,
+              },
+              {
+                // Suppress individual toasts during bulk extraction
+                onSuccess: () => {},
+                onError: () => {},
+              }
+            );
+            successCount++;
+          }
         } catch (error) {
           console.error(`Failed to extract recipe for ${meal.meal_name}:`, error);
           // Continue with other meals even if one fails
