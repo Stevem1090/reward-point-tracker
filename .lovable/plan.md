@@ -1,103 +1,38 @@
 
 
-# Fix Library Recipe Handling During Finalization
+# Hide "View Link" Button for Library Recipes
 
-## Two Bugs Identified
+## Problem
+On finalized plans, library recipes show a "View Link" button that opens a popup saying "Unable to Extract" -- which is misleading since these meals were never meant to be extracted from a URL.
 
-### Bug 1: Unnecessary Recipe Extraction for Library Meals
-In `MealPlanView.tsx`, `handleFinalisePlan` (line 166) runs `extractFromUrl` for **every** approved meal -- including library meals that already have full recipe data saved in the `recipes` table. This wastes AI credits, slows finalization, and can fail.
+## Why It Happens
+Line 411-418 in `MealSlot.tsx` shows a button for any finalized meal with a `recipe_card`. When ingredients are empty, it labels the button "View Link" (designed for failed URL extractions). Library meals that were finalized **before** our fix also have empty recipe cards, triggering this state.
 
-**Fix:** Before the extraction loop, check if a meal has `recipe_id` set. If it does, skip the URL extraction and instead create a `recipe_card` directly from the existing recipe data in the `recipes` table.
+## Fix
+On line 411, add a condition to skip showing the button when it's a library meal with an empty/failed recipe card. Library meals going through the new finalization flow will have populated recipe cards, so "View Recipe" will appear correctly.
 
-### Bug 2: Library Recipe Link Disappears After Finalization
-The "Library Recipe" badge (line 424) has a condition `!isPlanFinalised`, so it's hidden once the plan is approved. And the "View Recipe" button (line 411) requires `meal.recipe_card` to exist -- but if we skip extraction for library meals (Bug 1 fix), no recipe_card would be created unless we handle it.
+## Technical Change
 
-**Fix:** The Bug 1 fix will create recipe_cards from library data, so the "View Recipe" button will work. Additionally, show the "Library Recipe" badge on finalized plans too, so users can see which meals came from their library.
+### File: `src/components/meals/MealSlot.tsx` (line 411)
 
----
-
-## Technical Changes
-
-### File 1: `src/components/meals/MealPlanView.tsx`
-
-Update `handleFinalisePlan` to handle library meals differently:
-
-```
-for (const meal of approvedMeals) {
-  // If meal has a recipe_id, it's from the library -- 
-  // create recipe_card from existing recipe data instead of extracting
-  if (meal.recipe_id) {
-    // Fetch the recipe from the library
-    const { data: recipe } = await supabase
-      .from('recipes')
-      .select('name, ingredients, steps, servings, image_url')
-      .eq('id', meal.recipe_id)
-      .single();
-    
-    if (recipe) {
-      // Create/update recipe_card from library data
-      const { data: existing } = await supabase
-        .from('recipe_cards')
-        .select('id')
-        .eq('meal_id', meal.id)
-        .maybeSingle();
-      
-      const cardData = {
-        meal_id: meal.id,
-        meal_name: recipe.name,
-        image_url: recipe.image_url,
-        ingredients: recipe.ingredients,
-        steps: recipe.steps,
-        base_servings: recipe.servings,
-      };
-      
-      if (existing) {
-        await supabase.from('recipe_cards').update(cardData).eq('id', existing.id);
-      } else {
-        await supabase.from('recipe_cards').insert([cardData]);
-      }
-      successCount++;
-    }
-  } else {
-    // Existing extraction logic for non-library meals
-    await extractFromUrl.mutateAsync({ ... });
-    successCount++;
-  }
-}
-```
-
-### File 2: `src/components/meals/MealSlot.tsx`
-
-Update the Library Recipe badge to also show on finalized plans:
-
-**Current (line 424):**
-```
-{!isPlanFinalised && meal.recipe_id && !meal.recipe_url && (
+**Current:**
+```typescript
+{isPlanFinalised && meal.recipe_card && (
 ```
 
 **Updated:**
+```typescript
+{isPlanFinalised && meal.recipe_card && !(meal.recipe_id && meal.recipe_card.ingredients.length === 0) && (
 ```
-{meal.recipe_id && (
-```
 
-This shows the "Library Recipe" badge both before and after finalization. The "View Recipe" button will also work because the recipe_card is now created from library data.
+This means:
+- AI meals with full recipe card: shows "View Recipe" (unchanged)
+- AI meals with failed extraction: shows "View Link" (unchanged)
+- Library meals with full recipe card (new flow): shows "View Recipe"
+- Library meals with empty recipe card (old data): hidden (no misleading button)
 
----
+## One file to modify
 
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/meals/MealPlanView.tsx` | Skip extraction for library meals; create recipe_card from `recipes` table instead |
-| `src/components/meals/MealSlot.tsx` | Show "Library Recipe" badge on finalized plans too |
-
----
-
-## How It Works After the Fix
-
-| Meal Type | During Finalization | After Finalization |
-|-----------|--------------------|--------------------|
-| AI-generated (with URL) | Extracts recipe from URL, creates recipe_card | Shows "View Recipe" link |
-| AI-generated (no URL) | Creates placeholder recipe_card via AI fallback | Shows "View Link" |
-| Library recipe | Creates recipe_card from saved recipe data (no extraction needed) | Shows "Library Recipe" badge + "View Recipe" link |
-
+| File | Change |
+|------|--------|
+| `src/components/meals/MealSlot.tsx` | Add guard to hide "View Link" for library meals with empty recipe cards |
