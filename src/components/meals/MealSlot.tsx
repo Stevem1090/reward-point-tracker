@@ -408,7 +408,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                     )}
 
                     {/* View Recipe button - only for finalised meals with recipe card */}
-                    {isPlanFinalised && meal.recipe_card && (
+                    {isPlanFinalised && meal.recipe_card && !(meal.recipe_id && meal.recipe_card.ingredients.length === 0) && (
                       <button
                         onClick={() => setIsRecipeCardOpen(true)}
                         className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
