@@ -51,7 +51,23 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   const { generateShoppingList } = useShoppingListGeneration();
   const { extractFromUrl } = useRecipeExtraction();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+  const [dismissedWeeks, setDismissedWeeks] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('dismissedMealPlanBanners');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  const isBannerDismissed = dismissedWeeks.has(weekStartDate);
+
+  const dismissBanner = () => {
+    const updated = new Set(dismissedWeeks);
+    updated.add(weekStartDate);
+    setDismissedWeeks(updated);
+    localStorage.setItem('dismissedMealPlanBanners', JSON.stringify([...updated]));
+  };
   const [finalisingStep, setFinalisingStep] = useState<string | null>(null);
 
   // Drag and drop sensors with activation constraints
@@ -432,7 +448,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
             <Button 
               variant="ghost"
               size="icon"
-              onClick={() => setIsBannerDismissed(true)}
+              onClick={dismissBanner}
               className="shrink-0 h-8 w-8"
             >
               <X className="h-4 w-4" />
