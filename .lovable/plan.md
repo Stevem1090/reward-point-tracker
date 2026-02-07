@@ -1,38 +1,70 @@
 
 
-# Hide "View Link" Button for Library Recipes
+# Three Tweaks to the Meal Planning UI
 
-## Problem
-On finalized plans, library recipes show a "View Link" button that opens a popup saying "Unable to Extract" -- which is misleading since these meals were never meant to be extracted from a URL.
+## 1. Replace Delete button on green banner with dismiss X
 
-## Why It Happens
-Line 411-418 in `MealSlot.tsx` shows a button for any finalized meal with a `recipe_card`. When ingredients are empty, it labels the button "View Link" (designed for failed URL extractions). Library meals that were finalized **before** our fix also have empty recipe cards, triggering this state.
+The green "Meal plan approved!" banner currently has a destructive Delete button. This will be replaced with a simple X (close) icon button that dismisses the banner for the session.
 
-## Fix
-On line 411, add a condition to skip showing the button when it's a library meal with an empty/failed recipe card. Library meals going through the new finalization flow will have populated recipe cards, so "View Recipe" will appear correctly.
+### Technical Details
 
-## Technical Change
+**File: `src/components/meals/MealPlanView.tsx`**
 
-### File: `src/components/meals/MealSlot.tsx` (line 411)
+- Add a `const [isBannerDismissed, setIsBannerDismissed] = useState(false)` state
+- Change the banner condition from `{isPlanFinalised && (` to `{isPlanFinalised && !isBannerDismissed && (`
+- Replace the Delete `<Button>` with an X icon button that calls `setIsBannerDismissed(true)`
+- The delete plan functionality remains available via the draft plan's "Delete Plan" button (which still exists at the bottom of draft plans)
 
-**Current:**
-```typescript
-{isPlanFinalised && meal.recipe_card && (
-```
+---
 
-**Updated:**
-```typescript
-{isPlanFinalised && meal.recipe_card && !(meal.recipe_id && meal.recipe_card.ingredients.length === 0) && (
-```
+## 2. Ingredient search drawer on the Plan tab
 
-This means:
-- AI meals with full recipe card: shows "View Recipe" (unchanged)
-- AI meals with failed extraction: shows "View Link" (unchanged)
-- Library meals with full recipe card (new flow): shows "View Recipe"
-- Library meals with empty recipe card (old data): hidden (no misleading button)
+A new search feature accessible from a button on the Plan tab. Opens a Drawer (bottom sheet on mobile) where users can type an ingredient name (e.g. "mushrooms") and see which recipes in the current week's plan contain it, along with quantities.
 
-## One file to modify
+### How it works
+
+- Searches through `recipe_card.ingredients` on all approved meals in the current plan
+- Matches ingredient names case-insensitively against the search term
+- Displays results as a list: recipe name + matched ingredient quantity/unit/name
+
+### Technical Details
+
+**File: `src/components/meals/IngredientSearchDrawer.tsx` (new file)**
+
+- Uses the `Drawer` component from `vaul` (already in the project)
+- Props: `meals: MealWithRecipeCard[]` (the current plan's meals)
+- Contains an `Input` for search, filters meals' `recipe_card.ingredients` by name match
+- Shows results grouped by recipe name with ingredient details
+
+**File: `src/components/meals/MealPlanView.tsx`**
+
+- Import and render `IngredientSearchDrawer` on finalized plans
+- Add a `Search` icon button near the banner or above the meal list to open the drawer
+- Pass `mealPlan.meals` to the drawer component
+
+---
+
+## 3. Search in SwapMealDialog library tab
+
+Add a search input at the top of the "From Library" tab in the replace meal dialog, filtering recipes by name.
+
+### Technical Details
+
+**File: `src/components/meals/SwapMealDialog.tsx`**
+
+- Add `const [searchQuery, setSearchQuery] = useState('')` state
+- Add a search `Input` with a `Search` icon above the recipe list in the library tab
+- Filter `recipes` by `recipe.name.toLowerCase().includes(searchQuery.toLowerCase())`
+- Reset search query in `resetForm()`
+- Show "No matching recipes" message when filter returns empty but recipes exist
+
+---
+
+## Files to modify
 
 | File | Change |
 |------|--------|
-| `src/components/meals/MealSlot.tsx` | Add guard to hide "View Link" for library meals with empty recipe cards |
+| `src/components/meals/MealPlanView.tsx` | Replace Delete with dismiss X on banner; add ingredient search button + drawer |
+| `src/components/meals/IngredientSearchDrawer.tsx` | New file - drawer component for ingredient search |
+| `src/components/meals/SwapMealDialog.tsx` | Add search input to filter library recipes by name |
+
