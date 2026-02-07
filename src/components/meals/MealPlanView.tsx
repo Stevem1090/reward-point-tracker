@@ -8,7 +8,8 @@ import { MealSlot } from './MealSlot';
 import { SortableMealSlot } from './SortableMealSlot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Sparkles, Check, RefreshCw, Trash2, PenLine } from 'lucide-react';
+import { Loader2, Sparkles, Check, RefreshCw, Trash2, PenLine, X } from 'lucide-react';
+import { IngredientSearchDrawer } from './IngredientSearchDrawer';
 import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek, Ingredient } from '@/types/meal';
 import { scaleIngredients } from '@/utils/scaleIngredients';
 import { toast } from 'sonner';
@@ -50,6 +51,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   const { generateShoppingList } = useShoppingListGeneration();
   const { extractFromUrl } = useRecipeExtraction();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [finalisingStep, setFinalisingStep] = useState<string | null>(null);
 
   // Drag and drop sensors with activation constraints
@@ -420,7 +422,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   return (
     <div className="space-y-4">
       {/* Status banner for approved plans */}
-      {isPlanFinalised && (
+      {isPlanFinalised && !isBannerDismissed && (
         <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
           <CardContent className="py-3 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
@@ -429,16 +431,21 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
             </div>
             <Button 
               variant="ghost"
-              size="sm"
-              onClick={() => setIsDeleteDialogOpen(true)}
-              disabled={isDeleting}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+              size="icon"
+              onClick={() => setIsBannerDismissed(true)}
+              className="shrink-0 h-8 w-8"
             >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Delete
+              <X className="h-4 w-4" />
             </Button>
           </CardContent>
         </Card>
+      )}
+
+      {/* Ingredient search for finalized plans */}
+      {isPlanFinalised && (
+        <div className="flex justify-end">
+          <IngredientSearchDrawer meals={mealPlan.meals} />
+        </div>
       )}
 
       {/* Meal slots for each day - with drag-and-drop for finalized plans */}
