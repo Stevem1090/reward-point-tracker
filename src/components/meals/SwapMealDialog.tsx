@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { useRecipes } from '@/hooks/useRecipes';
 import { Recipe, DayOfWeek } from '@/types/meal';
-import { Clock, Users, BookOpen, Pencil, Loader2 } from 'lucide-react';
+import { Clock, Users, BookOpen, Pencil, Loader2, Search } from 'lucide-react';
 
 interface SwapMealDialogProps {
   open: boolean;
@@ -36,6 +36,7 @@ export function SwapMealDialog({
 }: SwapMealDialogProps) {
   const { recipes, isLoading: recipesLoading } = useRecipes();
   const [activeTab, setActiveTab] = useState<'library' | 'custom'>('custom');
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Custom meal form state
   const [customMeal, setCustomMeal] = useState({
@@ -45,6 +46,10 @@ export function SwapMealDialog({
     servings: 4,
     estimatedCookMinutes: 30,
   });
+
+  const filteredRecipes = recipes.filter(r =>
+    r.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleSelectRecipe = (recipe: Recipe) => {
     onSwap({
@@ -77,6 +82,7 @@ export function SwapMealDialog({
       servings: 4,
       estimatedCookMinutes: 30,
     });
+    setSearchQuery('');
     setActiveTab('custom');
   };
 
@@ -116,38 +122,53 @@ export function SwapMealDialog({
                 <p className="text-sm mt-1">Add recipes from the Recipe Library tab.</p>
               </div>
             ) : (
-              <ScrollArea className="h-[300px] pr-4">
-                <div className="space-y-2">
-                  {recipes.map((recipe) => (
-                    <Card 
-                      key={recipe.id} 
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => !isSwapping && handleSelectRecipe(recipe)}
-                    >
-                      <CardContent className="p-3">
-                        <h4 className="font-medium">{recipe.name}</h4>
-                        {recipe.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
-                            {recipe.description}
-                          </p>
-                        )}
-                        <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
-                          {recipe.estimated_cook_minutes && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {recipe.estimated_cook_minutes} mins
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {recipe.servings} servings
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+              <>
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search recipes..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
                 </div>
-              </ScrollArea>
+                <ScrollArea className="h-[300px] pr-4">
+                  {filteredRecipes.length === 0 ? (
+                    <p className="text-center py-8 text-sm text-muted-foreground">No matching recipes.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredRecipes.map((recipe) => (
+                        <Card 
+                          key={recipe.id} 
+                          className="cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => !isSwapping && handleSelectRecipe(recipe)}
+                        >
+                          <CardContent className="p-3">
+                            <h4 className="font-medium">{recipe.name}</h4>
+                            {recipe.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
+                                {recipe.description}
+                              </p>
+                            )}
+                            <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                              {recipe.estimated_cook_minutes && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {recipe.estimated_cook_minutes} mins
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {recipe.servings} servings
+                              </span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </>
             )}
           </TabsContent>
 
