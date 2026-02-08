@@ -8,9 +8,10 @@ import { MealSlot } from './MealSlot';
 import { SortableMealSlot } from './SortableMealSlot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Sparkles, Check, RefreshCw, Trash2, PenLine, X } from 'lucide-react';
+import { Loader2, Sparkles, Check, RefreshCw, Trash2, PenLine, X, Snowflake } from 'lucide-react';
 import { IngredientSearchDrawer } from './IngredientSearchDrawer';
 import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek, Ingredient } from '@/types/meal';
+import { useFreezerFlags } from '@/hooks/useFreezerFlags';
 import { scaleIngredients } from '@/utils/scaleIngredients';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,6 +52,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   const { generateShoppingList } = useShoppingListGeneration();
   const { extractFromUrl } = useRecipeExtraction();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const { frozenMealIds, toggleFlag } = useFreezerFlags(mealPlan?.id);
   const [dismissedWeeks, setDismissedWeeks] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('dismissedMealPlanBanners');
@@ -457,6 +459,22 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
         </Card>
       )}
 
+      {/* Freezer defrost summary banner */}
+      {isPlanFinalised && frozenMealIds.size > 0 && (() => {
+        const frozenMeals = mealPlan.meals.filter(m => frozenMealIds.has(m.id));
+        const summary = frozenMeals.map(m => `${m.day_of_week} (${m.meal_name})`).join(', ');
+        return (
+          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+            <CardContent className="py-3 flex items-center gap-2 text-blue-700 dark:text-blue-300">
+              <Snowflake className="h-4 w-4 shrink-0" />
+              <span className="text-sm">
+                <span className="font-medium">Defrost reminders set for:</span> {summary}
+              </span>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* Ingredient search for finalized plans */}
       {isPlanFinalised && (
         <div className="flex justify-end">
@@ -485,6 +503,8 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
                     day={day}
                     isPlanFinalised={isPlanFinalised}
                     mealPlanId={mealPlan.id}
+                    isFrozen={frozenMealIds.has(meal.id)}
+                    onToggleFrozen={() => toggleFlag.mutate(meal.id)}
                   />
                 ) : null;
               })}

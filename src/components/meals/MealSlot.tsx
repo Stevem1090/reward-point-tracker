@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MealWithRecipeCard, DayOfWeek, REJECTION_REASONS, RejectionReasonCode } from '@/types/meal';
-import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen, Search, Loader2 } from 'lucide-react';
+import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen, Search, Loader2, Snowflake } from 'lucide-react';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { cn } from '@/lib/utils';
 import {
@@ -36,9 +36,11 @@ interface MealSlotProps {
   meal?: MealWithRecipeCard;
   isPlanFinalised: boolean;
   mealPlanId?: string;
+  isFrozen?: boolean;
+  onToggleFrozen?: () => void;
 }
 
-export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotProps) {
+export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, isFrozen, onToggleFrozen }: MealSlotProps) {
   const { updateMealStatus, updateMealUrl, updateMealServings, replaceMeal, addMealToDay } = useMealPlans();
   const [isEditUrlOpen, setIsEditUrlOpen] = useState(false);
   const [editedUrl, setEditedUrl] = useState('');
@@ -420,13 +422,41 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                   </div>
                 )}
 
-                {/* Library Recipe indicator - when meal is from recipe library */}
-                {meal.recipe_id && (
+                {/* Library Recipe indicator and Frozen badge */}
+                {(meal.recipe_id || isFrozen) && (
                   <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary" className="text-xs gap-1">
-                      <BookOpen className="h-3 w-3" />
-                      Library Recipe
-                    </Badge>
+                    {meal.recipe_id && (
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        <BookOpen className="h-3 w-3" />
+                        Library Recipe
+                      </Badge>
+                    )}
+                    {isFrozen && (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-200 text-blue-700 bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:bg-blue-950">
+                        <Snowflake className="h-3 w-3" />
+                        Frozen
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
+                {/* Snowflake toggle - only for finalised plans */}
+                {isPlanFinalised && onToggleFrozen && (
+                  <div className="mt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onToggleFrozen}
+                      className={cn(
+                        "h-8 gap-1.5 text-xs",
+                        isFrozen
+                          ? "text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950"
+                          : "text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-950"
+                      )}
+                    >
+                      <Snowflake className={cn("h-4 w-4", isFrozen && "fill-blue-200 dark:fill-blue-800")} />
+                      {isFrozen ? 'Remove defrost reminder' : 'Needs defrosting'}
+                    </Button>
                   </div>
                 )}
 
