@@ -49,7 +49,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
       const reg = await navigator.serviceWorker.getRegistration();
       if (!reg) return false;
 
-      const existingSub = await reg.pushManager.getSubscription();
+      const existingSub = await (reg as any).pushManager.getSubscription();
       
       return !!(data && existingSub);
     } catch (error) {
@@ -75,7 +75,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         
         setRegistration(registration);
         
-        const existingSubscription = await registration.pushManager.getSubscription();
+        const existingSubscription = await (registration as any).pushManager.getSubscription();
         setSubscription(existingSubscription);
         
         const isSubbed = await checkSubscriptionStatus(initialFamilyMemberId);
@@ -109,7 +109,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
         throw new Error('VAPID public key not available');
       }
 
-      const existingSub = await reg.pushManager.getSubscription();
+      const existingSub = await (reg as any).pushManager.getSubscription();
       if (existingSub) {
         console.log('Unsubscribing from existing push subscription');
         await existingSub.unsubscribe();
@@ -118,7 +118,7 @@ export const usePushNotifications = (initialFamilyMemberId: string) => {
       const applicationServerKey = urlBase64ToUint8Array(publicKey);
 
       console.log('Creating new push subscription');
-      const newSubscription = await reg.pushManager.subscribe({
+      const newSubscription = await (reg as any).pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey,
       });

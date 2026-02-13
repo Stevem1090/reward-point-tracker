@@ -23,12 +23,12 @@ export const useSubscriptionManager = () => {
         throw new Error('VAPID public key not available');
       }
 
-      const existingSub = await reg.pushManager.getSubscription();
+      const existingSub = await (reg as any).pushManager.getSubscription();
       if (existingSub) {
         await existingSub.unsubscribe();
       }
 
-      const newSubscription = await reg.pushManager.subscribe({
+      const newSubscription = await (reg as any).pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
