@@ -6,14 +6,25 @@ import { useShoppingListGeneration } from '@/hooks/useShoppingListGeneration';
 import { useRecipeExtraction } from '@/hooks/useRecipeExtraction';
 import { MealSlot } from './MealSlot';
 import { SortableMealSlot } from './SortableMealSlot';
+import { SwapMealDialog } from './SwapMealDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Sparkles, Check, RefreshCw, Trash2, PenLine, X } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, Sparkles, Check, RefreshCw, Trash2, PenLine, X, AlertTriangle, Plus } from 'lucide-react';
 import { IngredientSearchDrawer } from './IngredientSearchDrawer';
-import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek, Ingredient } from '@/types/meal';
+import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek, Ingredient, MealType } from '@/types/meal';
 import { scaleIngredients } from '@/utils/scaleIngredients';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
   AlertDialogAction,
