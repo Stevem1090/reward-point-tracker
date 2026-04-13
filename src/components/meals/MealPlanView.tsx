@@ -895,6 +895,66 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit finalized meal dialog */}
+      {editingMeal && (
+        <SwapMealDialog
+          open={isEditSwapOpen}
+          onOpenChange={(open) => {
+            setIsEditSwapOpen(open);
+            if (!open) setEditingMeal(null);
+          }}
+          day={editingMeal.day_of_week}
+          mealId={editingMeal.id}
+          onSwap={handleEditSwap}
+          isSwapping={isEditProcessing}
+        />
+      )}
+
+      {/* Meal type picker dialog for adding extra meals */}
+      <Dialog open={!!addExtraMealDay} onOpenChange={(open) => !open && setAddExtraMealDay(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>What type of meal?</DialogTitle>
+          </DialogHeader>
+          <RadioGroup 
+            value={selectedMealType} 
+            onValueChange={(v) => setSelectedMealType(v as MealType)}
+            className="space-y-3 py-4"
+          >
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="breakfast" id="mt-breakfast" />
+              <Label htmlFor="mt-breakfast" className="cursor-pointer">Breakfast</Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="lunch" id="mt-lunch" />
+              <Label htmlFor="mt-lunch" className="cursor-pointer">Lunch</Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="other" id="mt-other" />
+              <Label htmlFor="mt-other" className="cursor-pointer">Other</Label>
+            </div>
+          </RadioGroup>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddExtraMealDay(null)}>Cancel</Button>
+            <Button onClick={handleConfirmMealType}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Swap dialog for extra meals */}
+      {extraMealDayForSwap && (
+        <SwapMealDialog
+          open={isAddExtraSwapOpen}
+          onOpenChange={(open) => {
+            setIsAddExtraSwapOpen(open);
+            if (!open) setExtraMealDayForSwap(null);
+          }}
+          day={extraMealDayForSwap}
+          onSwap={handleExtraMealSwap}
+          isSwapping={addMealToDay.isPending}
+        />
+      )}
     </div>
   );
 }
