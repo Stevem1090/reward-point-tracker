@@ -1,34 +1,33 @@
 
 
-# Restore Delete Plan for Finalized Plans
+# Refactor Meal Plan Edge Function for Better Variety
 
-## Problem
-The delete plan functionality was previously accessible from the green "Meal plan approved!" banner. When that banner's delete button was replaced with a dismiss X, finalized plans lost the ability to be deleted entirely. The current delete button only appears for draft plans (line 763: `!isPlanFinalised`).
+## What's changing
+Five improvements to the AI meal generation to reduce repetitiveness and produce more diverse, interesting meal plans.
 
-## Solution
-Add a separate "Delete Plan" button that appears on finalized plans. Place it below the meal list, styled subtly (ghost/destructive) so it doesn't compete with the main UI. It reuses the existing `isDeleteDialogOpen` dialog.
+## Changes (all in one file: `supabase/functions/generate-meal-plan/index.ts`)
 
-## Technical Details
+### 1. Model upgrade
+Switch from `google/gemini-2.5-flash` to `google/gemini-2.5-pro` for stronger reasoning and better constraint adherence.
 
-**File: `src/components/meals/MealPlanView.tsx`**
+### 2. AI parameters
+Add `temperature: 1.0`, `presence_penalty: 0.6`, `frequency_penalty: 0.3` to push the model toward more diverse outputs.
 
-Add a delete button section after the draft action buttons block, visible only when the plan IS finalized:
+### 3. Weekly theme injection
+Add a `WEEKLY_THEMES` array of 10 themes (e.g., "Street Food Classics", "Mediterranean Summer", "Asian Fusion", "One-Pot Wonders"). One is randomly selected per request and prepended to the user prompt as loose inspiration for 2-3 meals.
 
-```tsx
-{isPlanFinalised && mealPlan && (
-  <div className="pt-4 flex justify-center">
-    <Button 
-      variant="ghost"
-      onClick={() => setIsDeleteDialogOpen(true)}
-      disabled={isDeleting}
-      className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-    >
-      <Trash2 className="h-4 w-4" />
-      Delete Plan
-    </Button>
-  </div>
-)}
-```
+### 4. Strengthened two-pass planning
+Update the TWO-PASS PLANNING instruction to be more explicit: brainstorm 20 candidates across 8 cuisines, 6 proteins, 5 cooking methods — then select the final meals from that pool.
 
-This goes after the existing `{!isPlanFinalised && ...}` action buttons block (around line 864) and before the AlertDialog. One small addition, no other files changed.
+### 5. Prompt restructuring (recency bias)
+Reorder the system prompt so the critical exclusion rules are at the END (where LLMs pay most attention):
+- **Top**: Identity, balance, naming, slot timing, URL instructions
+- **Middle**: Ratings, preferences, saved recipes, conflict priority
+- **End**: Two-pass planning → Hard variety rules + self-check → Recent meals / current week / rejected exclusions
+
+## Technical details
+- No database or frontend changes
+- Output schema (`suggest_meals` function) is unchanged
+- All existing Supabase fetching logic (recent meals, ratings, saved recipes, preferences) stays intact
+- The edge function will be redeployed after changes
 
