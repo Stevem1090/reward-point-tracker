@@ -640,6 +640,28 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
         </Card>
       )}
 
+      {/* Extraction failure banner */}
+      {showExtractionBanner && mealPlan && (
+        <Alert variant="destructive" className="border-destructive/50">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Recipe extraction failed</AlertTitle>
+          <AlertDescription className="flex items-start justify-between gap-2">
+            <span>
+              Unable to import recipes for: {extractionFailures.map(m => m.meal_name).join(', ')}. 
+              You can still view the original links from each meal card.
+            </span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="shrink-0 h-6 w-6"
+              onClick={() => dismissExtractionError(mealPlan.id)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Ingredient search for finalized plans */}
       {isPlanFinalised && (
         <div className="flex justify-end">
@@ -647,7 +669,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
         </div>
       )}
 
-      {/* Meal slots for each day - with drag-and-drop for finalized plans */}
+      {/* Meal slots for each day */}
       {isPlanFinalised ? (
         <DndContext
           sensors={sensors}
@@ -660,31 +682,80 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
           >
             <div className="space-y-3">
               {DAYS_OF_WEEK.map((day) => {
-                const meal = getMealForDay(day);
-                return meal ? (
-                  <SortableMealSlot
-                    key={meal.id}
-                    meal={meal}
-                    day={day}
-                    isPlanFinalised={isPlanFinalised}
-                    mealPlanId={mealPlan.id}
-                  />
-                ) : null;
+                const dayMeals = getMealsForDay(day);
+                return (
+                  <div key={day} className="space-y-2">
+                    {dayMeals.map((meal) => (
+                      meal.meal_type === 'dinner' ? (
+                        <SortableMealSlot
+                          key={meal.id}
+                          meal={meal}
+                          day={day}
+                          isPlanFinalised={isPlanFinalised}
+                          mealPlanId={mealPlan.id}
+                          onEditFinalisedMeal={handleEditFinalisedMeal}
+                        />
+                      ) : (
+                        <MealSlot
+                          key={meal.id}
+                          day={day}
+                          meal={meal}
+                          isPlanFinalised={isPlanFinalised}
+                          mealPlanId={mealPlan.id}
+                          onEditFinalisedMeal={handleEditFinalisedMeal}
+                        />
+                      )
+                    ))}
+                    {dayMeals.length === 0 && (
+                      <MealSlot
+                        day={day}
+                        isPlanFinalised={isPlanFinalised}
+                        mealPlanId={mealPlan.id}
+                      />
+                    )}
+                  </div>
+                );
               })}
             </div>
           </SortableContext>
         </DndContext>
       ) : (
         <div className="space-y-3">
-          {DAYS_OF_WEEK.map((day) => (
-            <MealSlot
-              key={day}
-              day={day}
-              meal={getMealForDay(day)}
-              isPlanFinalised={isPlanFinalised}
-              mealPlanId={mealPlan.id}
-            />
-          ))}
+          {DAYS_OF_WEEK.map((day) => {
+            const dayMeals = getMealsForDay(day);
+            const dinnerMeal = dayMeals.find(m => m.meal_type === 'dinner');
+            const extraMeals = dayMeals.filter(m => m.meal_type !== 'dinner');
+            
+            return (
+              <div key={day} className="space-y-2">
+                <MealSlot
+                  day={day}
+                  meal={dinnerMeal}
+                  isPlanFinalised={isPlanFinalised}
+                  mealPlanId={mealPlan.id}
+                />
+                {extraMeals.map((meal) => (
+                  <MealSlot
+                    key={meal.id}
+                    day={day}
+                    meal={meal}
+                    isPlanFinalised={isPlanFinalised}
+                    mealPlanId={mealPlan.id}
+                  />
+                ))}
+                {/* Add extra meal button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-14 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => handleAddExtraMeal(day)}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add {day} meal
+                </Button>
+              </div>
+            );
+          })}
         </div>
       )}
 
