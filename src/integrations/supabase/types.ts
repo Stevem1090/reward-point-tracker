@@ -202,6 +202,38 @@ export type Database = {
         }
         Relationships: []
       }
+      freezer_flags: {
+        Row: {
+          created_at: string
+          id: string
+          meal_id: string
+          reminder_sent: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meal_id: string
+          reminder_sent?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meal_id?: string
+          reminder_sent?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freezer_flags_meal_id_fkey"
+            columns: ["meal_id"]
+            isOneToOne: false
+            referencedRelation: "meals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meal_plans: {
         Row: {
           approved_at: string | null
@@ -273,6 +305,7 @@ export type Database = {
           id: string
           meal_name: string
           meal_plan_id: string
+          meal_type: string
           recipe_id: string | null
           recipe_url: string | null
           rejection_reason: string | null
@@ -290,6 +323,7 @@ export type Database = {
           id?: string
           meal_name: string
           meal_plan_id: string
+          meal_type?: string
           recipe_id?: string | null
           recipe_url?: string | null
           rejection_reason?: string | null
@@ -307,6 +341,7 @@ export type Database = {
           id?: string
           meal_name?: string
           meal_plan_id?: string
+          meal_type?: string
           recipe_id?: string | null
           recipe_url?: string | null
           rejection_reason?: string | null
@@ -738,6 +773,7 @@ export type Database = {
     }
     Functions: {
       check_and_send_reminders: { Args: never; Returns: undefined }
+      check_freezer_reminders: { Args: never; Returns: undefined }
       debug_test_push_notification: { Args: never; Returns: undefined }
       get_points_summary_html: {
         Args: { summary_date: string }

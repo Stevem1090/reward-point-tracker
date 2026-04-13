@@ -5,8 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { MealWithRecipeCard, DayOfWeek, REJECTION_REASONS, RejectionReasonCode } from '@/types/meal';
-import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen, Search, Loader2 } from 'lucide-react';
+import { MealWithRecipeCard, DayOfWeek, REJECTION_REASONS, RejectionReasonCode, MealType } from '@/types/meal';
+import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen, Search, Loader2, SkipForward, UtensilsCrossed } from 'lucide-react';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { cn } from '@/lib/utils';
 import {
@@ -36,10 +36,13 @@ interface MealSlotProps {
   meal?: MealWithRecipeCard;
   isPlanFinalised: boolean;
   mealPlanId?: string;
+  onAddExtraMeal?: (day: DayOfWeek) => void;
+  onEditFinalisedMeal?: (meal: MealWithRecipeCard) => void;
+  showAddExtra?: boolean;
 }
 
-export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotProps) {
-  const { updateMealStatus, updateMealUrl, updateMealServings, replaceMeal, addMealToDay } = useMealPlans();
+export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMeal, onEditFinalisedMeal, showAddExtra }: MealSlotProps) {
+  const { updateMealStatus, updateMealUrl, updateMealServings, replaceMeal, addMealToDay, skipMeal, unskipMeal } = useMealPlans();
   const [isEditUrlOpen, setIsEditUrlOpen] = useState(false);
   const [editedUrl, setEditedUrl] = useState('');
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
@@ -174,6 +177,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
 
   // Check if this is a blank placeholder meal (created via "Create from Scratch")
   const isBlankMeal = meal && (!meal.meal_name || meal.meal_name.trim() === '');
+  const isSkipped = meal?.status === 'skipped';
 
   // Empty slot
   if (!meal) {
@@ -214,11 +218,66 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
     );
   }
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     approved: 'bg-green-100 text-green-800 border-green-200',
     rejected: 'bg-red-100 text-red-800 border-red-200',
+    skipped: 'bg-muted text-muted-foreground border-muted',
   };
+
+  // Meal type label
+  const mealTypeLabel = meal.meal_type && meal.meal_type !== 'dinner' 
+    ? meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1) 
+    : null;
+
+  // Skipped meal rendering
+  if (isSkipped && !isPlanFinalised) {
+    return (
+      <>
+        <Card className="border-dashed opacity-60">
+          <CardContent className="py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-12 h-12 rounded-lg flex items-center justify-center text-xs font-medium shrink-0",
+                "bg-muted text-muted-foreground"
+              )}>
+                {day.slice(0, 3)}
+              </div>
+              <div className="flex items-center gap-2">
+                <SkipForward className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">No meal for {day}</span>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => unskipMeal.mutate(meal.id)}
+              disabled={unskipMeal.isPending}
+            >
+              Restore
+            </Button>
+          </CardContent>
+        </Card>
+      </>
+    );
+  }
+
+  // Skipped on finalized plans
+  if (isSkipped && isPlanFinalised) {
+    return (
+      <Card className="border-dashed opacity-50">
+        <CardContent className="py-4 flex items-center gap-3">
+          <div className={cn(
+            "w-12 h-12 rounded-lg flex items-center justify-center text-xs font-medium shrink-0",
+            "bg-muted text-muted-foreground"
+          )}>
+            {day.slice(0, 3)}
+          </div>
+          <span className="text-muted-foreground italic">No Meal Planned</span>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -316,6 +375,10 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Replace Meal
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => skipMeal.mutate(meal.id)}>
+                            <SkipForward className="h-4 w-4 mr-2" />
+                            Skip Day
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -346,6 +409,29 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                           <DropdownMenuItem onClick={() => setIsSwapDialogOpen(true)}>
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Replace Meal
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => skipMeal.mutate(meal.id)}>
+                            <SkipForward className="h-4 w-4 mr-2" />
+                            Skip Day
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+
+                  {/* Edit button for finalized plans */}
+                  {isPlanFinalised && onEditFinalisedMeal && (
+                    <div className="hidden sm:block">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-10 w-10">
+                            <MoreVertical className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => onEditFinalisedMeal(meal)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Meal
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -420,15 +506,21 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                   </div>
                 )}
 
-                {/* Library Recipe indicator - when meal is from recipe library */}
-                {meal.recipe_id && (
-                  <div className="flex items-center gap-2 mt-2">
+                {/* Badges row: meal type + library recipe */}
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {mealTypeLabel && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <UtensilsCrossed className="h-3 w-3" />
+                      {mealTypeLabel}
+                    </Badge>
+                  )}
+                  {meal.recipe_id && (
                     <Badge variant="secondary" className="text-xs gap-1">
                       <BookOpen className="h-3 w-3" />
                       Library Recipe
                     </Badge>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Inline Recipe URL Input - visible before finalisation when no URL and no library recipe */}
                 {/* For blank meals, always show prominently */}
@@ -518,6 +610,10 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Replace Meal
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => skipMeal.mutate(meal.id)}>
+                      <SkipForward className="h-4 w-4 mr-2" />
+                      Skip Day
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -558,6 +654,21 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotPro
                     </Button>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Mobile edit for finalized plans */}
+            {isPlanFinalised && onEditFinalisedMeal && (
+              <div className="flex sm:hidden justify-end pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="min-h-[44px]"
+                  onClick={() => onEditFinalisedMeal(meal)}
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Edit Meal
+                </Button>
               </div>
             )}
           </div>

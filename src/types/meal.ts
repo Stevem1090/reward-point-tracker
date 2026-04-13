@@ -1,9 +1,10 @@
 export type DayOfWeek = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 
 export type MealPlanStatus = 'draft' | 'approved';
-export type MealStatus = 'pending' | 'approved' | 'rejected';
+export type MealStatus = 'pending' | 'approved' | 'rejected' | 'skipped';
 export type MealSourceType = 'ai_generated' | 'user_library' | 'user_custom';
 export type RecipeSourceType = 'website' | 'cookbook';
+export type MealType = 'dinner' | 'breakfast' | 'lunch' | 'other';
 
 export interface Ingredient {
   quantity: string;
@@ -53,6 +54,7 @@ export interface Meal {
   created_at: string;
   updated_at: string;
   rejection_reason: string | null;
+  meal_type: MealType;
   recipe_card?: RecipeCard;
 }
 
