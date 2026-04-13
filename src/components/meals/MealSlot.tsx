@@ -506,15 +506,21 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                   </div>
                 )}
 
-                {/* Library Recipe indicator - when meal is from recipe library */}
-                {meal.recipe_id && (
-                  <div className="flex items-center gap-2 mt-2">
+                {/* Badges row: meal type + library recipe */}
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {mealTypeLabel && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <UtensilsCrossed className="h-3 w-3" />
+                      {mealTypeLabel}
+                    </Badge>
+                  )}
+                  {meal.recipe_id && (
                     <Badge variant="secondary" className="text-xs gap-1">
                       <BookOpen className="h-3 w-3" />
                       Library Recipe
                     </Badge>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Inline Recipe URL Input - visible before finalisation when no URL and no library recipe */}
                 {/* For blank meals, always show prominently */}
