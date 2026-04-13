@@ -4,6 +4,7 @@ export type MealPlanStatus = 'draft' | 'approved';
 export type MealStatus = 'pending' | 'approved' | 'rejected';
 export type MealSourceType = 'ai_generated' | 'user_library' | 'user_custom';
 export type RecipeSourceType = 'website' | 'cookbook';
+export type MealType = 'dinner' | 'breakfast' | 'lunch' | 'other';
 
 export interface Ingredient {
   quantity: string;
