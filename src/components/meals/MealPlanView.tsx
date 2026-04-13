@@ -80,6 +80,29 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
     localStorage.setItem('dismissedMealPlanBanners', JSON.stringify([...updated]));
   };
   const [finalisingStep, setFinalisingStep] = useState<string | null>(null);
+  const [editingMeal, setEditingMeal] = useState<MealWithRecipeCard | null>(null);
+  const [isEditSwapOpen, setIsEditSwapOpen] = useState(false);
+  const [isEditProcessing, setIsEditProcessing] = useState(false);
+  const [addExtraMealDay, setAddExtraMealDay] = useState<DayOfWeek | null>(null);
+  const [selectedMealType, setSelectedMealType] = useState<MealType>('lunch');
+  const [isAddExtraSwapOpen, setIsAddExtraSwapOpen] = useState(false);
+
+  // Extraction failure banner dismissal
+  const [dismissedExtractionErrors, setDismissedExtractionErrors] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('dismissedExtractionErrors');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  const dismissExtractionError = (planId: string) => {
+    const updated = new Set(dismissedExtractionErrors);
+    updated.add(planId);
+    setDismissedExtractionErrors(updated);
+    localStorage.setItem('dismissedExtractionErrors', JSON.stringify([...updated]));
+  };
 
   // Drag and drop sensors with activation constraints
   const sensors = useSensors(
