@@ -863,6 +863,20 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
         </div>
       )}
 
+      {isPlanFinalised && mealPlan && (
+        <div className="pt-4 flex justify-center">
+          <Button 
+            variant="ghost"
+            onClick={() => setIsDeleteDialogOpen(true)}
+            disabled={isDeleting}
+            className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete Plan
+          </Button>
+        </div>
+      )}
+
       {/* Delete confirmation dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
