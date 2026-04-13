@@ -348,9 +348,15 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
     }
   };
 
-  // Get meal for a specific day
+  // Get meals for a specific day (supports multiple meals per day)
+  const getMealsForDay = (day: string): MealWithRecipeCard[] => {
+    return mealPlan?.meals.filter(m => m.day_of_week === day) || [];
+  };
+
+  // Get primary (dinner) meal for a specific day - backward compat
   const getMealForDay = (day: string): MealWithRecipeCard | undefined => {
-    return mealPlan?.meals.find(m => m.day_of_week === day);
+    return mealPlan?.meals.find(m => m.day_of_week === day && m.meal_type === 'dinner') 
+      || mealPlan?.meals.find(m => m.day_of_week === day);
   };
 
   // Get meals sorted by their current day positions (for drag-and-drop)
@@ -370,10 +376,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
 
     if (oldIndex === -1 || newIndex === -1) return;
 
-    // Reorder the array
     const reorderedMeals = arrayMove(sortedMeals, oldIndex, newIndex);
-
-    // Create updates: assign each meal the day corresponding to its new position
     const updates = reorderedMeals.map((meal, index) => ({
       mealId: meal.id,
       dayOfWeek: DAYS_OF_WEEK[index]
@@ -382,18 +385,155 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
     await reorderMeals.mutateAsync(updates);
   };
 
-  // Check if all meals are approved (and have names - not blank)
-  const allMealsApproved = mealPlan?.meals.length === 7 && 
-    mealPlan.meals.every(m => m.status === 'approved' && m.meal_name && m.meal_name.trim() !== '');
+  // Check if all dinner meals are approved or skipped (and have names if approved)
+  const allMealsReady = mealPlan?.meals
+    .filter(m => m.meal_type === 'dinner')
+    .every(m => 
+      m.status === 'skipped' || 
+      (m.status === 'approved' && m.meal_name && m.meal_name.trim() !== '')
+    ) ?? false;
+
+  // Also check non-dinner meals are approved
+  const allExtraMealsApproved = mealPlan?.meals
+    .filter(m => m.meal_type !== 'dinner')
+    .every(m => m.status === 'approved' && m.meal_name && m.meal_name.trim() !== '') ?? true;
+
+  const allMealsApproved = allMealsReady && allExtraMealsApproved && (mealPlan?.meals.length ?? 0) > 0;
 
   // Check if there are rejected meals
   const hasRejectedMeals = mealPlan?.meals.some(m => m.status === 'rejected');
 
-  // Check if there are blank slots (empty meal_name)
-  const hasBlankSlots = mealPlan?.meals.some(m => !m.meal_name || m.meal_name.trim() === '');
+  // Check if there are blank slots (empty meal_name on non-skipped dinner meals)
+  const hasBlankSlots = mealPlan?.meals.some(m => m.meal_type === 'dinner' && m.status !== 'skipped' && (!m.meal_name || m.meal_name.trim() === ''));
 
   // Check if plan is already finalised
   const isPlanFinalised = mealPlan?.status === 'approved';
+
+  // Detect extraction failures on finalized plans
+  const extractionFailures = isPlanFinalised ? (mealPlan?.meals || []).filter(m => 
+    m.status === 'approved' && 
+    !m.recipe_id && 
+    m.recipe_card && 
+    (m.recipe_card.ingredients as Ingredient[]).length === 0
+  ) : [];
+  const showExtractionBanner = extractionFailures.length > 0 && 
+    mealPlan && !dismissedExtractionErrors.has(mealPlan.id);
+
+  // Handle editing a finalized meal
+  const handleEditFinalisedMeal = (meal: MealWithRecipeCard) => {
+    setEditingMeal(meal);
+    setIsEditSwapOpen(true);
+  };
+
+  const handleEditSwap = async (data: {
+    mealName: string;
+    description?: string;
+    recipeUrl?: string;
+    servings: number;
+    estimatedCookMinutes?: number;
+    recipeId?: string;
+  }) => {
+    if (!editingMeal || !mealPlan) return;
+    setIsEditProcessing(true);
+    
+    try {
+      // 1. Replace the meal
+      await replaceMeal.mutateAsync({ mealId: editingMeal.id, ...data });
+      
+      // 2. Delete old recipe card
+      await supabase.from('recipe_cards').delete().eq('meal_id', editingMeal.id);
+      
+      // 3. Extract recipe for the new meal
+      if (data.recipeId) {
+        const { data: recipe } = await supabase
+          .from('recipes')
+          .select('name, ingredients, steps, servings, image_url')
+          .eq('id', data.recipeId)
+          .single();
+        if (recipe) {
+          await supabase.from('recipe_cards').insert([{
+            meal_id: editingMeal.id,
+            meal_name: recipe.name,
+            image_url: recipe.image_url,
+            ingredients: recipe.ingredients,
+            steps: recipe.steps,
+            base_servings: recipe.servings,
+          }]);
+        }
+      } else if (data.recipeUrl) {
+        await extractFromUrl.mutateAsync({
+          mealId: editingMeal.id,
+          url: data.recipeUrl,
+          mealName: data.mealName,
+        });
+      }
+      
+      // 4. Delete shopping list and regenerate
+      await supabase.from('shopping_lists').delete().eq('meal_plan_id', mealPlan.id);
+      
+      // 5. Refetch and regenerate shopping list
+      await queryClient.invalidateQueries({ queryKey: ['mealPlan', weekStartDate] });
+      const { data: updatedPlan } = await refetch();
+      
+      if (updatedPlan) {
+        const mealsWithIngredients = updatedPlan.meals
+          .filter(m => (m.status === 'approved') && m.recipe_card?.ingredients)
+          .map(m => {
+            const baseServings = m.recipe_card?.base_servings || 4;
+            const targetServings = m.servings;
+            const rawIngredients = (m.recipe_card?.ingredients || []) as Ingredient[];
+            const scaledIngredients = scaleIngredients(rawIngredients, baseServings, targetServings);
+            return { mealName: m.meal_name, servings: targetServings, ingredients: scaledIngredients };
+          });
+        
+        if (mealsWithIngredients.length > 0) {
+          await generateShoppingList.mutateAsync({
+            mealPlanId: mealPlan.id,
+            meals: mealsWithIngredients,
+          });
+        }
+      }
+
+      // Re-approve the meal since replaceMeal sets it to pending
+      await supabase.from('meals').update({ status: 'approved' }).eq('id', editingMeal.id);
+      await queryClient.invalidateQueries({ queryKey: ['mealPlan', weekStartDate] });
+      await queryClient.invalidateQueries({ queryKey: ['shoppingList', mealPlan.id] });
+      
+      toast.success('Meal updated and shopping list regenerated');
+    } catch (error) {
+      console.error('Failed to edit finalised meal:', error);
+      toast.error('Failed to update meal');
+    } finally {
+      setIsEditProcessing(false);
+      setIsEditSwapOpen(false);
+      setEditingMeal(null);
+    }
+  };
+
+  // Handle adding extra meal
+  const handleAddExtraMeal = (day: DayOfWeek) => {
+    setAddExtraMealDay(day);
+    setSelectedMealType('lunch');
+  };
+
+  const handleConfirmMealType = () => {
+    setAddExtraMealDay(null);
+    setIsAddExtraSwapOpen(true);
+  };
+
+  const handleExtraMealSwap = async (data: {
+    mealName: string;
+    description?: string;
+    recipeUrl?: string;
+    servings: number;
+    estimatedCookMinutes?: number;
+    recipeId?: string;
+  }) => {
+    if (!addExtraMealDay && !mealPlan) return;
+    const { addMealToDay } = useMealPlans();
+    // This is handled via the SwapMealDialog's onSwap which calls addMealToDay
+    setIsAddExtraSwapOpen(false);
+  };
 
   if (isLoading) {
     return (
