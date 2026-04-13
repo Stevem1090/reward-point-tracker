@@ -10,9 +10,10 @@ interface SortableMealSlotProps {
   day: DayOfWeek;
   isPlanFinalised: boolean;
   mealPlanId: string;
+  onEditFinalisedMeal?: (meal: MealWithRecipeCard) => void;
 }
 
-export function SortableMealSlot({ meal, day, isPlanFinalised, mealPlanId }: SortableMealSlotProps) {
+export function SortableMealSlot({ meal, day, isPlanFinalised, mealPlanId, onEditFinalisedMeal }: SortableMealSlotProps) {
   const {
     attributes,
     listeners,
