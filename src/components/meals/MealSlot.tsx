@@ -410,6 +410,29 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Replace Meal
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => skipMeal.mutate(meal.id)}>
+                            <SkipForward className="h-4 w-4 mr-2" />
+                            Skip Day
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+
+                  {/* Edit button for finalized plans */}
+                  {isPlanFinalised && onEditFinalisedMeal && (
+                    <div className="hidden sm:block">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-10 w-10">
+                            <MoreVertical className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => onEditFinalisedMeal(meal)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Meal
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
