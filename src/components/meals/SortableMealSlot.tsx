@@ -10,11 +10,9 @@ interface SortableMealSlotProps {
   day: DayOfWeek;
   isPlanFinalised: boolean;
   mealPlanId: string;
-  isFrozen?: boolean;
-  onToggleFrozen?: () => void;
 }
 
-export function SortableMealSlot({ meal, day, isPlanFinalised, mealPlanId, isFrozen, onToggleFrozen }: SortableMealSlotProps) {
+export function SortableMealSlot({ meal, day, isPlanFinalised, mealPlanId }: SortableMealSlotProps) {
   const {
     attributes,
     listeners,
@@ -55,8 +53,6 @@ export function SortableMealSlot({ meal, day, isPlanFinalised, mealPlanId, isFro
           meal={meal}
           isPlanFinalised={isPlanFinalised}
           mealPlanId={mealPlanId}
-          isFrozen={isFrozen}
-          onToggleFrozen={onToggleFrozen}
         />
       </div>
     </div>

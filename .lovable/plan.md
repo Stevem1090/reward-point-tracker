@@ -1,26 +1,45 @@
 
 
-# Fix Notification Delivery and Build Errors
+# Per-Week Banner Dismissal with Persistence
 
-## Summary of Issues Found
+## Problem
+The banner dismiss state is stored in a simple `useState(false)` which:
+1. Resets when navigating away and back (no persistence)
+2. Is shared across both "this week" and "next week" since it's a single boolean
 
-### 1. Regular reminders use a placeholder auth token (critical)
-The `check_and_send_reminders()` database function calls the edge function with `'Authorization', 'Bearer your_token_here'` instead of the real anon key. This means your "Hello Steve" Saturday reminder (and any future reminders) silently fail every time. The freezer reminder function has the correct key -- this one was just never updated.
+## Solution
+Replace the single boolean state with a `Set<string>` of dismissed `weekStartDate` values, stored in `localStorage` so it persists across sessions.
 
-### 2. Freezer reminders were sent before you had a subscription
-All defrost reminders fired correctly at 6:00 PM each evening, but your push subscription was only created at 10:03 PM tonight. So the edge function responded "No subscriptions found" each time. Now that your subscription exists, future freezer reminders should work.
+## Technical Changes
 
-### 3. TypeScript build errors on `pushManager`
-The `pushManager` property isn't in the default TypeScript type for `ServiceWorkerRegistration`. This needs a type declaration fix.
+### File: `src/components/meals/MealPlanView.tsx`
 
-## Plan
+**Remove:**
+```typescript
+const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+```
 
-### Step 1: Fix the auth token in `check_and_send_reminders()`
-Run a SQL statement (via the SQL editor, not a migration) to replace the placeholder `'Bearer your_token_here'` with the real anon key in the `check_and_send_reminders()` function. This is the same key already used in `check_freezer_reminders()`.
+**Replace with:**
+```typescript
+const [dismissedWeeks, setDismissedWeeks] = useState<Set<string>>(() => {
+  try {
+    const stored = localStorage.getItem('dismissedMealPlanBanners');
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+});
 
-### Step 2: Fix TypeScript build errors
-Add a type declaration file `src/types/service-worker.d.ts` that extends `ServiceWorkerRegistration` to include the `pushManager` property. This resolves all 6 build errors across `useSubscriptionManager.ts` and `usePushNotifications.ts`.
+const isBannerDismissed = dismissedWeeks.has(weekStartDate);
 
-### Step 3: Reset freezer reminder flags for testing
-Reset `reminder_sent = false` on your current freezer flags so the cron job will re-attempt delivery now that your subscription is active. This lets us verify the full flow works end-to-end.
+const dismissBanner = () => {
+  const updated = new Set(dismissedWeeks);
+  updated.add(weekStartDate);
+  setDismissedWeeks(updated);
+  localStorage.setItem('dismissedMealPlanBanners', JSON.stringify([...updated]));
+};
+```
 
+**Update the X button handler** from `setIsBannerDismissed(true)` to `dismissBanner()`.
+
+This way each week's banner is tracked independently and persists across page refreshes. Old weeks will accumulate in storage but the set stays tiny (just date strings).
