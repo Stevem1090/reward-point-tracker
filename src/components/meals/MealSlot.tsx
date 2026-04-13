@@ -656,6 +656,21 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                 </div>
               </div>
             )}
+
+            {/* Mobile edit for finalized plans */}
+            {isPlanFinalised && onEditFinalisedMeal && (
+              <div className="flex sm:hidden justify-end pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="min-h-[44px]"
+                  onClick={() => onEditFinalisedMeal(meal)}
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Edit Meal
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
