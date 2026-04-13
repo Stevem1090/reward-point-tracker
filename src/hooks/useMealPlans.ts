@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { MealPlan, Meal, MealPlanWithMeals, DayOfWeek, MealStatus, MealPlanStatus, RecipeSourceType, Ingredient, DAYS_OF_WEEK } from '@/types/meal';
+import { MealPlan, Meal, MealPlanWithMeals, DayOfWeek, MealStatus, MealPlanStatus, RecipeSourceType, Ingredient, DAYS_OF_WEEK, MealType } from '@/types/meal';
 import { toast } from 'sonner';
 import { getWeekStartDate } from '@/utils/getWeekBounds';
 
