@@ -225,6 +225,60 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
     skipped: 'bg-muted text-muted-foreground border-muted',
   };
 
+  // Meal type label
+  const mealTypeLabel = meal.meal_type && meal.meal_type !== 'dinner' 
+    ? meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1) 
+    : null;
+
+  // Skipped meal rendering
+  if (isSkipped && !isPlanFinalised) {
+    return (
+      <>
+        <Card className="border-dashed opacity-60">
+          <CardContent className="py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-12 h-12 rounded-lg flex items-center justify-center text-xs font-medium shrink-0",
+                "bg-muted text-muted-foreground"
+              )}>
+                {day.slice(0, 3)}
+              </div>
+              <div className="flex items-center gap-2">
+                <SkipForward className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">No meal for {day}</span>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => unskipMeal.mutate(meal.id)}
+              disabled={unskipMeal.isPending}
+            >
+              Restore
+            </Button>
+          </CardContent>
+        </Card>
+      </>
+    );
+  }
+
+  // Skipped on finalized plans
+  if (isSkipped && isPlanFinalised) {
+    return (
+      <Card className="border-dashed opacity-50">
+        <CardContent className="py-4 flex items-center gap-3">
+          <div className={cn(
+            "w-12 h-12 rounded-lg flex items-center justify-center text-xs font-medium shrink-0",
+            "bg-muted text-muted-foreground"
+          )}>
+            {day.slice(0, 3)}
+          </div>
+          <span className="text-muted-foreground italic">No Meal Planned</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <>
       <Card className={cn(
