@@ -234,7 +234,8 @@ export function useMealPlans() {
       recipeUrl, 
       servings, 
       estimatedCookMinutes,
-      recipeId 
+      recipeId,
+      mealType = 'dinner'
     }: { 
       mealPlanId: string;
       dayOfWeek: DayOfWeek;
@@ -244,6 +245,7 @@ export function useMealPlans() {
       servings: number;
       estimatedCookMinutes?: number;
       recipeId?: string;
+      mealType?: MealType;
     }) => {
       const { error } = await supabase
         .from('meals')
@@ -257,7 +259,8 @@ export function useMealPlans() {
           estimated_cook_minutes: estimatedCookMinutes || null,
           recipe_id: recipeId || null,
           source_type: recipeId ? 'user_library' : 'user_custom',
-          status: 'pending'
+          status: 'pending',
+          meal_type: mealType
         }]);
       if (error) throw error;
     },
@@ -266,6 +269,48 @@ export function useMealPlans() {
       toast.success('Meal added');
     },
     onError: () => toast.error('Failed to add meal')
+  });
+
+  const skipMeal = useMutation({
+    mutationFn: async (mealId: string) => {
+      const { error } = await supabase
+        .from('meals')
+        .update({ status: 'skipped' })
+        .eq('id', mealId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+    },
+    onError: () => toast.error('Failed to skip meal')
+  });
+
+  const unskipMeal = useMutation({
+    mutationFn: async (mealId: string) => {
+      const { error } = await supabase
+        .from('meals')
+        .update({ status: 'pending' })
+        .eq('id', mealId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+    },
+    onError: () => toast.error('Failed to restore meal')
+  });
+
+  const deleteMeal = useMutation({
+    mutationFn: async (mealId: string) => {
+      const { error } = await supabase
+        .from('meals')
+        .delete()
+        .eq('id', mealId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+    },
+    onError: () => toast.error('Failed to delete meal')
   });
 
   const saveAIRecipesToLibrary = async (meals: Array<{
