@@ -86,6 +86,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   const [addExtraMealDay, setAddExtraMealDay] = useState<DayOfWeek | null>(null);
   const [selectedMealType, setSelectedMealType] = useState<MealType>('lunch');
   const [isAddExtraSwapOpen, setIsAddExtraSwapOpen] = useState(false);
+  const [extraMealDayForSwap, setExtraMealDayForSwap] = useState<DayOfWeek | null>(null);
 
   // Extraction failure banner dismissal
   const [dismissedExtractionErrors, setDismissedExtractionErrors] = useState<Set<string>>(() => {
