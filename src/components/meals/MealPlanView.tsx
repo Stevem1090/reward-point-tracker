@@ -56,7 +56,7 @@ interface MealPlanViewProps {
 
 export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   const queryClient = useQueryClient();
-  const { useMealPlanForWeek, createMealPlan, createBlankMealPlan, approveMealPlan, deleteMealPlan, saveAIRecipesToLibrary, reorderMeals, replaceMeal, deleteMeal } = useMealPlans();
+  const { useMealPlanForWeek, createMealPlan, createBlankMealPlan, approveMealPlan, deleteMealPlan, saveAIRecipesToLibrary, reorderMeals, replaceMeal, deleteMeal, addMealToDay } = useMealPlans();
   const { data: mealPlan, isLoading, error, refetch } = useMealPlanForWeek(weekStartDate);
   const { generateMealPlan } = useAIMealGeneration();
   const { generateShoppingList } = useShoppingListGeneration();
@@ -510,14 +510,18 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
     }
   };
 
-  // Handle adding extra meal
+  // Handle adding extra meal - state for meal type picker
+  const [extraMealDayForSwap, setExtraMealDayForSwap] = useState<DayOfWeek | null>(null);
+
   const handleAddExtraMeal = (day: DayOfWeek) => {
     setAddExtraMealDay(day);
     setSelectedMealType('lunch');
   };
 
   const handleConfirmMealType = () => {
+    const day = addExtraMealDay;
     setAddExtraMealDay(null);
+    setExtraMealDayForSwap(day);
     setIsAddExtraSwapOpen(true);
   };
 
@@ -529,10 +533,15 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
     estimatedCookMinutes?: number;
     recipeId?: string;
   }) => {
-    if (!addExtraMealDay && !mealPlan) return;
-    const { addMealToDay } = useMealPlans();
-    // This is handled via the SwapMealDialog's onSwap which calls addMealToDay
+    if (!extraMealDayForSwap || !mealPlan) return;
+    await addMealToDay.mutateAsync({
+      mealPlanId: mealPlan.id,
+      dayOfWeek: extraMealDayForSwap,
+      mealType: selectedMealType,
+      ...data,
+    });
     setIsAddExtraSwapOpen(false);
+    setExtraMealDayForSwap(null);
   };
 
   if (isLoading) {
