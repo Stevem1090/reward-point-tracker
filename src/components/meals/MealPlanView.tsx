@@ -56,7 +56,7 @@ interface MealPlanViewProps {
 
 export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
   const queryClient = useQueryClient();
-  const { useMealPlanForWeek, createMealPlan, createBlankMealPlan, approveMealPlan, deleteMealPlan, saveAIRecipesToLibrary, reorderMeals } = useMealPlans();
+  const { useMealPlanForWeek, createMealPlan, createBlankMealPlan, approveMealPlan, deleteMealPlan, saveAIRecipesToLibrary, reorderMeals, replaceMeal, deleteMeal } = useMealPlans();
   const { data: mealPlan, isLoading, error, refetch } = useMealPlanForWeek(weekStartDate);
   const { generateMealPlan } = useAIMealGeneration();
   const { generateShoppingList } = useShoppingListGeneration();
