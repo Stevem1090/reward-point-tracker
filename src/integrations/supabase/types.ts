@@ -305,6 +305,7 @@ export type Database = {
           id: string
           meal_name: string
           meal_plan_id: string
+          meal_type: string
           recipe_id: string | null
           recipe_url: string | null
           rejection_reason: string | null
@@ -322,6 +323,7 @@ export type Database = {
           id?: string
           meal_name: string
           meal_plan_id: string
+          meal_type?: string
           recipe_id?: string | null
           recipe_url?: string | null
           rejection_reason?: string | null
@@ -339,6 +341,7 @@ export type Database = {
           id?: string
           meal_name?: string
           meal_plan_id?: string
+          meal_type?: string
           recipe_id?: string | null
           recipe_url?: string | null
           rejection_reason?: string | null
