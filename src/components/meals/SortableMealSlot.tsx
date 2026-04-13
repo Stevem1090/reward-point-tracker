@@ -54,6 +54,7 @@ export function SortableMealSlot({ meal, day, isPlanFinalised, mealPlanId, onEdi
           meal={meal}
           isPlanFinalised={isPlanFinalised}
           mealPlanId={mealPlanId}
+          onEditFinalisedMeal={onEditFinalisedMeal}
         />
       </div>
     </div>
