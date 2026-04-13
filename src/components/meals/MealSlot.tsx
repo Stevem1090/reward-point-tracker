@@ -177,6 +177,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
 
   // Check if this is a blank placeholder meal (created via "Create from Scratch")
   const isBlankMeal = meal && (!meal.meal_name || meal.meal_name.trim() === '');
+  const isSkipped = meal?.status === 'skipped';
 
   // Empty slot
   if (!meal) {
@@ -217,10 +218,11 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
     );
   }
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     approved: 'bg-green-100 text-green-800 border-green-200',
     rejected: 'bg-red-100 text-red-800 border-red-200',
+    skipped: 'bg-muted text-muted-foreground border-muted',
   };
 
   return (
