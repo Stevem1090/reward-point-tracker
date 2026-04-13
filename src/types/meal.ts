@@ -54,6 +54,7 @@ export interface Meal {
   created_at: string;
   updated_at: string;
   rejection_reason: string | null;
+  meal_type: MealType;
   recipe_card?: RecipeCard;
 }
 
