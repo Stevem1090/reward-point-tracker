@@ -610,6 +610,10 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Replace Meal
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => skipMeal.mutate(meal.id)}>
+                      <SkipForward className="h-4 w-4 mr-2" />
+                      Skip Day
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
