@@ -492,6 +492,9 @@ export function useMealPlans() {
     approveMealPlan,
     deleteMealPlan,
     saveAIRecipesToLibrary,
-    reorderMeals
+    reorderMeals,
+    skipMeal,
+    unskipMeal,
+    deleteMeal
   };
 }

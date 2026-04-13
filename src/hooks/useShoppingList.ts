@@ -115,6 +115,21 @@ export function useShoppingList(mealPlanId: string | null) {
     return groups;
   };
 
+  const deleteShoppingList = useMutation({
+    mutationFn: async () => {
+      if (!mealPlanId) throw new Error('No meal plan ID');
+      const { error } = await supabase
+        .from('shopping_lists')
+        .delete()
+        .eq('meal_plan_id', mealPlanId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shoppingList', mealPlanId] });
+    },
+    onError: () => toast.error('Failed to delete shopping list')
+  });
+
   return {
     shoppingList: shoppingListQuery.data,
     items: shoppingListQuery.data?.items || [],
@@ -122,6 +137,7 @@ export function useShoppingList(mealPlanId: string | null) {
     isLoading: shoppingListQuery.isLoading,
     toggleItem,
     addItem,
-    clearChecked
+    clearChecked,
+    deleteShoppingList
   };
 }
