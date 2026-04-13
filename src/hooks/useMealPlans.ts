@@ -42,6 +42,7 @@ export function useMealPlans() {
             day_of_week: meal.day_of_week as DayOfWeek,
             status: meal.status as MealStatus,
             source_type: meal.source_type as Meal['source_type'],
+            meal_type: (meal.meal_type || 'dinner') as MealType,
             recipe_card: Array.isArray(meal.recipe_card) ? meal.recipe_card[0] : meal.recipe_card
           }))
         } as MealPlanWithMeals;
@@ -400,6 +401,7 @@ export function useMealPlans() {
             day_of_week: meal.day_of_week as DayOfWeek,
             status: meal.status as MealStatus,
             source_type: meal.source_type as Meal['source_type'],
+            meal_type: (meal.meal_type || 'dinner') as MealType,
           });
           mealsByPlan.set(meal.meal_plan_id, list);
         });
