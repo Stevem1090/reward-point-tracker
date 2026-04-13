@@ -511,8 +511,7 @@ export function MealPlanView({ weekStartDate }: MealPlanViewProps) {
     }
   };
 
-  // Handle adding extra meal - state for meal type picker
-  const [extraMealDayForSwap, setExtraMealDayForSwap] = useState<DayOfWeek | null>(null);
+  // Handle adding extra meal
 
   const handleAddExtraMeal = (day: DayOfWeek) => {
     setAddExtraMealDay(day);
