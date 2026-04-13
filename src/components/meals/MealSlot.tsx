@@ -36,10 +36,13 @@ interface MealSlotProps {
   meal?: MealWithRecipeCard;
   isPlanFinalised: boolean;
   mealPlanId?: string;
+  onAddExtraMeal?: (day: DayOfWeek) => void;
+  onEditFinalisedMeal?: (meal: MealWithRecipeCard) => void;
+  showAddExtra?: boolean;
 }
 
-export function MealSlot({ day, meal, isPlanFinalised, mealPlanId }: MealSlotProps) {
-  const { updateMealStatus, updateMealUrl, updateMealServings, replaceMeal, addMealToDay } = useMealPlans();
+export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMeal, onEditFinalisedMeal, showAddExtra }: MealSlotProps) {
+  const { updateMealStatus, updateMealUrl, updateMealServings, replaceMeal, addMealToDay, skipMeal, unskipMeal } = useMealPlans();
   const [isEditUrlOpen, setIsEditUrlOpen] = useState(false);
   const [editedUrl, setEditedUrl] = useState('');
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
