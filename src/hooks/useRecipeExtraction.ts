@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Ingredient } from '@/types/meal';
 import { Json } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
+import { estimateCaloriesForRecipeCard } from './useCalorieEstimation';
 
 interface ExtractedRecipe {
   name: string;
@@ -103,6 +104,8 @@ export function useRecipeExtraction() {
         .eq('meal_id', mealId)
         .maybeSingle();
 
+      let recipeCardId: string | null = existing?.id || null;
+
       if (existing) {
         // Update existing
         const { error: updateError } = await supabase
@@ -113,12 +116,13 @@ export function useRecipeExtraction() {
             ingredients: recipe.ingredients as unknown as Json,
             steps: recipe.steps as unknown as Json,
             base_servings: recipe.servings,
+            estimated_calories_per_serving: null,
           })
           .eq('id', existing.id);
         if (updateError) throw updateError;
       } else {
         // Insert new
-        const { error: insertError } = await supabase
+        const { data: inserted, error: insertError } = await supabase
           .from('recipe_cards')
           .insert([{
             meal_id: mealId,
@@ -127,8 +131,25 @@ export function useRecipeExtraction() {
             ingredients: recipe.ingredients as unknown as Json,
             steps: recipe.steps as unknown as Json,
             base_servings: recipe.servings,
-          }]);
+          }])
+          .select('id')
+          .single();
         if (insertError) throw insertError;
+        recipeCardId = inserted?.id || null;
+      }
+
+      // Fire-and-forget calorie estimation (non-blocking)
+      if (recipeCardId && recipe.ingredients?.length) {
+        estimateCaloriesForRecipeCard({
+          recipeCardId,
+          ingredients: recipe.ingredients,
+          servings: recipe.servings,
+          mealName: recipe.name,
+        }).then((cals) => {
+          if (cals) {
+            queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+          }
+        });
       }
 
       // Also update the meal record with extracted name and cook time
