@@ -131,6 +131,12 @@ export function RecipeCardDialog({
               <Users className="h-3 w-3" />
               {currentServings} servings
             </Badge>
+            {localCalories ? (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Flame className="h-3 w-3 text-orange-500" />
+                ~{localCalories} kcal / serving
+              </Badge>
+            ) : null}
             {recipeUrl && (
               <a
                 href={recipeUrl}
