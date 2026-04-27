@@ -67,6 +67,7 @@ export interface RecipeCard {
   steps: string[];
   base_servings: number;
   html_content: string | null;
+  estimated_calories_per_serving: number | null;
   created_at: string;
 }
 

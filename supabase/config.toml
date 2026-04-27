@@ -18,3 +18,6 @@ verify_jwt = true
 
 [functions.generate-shopping-list]
 verify_jwt = true
+
+[functions.estimate-calories]
+verify_jwt = true

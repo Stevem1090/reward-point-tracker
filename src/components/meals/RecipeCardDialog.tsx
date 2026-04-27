@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -5,12 +6,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { RecipeCard, Ingredient } from '@/types/meal';
-import { Clock, Users, ExternalLink, Printer, AlertCircle } from 'lucide-react';
+import { Clock, Users, ExternalLink, Printer, AlertCircle, Flame } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { scaleIngredients } from '@/utils/scaleIngredients';
 import { generateRecipeCardHtml, RecipeCardData } from '@/utils/generateRecipeCardHtml';
+import { estimateCaloriesForRecipeCard } from '@/hooks/useCalorieEstimation';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface RecipeCardDialogProps {
   open: boolean;
@@ -29,6 +32,43 @@ export function RecipeCardDialog({
   recipeUrl,
   estimatedCookMinutes,
 }: RecipeCardDialogProps) {
+  const queryClient = useQueryClient();
+  // Local cache of estimated calories so we can show the result immediately
+  // after a lazy backfill, without waiting for the next refetch cycle.
+  const [localCalories, setLocalCalories] = useState<number | null>(
+    recipeCard.estimated_calories_per_serving ?? null
+  );
+
+  useEffect(() => {
+    setLocalCalories(recipeCard.estimated_calories_per_serving ?? null);
+  }, [recipeCard.id, recipeCard.estimated_calories_per_serving]);
+
+  // Lazy backfill: when dialog opens for a card with ingredients but no calorie
+  // estimate yet, trigger one (fire-and-forget). Skipped for library previews
+  // where meal_id === id (synthetic recipe cards constructed from saved recipes).
+  useEffect(() => {
+    const isSyntheticPreview = recipeCard.meal_id === recipeCard.id;
+    if (
+      open &&
+      !isSyntheticPreview &&
+      !recipeCard.estimated_calories_per_serving &&
+      recipeCard.ingredients?.length > 0
+    ) {
+      estimateCaloriesForRecipeCard({
+        recipeCardId: recipeCard.id,
+        ingredients: recipeCard.ingredients,
+        servings: recipeCard.base_servings,
+        mealName: recipeCard.meal_name,
+      }).then((cals) => {
+        if (cals) {
+          setLocalCalories(cals);
+          queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, recipeCard.id]);
+
   // Check if extraction failed (empty ingredients and steps)
   const extractionFailed = recipeCard.ingredients.length === 0 && recipeCard.steps.length === 0;
 
@@ -91,6 +131,12 @@ export function RecipeCardDialog({
               <Users className="h-3 w-3" />
               {currentServings} servings
             </Badge>
+            {localCalories ? (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Flame className="h-3 w-3 text-orange-500" />
+                ~{localCalories} kcal / serving
+              </Badge>
+            ) : null}
             {recipeUrl && (
               <a
                 href={recipeUrl}

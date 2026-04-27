@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MealWithRecipeCard, DayOfWeek, REJECTION_REASONS, RejectionReasonCode, MealType } from '@/types/meal';
-import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen, Search, Loader2, SkipForward, UtensilsCrossed } from 'lucide-react';
+import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen, Search, Loader2, SkipForward, UtensilsCrossed, Flame } from 'lucide-react';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { cn } from '@/lib/utils';
 import {
@@ -449,6 +449,14 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                         {meal.estimated_cook_minutes} mins
                       </span>
                     )}
+
+                    {/* Calories per serving (if estimated) */}
+                    {meal.recipe_card?.estimated_calories_per_serving ? (
+                      <span className="flex items-center gap-1">
+                        <Flame className="h-3.5 w-3.5 text-orange-500" />
+                        ~{meal.recipe_card.estimated_calories_per_serving} kcal
+                      </span>
+                    ) : null}
                     
                     {/* Editable servings - only before finalisation */}
                     {!isPlanFinalised ? (

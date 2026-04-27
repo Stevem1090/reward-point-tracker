@@ -22,6 +22,7 @@ const recipeToRecipeCard = (recipe: Recipe): RecipeCardType => ({
   steps: recipe.steps,
   base_servings: recipe.servings,
   html_content: null,
+  estimated_calories_per_serving: null,
   created_at: recipe.created_at,
 });
 

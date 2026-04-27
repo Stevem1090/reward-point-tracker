@@ -431,6 +431,7 @@ export type Database = {
         Row: {
           base_servings: number
           created_at: string
+          estimated_calories_per_serving: number | null
           html_content: string | null
           id: string
           image_url: string | null
@@ -442,6 +443,7 @@ export type Database = {
         Insert: {
           base_servings?: number
           created_at?: string
+          estimated_calories_per_serving?: number | null
           html_content?: string | null
           id?: string
           image_url?: string | null
@@ -453,6 +455,7 @@ export type Database = {
         Update: {
           base_servings?: number
           created_at?: string
+          estimated_calories_per_serving?: number | null
           html_content?: string | null
           id?: string
           image_url?: string | null
