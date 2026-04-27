@@ -44,20 +44,13 @@ export function RecipeCardDialog({
   }, [recipeCard.id, recipeCard.estimated_calories_per_serving]);
 
   // Lazy backfill: when dialog opens for a card with ingredients but no calorie
-  // estimate yet, trigger one (fire-and-forget).
+  // estimate yet, trigger one (fire-and-forget). Skipped for library previews
+  // where meal_id === id (synthetic recipe cards constructed from saved recipes).
   useEffect(() => {
+    const isSyntheticPreview = recipeCard.meal_id === recipeCard.id;
     if (
       open &&
-      !recipeCard.estimated_calories_per_serving &&
-      recipeCard.ingredients?.length > 0 &&
-      // Only run when this is a real meal recipe card (not a library preview, which uses recipe.id as both id and meal_id)
-      recipeCard.meal_id !== recipeCard.id ||
-      (open && !recipeCard.estimated_calories_per_serving && recipeCard.ingredients?.length > 0 && recipeCard.meal_id !== recipeCard.id)
-    ) {
-      // The condition above is intentionally permissive; the backfill itself is harmless if it fails
-    }
-    if (
-      open &&
+      !isSyntheticPreview &&
       !recipeCard.estimated_calories_per_serving &&
       recipeCard.ingredients?.length > 0
     ) {
