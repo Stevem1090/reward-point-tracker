@@ -163,6 +163,10 @@ export const useChores = (selectedYear: number) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return null;
     }
+    if (data) {
+      const cat = data as ChoreCategory;
+      setCategories((prev) => (prev.some((c) => c.id === cat.id) ? prev : [...prev, cat]));
+    }
     return data as ChoreCategory;
   };
 
@@ -172,17 +176,25 @@ export const useChores = (selectedYear: number) => {
     frequency: ChoreFrequency;
   }) => {
     if (!user) return;
-    const { error } = await supabase.from('chores').insert({
-      user_id: user.id,
-      name: params.name,
-      category_id: params.category_id,
-      frequency: params.frequency,
-    });
+    const { data, error } = await supabase
+      .from('chores')
+      .insert({
+        user_id: user.id,
+        name: params.name,
+        category_id: params.category_id,
+        frequency: params.frequency,
+      })
+      .select()
+      .single();
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ title: 'Chore added', description: params.name });
+      return;
     }
+    if (data) {
+      const chore = data as Chore;
+      setChores((prev) => (prev.some((c) => c.id === chore.id) ? prev : [...prev, chore]));
+    }
+    toast({ title: 'Chore added', description: params.name });
   };
 
   const logCompletion = async (chore_id: string) => {
@@ -285,13 +297,23 @@ export const useChores = (selectedYear: number) => {
   };
 
   const deleteChore = async (chore_id: string) => {
+    const prev = chores;
+    setChores((cs) => cs.filter((c) => c.id !== chore_id));
     const { error } = await supabase.from('chores').delete().eq('id', chore_id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) {
+      setChores(prev);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
   };
 
   const deleteCategory = async (category_id: string) => {
+    const prev = categories;
+    setCategories((cs) => cs.filter((c) => c.id !== category_id));
     const { error } = await supabase.from('chore_categories').delete().eq('id', category_id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) {
+      setCategories(prev);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
   };
 
   return {
