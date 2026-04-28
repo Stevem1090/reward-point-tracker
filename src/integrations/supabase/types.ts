@@ -112,6 +112,103 @@ export type Database = {
           },
         ]
       }
+      chore_categories: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chore_completions: {
+        Row: {
+          chore_id: string
+          completed_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          chore_id: string
+          completed_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          chore_id?: string
+          completed_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chore_completions_chore_id_fkey"
+            columns: ["chore_id"]
+            isOneToOne: false
+            referencedRelation: "chores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chores: {
+        Row: {
+          archived: boolean
+          category_id: string
+          completed_at: string | null
+          created_at: string
+          frequency: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          archived?: boolean
+          category_id: string
+          completed_at?: string | null
+          created_at?: string
+          frequency: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          archived?: boolean
+          category_id?: string
+          completed_at?: string | null
+          created_at?: string
+          frequency?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chores_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "chore_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cron_job_log: {
         Row: {
           id: number
