@@ -297,13 +297,23 @@ export const useChores = (selectedYear: number) => {
   };
 
   const deleteChore = async (chore_id: string) => {
+    const prev = chores;
+    setChores((cs) => cs.filter((c) => c.id !== chore_id));
     const { error } = await supabase.from('chores').delete().eq('id', chore_id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) {
+      setChores(prev);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
   };
 
   const deleteCategory = async (category_id: string) => {
+    const prev = categories;
+    setCategories((cs) => cs.filter((c) => c.id !== category_id));
     const { error } = await supabase.from('chore_categories').delete().eq('id', category_id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) {
+      setCategories(prev);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
   };
 
   return {
