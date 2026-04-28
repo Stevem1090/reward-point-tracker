@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { RecipeCard, Ingredient } from '@/types/meal';
-import { Clock, Users, ExternalLink, Printer, AlertCircle, Flame } from 'lucide-react';
+import { Clock, Users, ExternalLink, Printer, AlertCircle, Flame, Loader2, RefreshCw } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,33 +38,46 @@ export function RecipeCardDialog({
   const [localCalories, setLocalCalories] = useState<number | null>(
     recipeCard.estimated_calories_per_serving ?? null
   );
+  const [calorieStatus, setCalorieStatus] = useState<'idle' | 'loading' | 'rate_limited' | 'credits_exhausted' | 'error'>('idle');
 
   useEffect(() => {
     setLocalCalories(recipeCard.estimated_calories_per_serving ?? null);
+    setCalorieStatus('idle');
   }, [recipeCard.id, recipeCard.estimated_calories_per_serving]);
 
+  const isSyntheticPreview = recipeCard.meal_id === recipeCard.id;
+  const canEstimate =
+    !isSyntheticPreview &&
+    recipeCard.ingredients?.length > 0 &&
+    recipeCard.id;
+
+  const runEstimate = async () => {
+    if (!canEstimate) return;
+    setCalorieStatus('loading');
+    const result = await estimateCaloriesForRecipeCard({
+      recipeCardId: recipeCard.id,
+      ingredients: recipeCard.ingredients,
+      servings: recipeCard.base_servings,
+      mealName: recipeCard.meal_name,
+    });
+    if (result.status === 'ok') {
+      setLocalCalories(result.calories);
+      setCalorieStatus('idle');
+      queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+    } else if (result.status === 'rate_limited') {
+      setCalorieStatus('rate_limited');
+    } else if (result.status === 'credits_exhausted') {
+      setCalorieStatus('credits_exhausted');
+    } else {
+      setCalorieStatus('error');
+    }
+  };
+
   // Lazy backfill: when dialog opens for a card with ingredients but no calorie
-  // estimate yet, trigger one (fire-and-forget). Skipped for library previews
-  // where meal_id === id (synthetic recipe cards constructed from saved recipes).
+  // estimate yet, trigger one. Skipped for library previews (synthetic recipe cards).
   useEffect(() => {
-    const isSyntheticPreview = recipeCard.meal_id === recipeCard.id;
-    if (
-      open &&
-      !isSyntheticPreview &&
-      !recipeCard.estimated_calories_per_serving &&
-      recipeCard.ingredients?.length > 0
-    ) {
-      estimateCaloriesForRecipeCard({
-        recipeCardId: recipeCard.id,
-        ingredients: recipeCard.ingredients,
-        servings: recipeCard.base_servings,
-        mealName: recipeCard.meal_name,
-      }).then((cals) => {
-        if (cals) {
-          setLocalCalories(cals);
-          queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
-        }
-      });
+    if (open && canEstimate && !recipeCard.estimated_calories_per_serving) {
+      runEstimate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, recipeCard.id]);
@@ -135,6 +148,40 @@ export function RecipeCardDialog({
               <Badge variant="secondary" className="flex items-center gap-1">
                 <Flame className="h-3 w-3 text-orange-500" />
                 ~{localCalories} kcal / serving
+              </Badge>
+            ) : calorieStatus === 'loading' ? (
+              <Badge variant="secondary" className="flex items-center gap-1 text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Estimating calories…
+              </Badge>
+            ) : calorieStatus === 'rate_limited' ? (
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-muted-foreground cursor-pointer"
+                title="AI rate limit reached. Try again shortly."
+                onClick={runEstimate}
+              >
+                <RefreshCw className="h-3 w-3" />
+                Calories rate-limited
+              </Badge>
+            ) : calorieStatus === 'credits_exhausted' ? (
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-muted-foreground"
+                title="AI credits exhausted."
+              >
+                <AlertCircle className="h-3 w-3" />
+                Calories unavailable
+              </Badge>
+            ) : calorieStatus === 'error' ? (
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-muted-foreground cursor-pointer"
+                title="Calorie estimate failed. Tap to retry."
+                onClick={runEstimate}
+              >
+                <RefreshCw className="h-3 w-3" />
+                Retry calories
               </Badge>
             ) : null}
             {recipeUrl && (

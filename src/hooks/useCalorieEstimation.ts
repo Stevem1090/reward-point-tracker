@@ -8,21 +8,31 @@ interface EstimateParams {
   mealName: string;
 }
 
+export type CalorieEstimateResult =
+  | { status: 'ok'; calories: number }
+  | { status: 'rate_limited' }
+  | { status: 'credits_exhausted' }
+  | { status: 'no_ingredients' }
+  | { status: 'unauthenticated' }
+  | { status: 'error'; message?: string };
+
 /**
- * Fire-and-forget calorie estimation for a recipe card.
- * Updates the recipe_cards row server-side. Failures are non-fatal.
+ * Calorie estimation for a recipe card. Persists server-side on success.
+ * Returns a structured result so the UI can show appropriate feedback.
  */
 export async function estimateCaloriesForRecipeCard({
   recipeCardId,
   ingredients,
   servings,
   mealName,
-}: EstimateParams): Promise<number | null> {
-  if (!ingredients || ingredients.length === 0) return null;
+}: EstimateParams): Promise<CalorieEstimateResult> {
+  if (!ingredients || ingredients.length === 0) {
+    return { status: 'no_ingredients' };
+  }
 
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return null;
+    if (!session) return { status: 'unauthenticated' };
 
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/estimate-calories`,
@@ -41,15 +51,21 @@ export async function estimateCaloriesForRecipeCard({
       }
     );
 
+    if (response.status === 429) return { status: 'rate_limited' };
+    if (response.status === 402) return { status: 'credits_exhausted' };
+
     if (!response.ok) {
       console.warn('Calorie estimation failed:', response.status);
-      return null;
+      return { status: 'error', message: `HTTP ${response.status}` };
     }
 
     const { calories_per_serving } = await response.json();
-    return calories_per_serving || null;
+    if (typeof calories_per_serving === 'number' && calories_per_serving > 0) {
+      return { status: 'ok', calories: calories_per_serving };
+    }
+    return { status: 'error', message: 'No calorie value returned' };
   } catch (err) {
     console.warn('Calorie estimation error:', err);
-    return null;
+    return { status: 'error', message: err instanceof Error ? err.message : 'Unknown error' };
   }
 }

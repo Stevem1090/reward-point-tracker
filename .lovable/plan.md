@@ -1,47 +1,51 @@
-# Fix: Chore changes don't appear until page refresh
+# Harden Calorie Estimation
 
-## Root cause
+## Problem
 
-Two issues compound each other:
+Calorie estimation occasionally fails to populate when opening a recipe card. Edge function logs confirm the root cause: **transient 502 "Bad gateway" errors from the Lovable AI Gateway (Cloudflare upstream)**. When this happens, no value is saved, the badge is missing, and the user has no feedback. It only re-attempts the next time the dialog is opened.
 
-1. **Realtime is not enabled on the chore tables.** The hook `useChores.ts` subscribes to `postgres_changes` for `chores`, `chore_categories`, and `chore_completions`, but none of these tables are included in the `supabase_realtime` publication. Verified directly against the database — the publication returns no rows for them. As a result the channel never fires, and the UI only updates when `fetchAll` runs (page mount/refresh or year change).
+## Changes
 
-2. **Mutations don't update local state.** `addCategory`, `addChore`, `deleteChore`, and `deleteCategory` write to Supabase but never touch the local `categories` / `chores` arrays. They rely entirely on the (broken) realtime subscription to trigger a refetch. Even once realtime is fixed, there's a perceptible delay; if realtime ever drops, the UI silently desyncs.
+### 1. Edge function — retry transient failures (`supabase/functions/estimate-calories/index.ts`)
 
-`logCompletion` and `undoLastCompletionInPeriod` already do optimistic updates correctly — that's why completion logging feels instant while create/delete don't.
+Wrap the AI gateway `fetch` in a retry loop:
+- Up to 3 attempts total
+- Retry only on 502/503/504 and network errors (not 429/402/400)
+- Exponential backoff: 500ms, then 1500ms
+- Log each retry attempt for observability
 
-## Plan
+This alone should eliminate the vast majority of the failures you're seeing.
 
-### 1. Database migration — enable realtime
+### 2. Client — surface in-progress and failure states (`src/components/meals/RecipeCardDialog.tsx`)
 
-Add the three chore tables to the `supabase_realtime` publication and ensure full row data is published so DELETE payloads include identifiable fields:
+- Add a small "Estimating…" placeholder badge while the request is in flight, so the user knows something is happening
+- On failure (network error, 429, 402), show a subtle "Calories unavailable" badge with a tooltip explaining the reason — no scary red error
+- Add a small retry button on the failure badge so the user can manually re-trigger without closing/reopening the dialog
 
-```sql
-ALTER TABLE public.chores REPLICA IDENTITY FULL;
-ALTER TABLE public.chore_categories REPLICA IDENTITY FULL;
-ALTER TABLE public.chore_completions REPLICA IDENTITY FULL;
+### 3. Client hook — return structured result (`src/hooks/useCalorieEstimation.ts`)
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.chores;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.chore_categories;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.chore_completions;
+Currently returns `number | null`, swallowing the reason for failure. Change to return:
+```ts
+{ status: 'ok', calories: number }
+| { status: 'rate_limited' }
+| { status: 'credits_exhausted' }
+| { status: 'error', message?: string }
 ```
+So the dialog can render the right badge.
 
-(Wrapped with existence checks so the migration is idempotent.)
+### 4. (Optional) Background re-attempt on dialog mount
 
-### 2. Frontend — optimistic create/delete in `src/hooks/useChores.ts`
+If a previously failed estimate exists (no value, ingredients present), the existing logic already re-tries on next open. With retry + UX feedback above, this becomes reliable. No extra change needed unless we want a periodic background backfill — which I'd skip to keep AI usage low.
 
-Update mutations to mirror the pattern already used for completions:
+## Out of scope (call out, don't change)
 
-- **`addCategory`**: on successful insert, append the returned row to `categories` immediately (skip if an id-match already exists, so a racing realtime event doesn't duplicate).
-- **`addChore`**: switch to `.insert(...).select().single()` and append the new chore to local `chores` on success.
-- **`deleteChore`**: optimistically remove from local `chores` before the network call; restore on error.
-- **`deleteCategory`**: optimistically remove from local `categories` before the network call; restore on error.
+- **Library previews still won't show calories** (synthetic recipe cards where `meal_id === id`). This is intentional today. If you want calories there too, that's a separate piece of work — would need to either persist calories on the `recipes` table, or compute on the fly without persisting.
+- **No bulk pre-warming** of calories at meal-plan finalization time. Could be added later if you want all cards to have calories before the user ever opens them.
 
-The existing realtime handler (`debouncedRefetch`) stays as the reconciliation safety net once realtime starts firing — and `fetchAll` already de-dupes by replacing arrays wholesale, so optimistic + realtime won't conflict.
+## Files touched
 
-## Files
+- `supabase/functions/estimate-calories/index.ts` — add retry loop
+- `src/hooks/useCalorieEstimation.ts` — structured return type
+- `src/components/meals/RecipeCardDialog.tsx` — loading / error / retry UI
 
-- New migration (enables realtime on the three chore tables)
-- `src/hooks/useChores.ts` (optimistic state updates in 4 mutations)
-
-No UI component changes required.
+No DB migration needed.

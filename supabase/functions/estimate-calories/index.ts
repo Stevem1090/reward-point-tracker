@@ -64,64 +64,98 @@ ${ingredientsList}
 
 Estimate the calories per single serving. Be a sensible UK home-cooking average. Round to the nearest 10.`;
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          {
-            role: "system",
-            content: "You are a nutrition estimator. Given an ingredient list and serving count, return a realistic estimated calories per single serving as an integer. Be sensible and pragmatic — avoid extremes.",
-          },
-          { role: "user", content: prompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "estimate_calories",
-              description: "Return the estimated calories per single serving.",
-              parameters: {
-                type: "object",
-                properties: {
-                  calories_per_serving: {
-                    type: "number",
-                    description: "Estimated kcal per single serving, rounded to nearest 10.",
-                  },
-                  confidence: {
-                    type: "string",
-                    enum: ["low", "medium", "high"],
-                  },
+    const aiRequestBody = JSON.stringify({
+      model: "google/gemini-2.5-flash-lite",
+      messages: [
+        {
+          role: "system",
+          content: "You are a nutrition estimator. Given an ingredient list and serving count, return a realistic estimated calories per single serving as an integer. Be sensible and pragmatic — avoid extremes.",
+        },
+        { role: "user", content: prompt },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "estimate_calories",
+            description: "Return the estimated calories per single serving.",
+            parameters: {
+              type: "object",
+              properties: {
+                calories_per_serving: {
+                  type: "number",
+                  description: "Estimated kcal per single serving, rounded to nearest 10.",
                 },
-                required: ["calories_per_serving", "confidence"],
+                confidence: {
+                  type: "string",
+                  enum: ["low", "medium", "high"],
+                },
               },
+              required: ["calories_per_serving", "confidence"],
             },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "estimate_calories" } },
-      }),
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "estimate_calories" } },
     });
 
-    if (!aiResp.ok) {
-      if (aiResp.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Retry transient gateway failures (502/503/504, network errors).
+    // Do NOT retry 429 (rate limit) or 402 (credits) — those are terminal.
+    const RETRY_DELAYS_MS = [500, 1500];
+    let aiResp: Response | null = null;
+    let lastErr: unknown = null;
+
+    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+      try {
+        aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: aiRequestBody,
         });
+
+        if (aiResp.ok) break;
+
+        // Terminal statuses — don't retry
+        if (aiResp.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (aiResp.status === 402) {
+          return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
+            status: 402,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Retry only on 5xx
+        if (aiResp.status >= 500 && attempt < RETRY_DELAYS_MS.length) {
+          console.warn(`AI gateway ${aiResp.status} (attempt ${attempt + 1}), retrying in ${RETRY_DELAYS_MS[attempt]}ms`);
+          await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+          continue;
+        }
+
+        // Non-retryable or out of attempts
+        const t = await aiResp.text();
+        console.error("AI gateway error:", aiResp.status, t.slice(0, 500));
+        throw new Error(`AI gateway error: ${aiResp.status}`);
+      } catch (err) {
+        lastErr = err;
+        if (attempt < RETRY_DELAYS_MS.length) {
+          console.warn(`AI gateway network error (attempt ${attempt + 1}), retrying:`, err);
+          await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+          continue;
+        }
+        throw err;
       }
-      if (aiResp.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await aiResp.text();
-      console.error("AI gateway error:", aiResp.status, t);
-      throw new Error(`AI gateway error: ${aiResp.status}`);
+    }
+
+    if (!aiResp || !aiResp.ok) {
+      throw lastErr ?? new Error("AI gateway failed after retries");
     }
 
     const data = await aiResp.json();
