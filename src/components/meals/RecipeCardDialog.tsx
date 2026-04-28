@@ -38,33 +38,46 @@ export function RecipeCardDialog({
   const [localCalories, setLocalCalories] = useState<number | null>(
     recipeCard.estimated_calories_per_serving ?? null
   );
+  const [calorieStatus, setCalorieStatus] = useState<'idle' | 'loading' | 'rate_limited' | 'credits_exhausted' | 'error'>('idle');
 
   useEffect(() => {
     setLocalCalories(recipeCard.estimated_calories_per_serving ?? null);
+    setCalorieStatus('idle');
   }, [recipeCard.id, recipeCard.estimated_calories_per_serving]);
 
+  const isSyntheticPreview = recipeCard.meal_id === recipeCard.id;
+  const canEstimate =
+    !isSyntheticPreview &&
+    recipeCard.ingredients?.length > 0 &&
+    recipeCard.id;
+
+  const runEstimate = async () => {
+    if (!canEstimate) return;
+    setCalorieStatus('loading');
+    const result = await estimateCaloriesForRecipeCard({
+      recipeCardId: recipeCard.id,
+      ingredients: recipeCard.ingredients,
+      servings: recipeCard.base_servings,
+      mealName: recipeCard.meal_name,
+    });
+    if (result.status === 'ok') {
+      setLocalCalories(result.calories);
+      setCalorieStatus('idle');
+      queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+    } else if (result.status === 'rate_limited') {
+      setCalorieStatus('rate_limited');
+    } else if (result.status === 'credits_exhausted') {
+      setCalorieStatus('credits_exhausted');
+    } else {
+      setCalorieStatus('error');
+    }
+  };
+
   // Lazy backfill: when dialog opens for a card with ingredients but no calorie
-  // estimate yet, trigger one (fire-and-forget). Skipped for library previews
-  // where meal_id === id (synthetic recipe cards constructed from saved recipes).
+  // estimate yet, trigger one. Skipped for library previews (synthetic recipe cards).
   useEffect(() => {
-    const isSyntheticPreview = recipeCard.meal_id === recipeCard.id;
-    if (
-      open &&
-      !isSyntheticPreview &&
-      !recipeCard.estimated_calories_per_serving &&
-      recipeCard.ingredients?.length > 0
-    ) {
-      estimateCaloriesForRecipeCard({
-        recipeCardId: recipeCard.id,
-        ingredients: recipeCard.ingredients,
-        servings: recipeCard.base_servings,
-        mealName: recipeCard.meal_name,
-      }).then((cals) => {
-        if (cals) {
-          setLocalCalories(cals);
-          queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
-        }
-      });
+    if (open && canEstimate && !recipeCard.estimated_calories_per_serving) {
+      runEstimate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, recipeCard.id]);
