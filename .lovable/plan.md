@@ -1,52 +1,29 @@
-## Goal
+## Problem
 
-Make logging a chore completion feel instant and effortless on mobile by:
-1. Letting the user tap **anywhere on the grid** (not just the tiny current-week box) to log a completion
-2. Updating the UI **immediately** (optimistic) instead of waiting for the round-trip to Supabase
-3. Letting the user **long-press anywhere on the grid** to undo the most recent completion in the current period (e.g. mis-tap)
-4. Keeping the **trash icon** as the way to delete the entire chore
+The DB is saving correctly (verified — completions are persisting). The flicker is caused by client-side state reconciliation bugs in `useChores.ts`:
 
-## UX changes
+1. **Pending completions removed too early.** After insert succeeds, we drop the `temp-` row after 600ms. But `fetchAll` is debounced 300ms after the realtime event, AND the realtime event for the inserted row may arrive before the followup fetch completes — there's a window where the pending row is gone but the real row hasn't landed in `completions` yet → count drops, then comes back up.
 
-### ChoreCard
-- Keep the small trash button in the top-right for full chore deletion (with existing confirm pattern).
-- The whole grid becomes the interaction surface for logging/undoing the current period:
-  - **Tap (anywhere on grid)** → log a completion for the current period (week/month). Current box fills/increments instantly.
-  - **Long-press (~600ms, anywhere on grid)** → undo the most recent completion in the current period. If there are none, the long-press is a no-op (subtle haptic/none).
-  - **Right-click (desktop)** → same as long-press (undo last in current period).
-- Helper text updated to: "Tap the grid to log. Long-press to undo your last entry this {week|month}."
-- The current-period box keeps its highlight ring so the user still sees which box will fill.
-- Past/future boxes lose their individual click handlers — the whole grid handles the gesture.
+2. **`removedCompletionIds` never cleared.** After undo, we add the deleted row's ID to `removedCompletionIds`. The refetch returns a list that no longer contains that ID, but the Set still holds it forever. Not visually wrong yet, but it leaks and can hide a row if the same ID ever reappears.
 
-### Long-press behavior
-- Implemented via `pointerdown` timer (600ms) + cancel on `pointermove` (>10px), `pointerup`, `pointerleave`, or scroll.
-- A subtle scale/opacity press animation gives feedback that a long-press is in progress.
+3. **Year-window mismatch.** `fetchAll` only fetches completions for `selectedYear`. If the user logs while viewing a previous year (edge case), the real row never appears in `completions`, the temp is dropped, and the count permanently reverts.
 
-## Performance fix (the "lag")
+4. **Race on rapid taps.** Multiple taps in <600ms each schedule their own `setTimeout` to drop their temp row, while the debounced refetch coalesces. Counts can briefly desync.
 
-The current flow waits for Supabase insert → realtime broadcast → refetch all → re-render. That's why taps feel sluggish.
+## Fix
 
-### Optimistic updates in `useChores`
-- Add a local `pendingCompletions` state (array of `ChoreCompletion`-shaped objects with a temp `id` like `temp-${uuid}`) and a local `removedCompletionIds` set.
-- `logCompletion(chore_id)`:
-  1. Immediately push a temp completion `{ id: temp-uuid, chore_id, user_id, completed_at: new Date().toISOString() }` into local state.
-  2. Fire the Supabase insert in the background.
-  3. On success → remove the temp entry (the realtime/refetch will bring in the real one). On error → remove temp entry + toast.
-- `undoLastCompletionInPeriod` (used by long-press): immediately remove the latest matching completion (from either real or pending) from the rendered set; fire Supabase delete in background; restore on error.
-- The `grouped` memo merges `completions` + `pendingCompletions` minus `removedCompletionIds` so the grid + "X/Y done this week" badge update on the next render tick.
+Rewrite the reconciliation in `src/hooks/useChores.ts` so pending/removed state is cleared **based on what the server returns**, not on timers:
 
-### Reduce refetch overhead
-- Keep realtime subscription but debounce the realtime-triggered `fetchAll()` by ~300ms so a rapid tap doesn't fight the optimistic state.
+- **Keep pending until reconciled.** Don't `setTimeout` to remove `temp-` rows. Instead, after each `fetchAll` completes, drop any pending rows whose `(chore_id + completed_at within ~10s window)` now exists in the fetched `completions`. Fallback: drop pending older than 30s (covers the cross-year edge case so they don't accumulate).
+- **Clear `removedCompletionIds` on refetch.** After fetch, intersect the set with IDs still present in `completions` — IDs no longer present have been confirmed deleted and can be dropped from the set.
+- **Insert returns the row.** Use `.insert(...).select().single()` so we know the real ID immediately and can map temp → real in one step (more reliable than the time-window match).
+- **Single source of truth for "now".** Use the returned row's `completed_at` to replace the optimistic timestamp.
+- **Refetch immediately on own writes** (not debounced) so the user's own action reconciles fast; keep the 300ms debounce only for realtime events triggered by other tabs/devices.
 
-## Technical changes
+## Files
 
-**Files to edit:**
-- `src/components/chores/ChoreCard.tsx` — keep trash button; wrap `<ChoreGrid>` in a `<div>` with pointer handlers for tap (log) + long-press (undo current period).
-- `src/components/chores/ChoreGrid.tsx` — make individual boxes display-only (`<div>`s, no per-box click/contextmenu/disabled). Tooltips on hover can stay for desktop.
-- `src/hooks/useChores.ts` — add `pendingCompletions` + `removedCompletionIds`; merge into `grouped`; optimistic insert in `logCompletion` and optimistic delete in `undoLastCompletionInPeriod`; debounce realtime refetch.
+- `src/hooks/useChores.ts` — rewrite `logCompletion`, `undoLastCompletionInPeriod`, and `fetchAll` reconciliation logic as above. No UI/component changes needed.
 
-**No DB / schema / route changes.**
+## Expected result
 
-## Out of scope
-- Per-box editing of historical weeks (still display-only).
-- Changing the trash-icon delete-chore flow.
+Tap → count goes up instantly and stays up. Long-press → count goes down instantly and stays down. No revert/flicker after the network round-trip.
