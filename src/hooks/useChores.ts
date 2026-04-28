@@ -196,18 +196,26 @@ export const useChores = (selectedYear: number) => {
     };
     setPendingCompletions((prev) => [...prev, optimistic]);
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('chore_completions')
-      .insert({ chore_id, user_id: user.id });
+      .insert({ chore_id, user_id: user.id })
+      .select()
+      .single();
 
     if (error) {
       setPendingCompletions((prev) => prev.filter((c) => c.id !== tempId));
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      // Remove pending; realtime/refetch will bring real one shortly
-      setTimeout(() => {
-        setPendingCompletions((prev) => prev.filter((c) => c.id !== tempId));
-      }, 600);
+      return;
+    }
+
+    // Swap temp → real row immediately. Add the real row to completions
+    // and drop the temp in the same render so counts stay stable.
+    if (data) {
+      const real = data as ChoreCompletion;
+      setCompletions((prev) =>
+        prev.some((c) => c.id === real.id) ? prev : [...prev, real]
+      );
+      setPendingCompletions((prev) => prev.filter((c) => c.id !== tempId));
     }
   };
 
