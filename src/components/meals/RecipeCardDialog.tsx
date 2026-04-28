@@ -149,6 +149,40 @@ export function RecipeCardDialog({
                 <Flame className="h-3 w-3 text-orange-500" />
                 ~{localCalories} kcal / serving
               </Badge>
+            ) : calorieStatus === 'loading' ? (
+              <Badge variant="secondary" className="flex items-center gap-1 text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Estimating calories…
+              </Badge>
+            ) : calorieStatus === 'rate_limited' ? (
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-muted-foreground cursor-pointer"
+                title="AI rate limit reached. Try again shortly."
+                onClick={runEstimate}
+              >
+                <RefreshCw className="h-3 w-3" />
+                Calories rate-limited
+              </Badge>
+            ) : calorieStatus === 'credits_exhausted' ? (
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-muted-foreground"
+                title="AI credits exhausted."
+              >
+                <AlertCircle className="h-3 w-3" />
+                Calories unavailable
+              </Badge>
+            ) : calorieStatus === 'error' ? (
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-muted-foreground cursor-pointer"
+                title="Calorie estimate failed. Tap to retry."
+                onClick={runEstimate}
+              >
+                <RefreshCw className="h-3 w-3" />
+                Retry calories
+              </Badge>
             ) : null}
             {recipeUrl && (
               <a
