@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { RecipeCard, Ingredient } from '@/types/meal';
-import { Clock, Users, ExternalLink, Printer, AlertCircle, Flame } from 'lucide-react';
+import { Clock, Users, ExternalLink, Printer, AlertCircle, Flame, Loader2, RefreshCw } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
