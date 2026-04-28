@@ -125,8 +125,8 @@ export const AddChoreDialog: React.FC<AddChoreDialogProps> = ({ categories, onAd
             </RadioGroup>
           </div>
 
-          <Button className="w-full h-11" onClick={handleSubmit} disabled={!canSubmit}>
-            Add chore
+          <Button className="w-full h-11" onClick={handleSubmit} disabled={!canSubmit || submitting}>
+            {submitting ? 'Adding…' : 'Add chore'}
           </Button>
         </div>
       </DialogContent>
