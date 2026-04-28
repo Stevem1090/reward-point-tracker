@@ -22,10 +22,13 @@ export const AddChoreDialog: React.FC<AddChoreDialogProps> = ({ categories, onAd
   const [newCategory, setNewCategory] = useState('');
   const [creatingCategory, setCreatingCategory] = useState(false);
 
+  const isCreatingCategory = creatingCategory || categories.length === 0;
+
   const handleSubmit = async () => {
     if (!name.trim()) return;
     let catId = categoryId;
-    if (creatingCategory && newCategory.trim()) {
+    if (isCreatingCategory) {
+      if (!newCategory.trim()) return;
       const cat = await onAddCategory(newCategory.trim());
       if (!cat) return;
       catId = cat.id;
@@ -37,6 +40,9 @@ export const AddChoreDialog: React.FC<AddChoreDialogProps> = ({ categories, onAd
     setCreatingCategory(false);
     setOpen(false);
   };
+
+  const canSubmit =
+    !!name.trim() && (isCreatingCategory ? !!newCategory.trim() : !!categoryId);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -62,7 +68,7 @@ export const AddChoreDialog: React.FC<AddChoreDialogProps> = ({ categories, onAd
 
           <div className="space-y-1.5">
             <Label>Category</Label>
-            {categories.length > 0 && !creatingCategory ? (
+            {!isCreatingCategory ? (
               <>
                 <Select value={categoryId} onValueChange={setCategoryId}>
                   <SelectTrigger>
@@ -112,7 +118,7 @@ export const AddChoreDialog: React.FC<AddChoreDialogProps> = ({ categories, onAd
             </RadioGroup>
           </div>
 
-          <Button className="w-full h-11" onClick={handleSubmit} disabled={!name.trim()}>
+          <Button className="w-full h-11" onClick={handleSubmit} disabled={!canSubmit}>
             Add chore
           </Button>
         </div>
