@@ -74,7 +74,7 @@ export const ChoreGrid: React.FC<ChoreGridProps> = ({ frequency, year, completio
   return (
     <div
       className={cn(
-        'grid gap-[3px] w-full select-none',
+        'grid gap-[2px] w-full select-none',
         frequency === 'weekly' ? 'grid-cols-13' : 'grid-cols-12'
       )}
     >
@@ -90,12 +90,14 @@ export const ChoreGrid: React.FC<ChoreGridProps> = ({ frequency, year, completio
                 ? 'bg-kid-purple text-white'
                 : p.isFuture
                 ? 'bg-muted/40'
+                : p.isCurrent
+                ? 'bg-background'
                 : 'bg-muted',
-              p.isCurrent && !filled && 'ring-2 ring-kid-purple/50',
-              p.isCurrent && filled && 'ring-2 ring-kid-purple'
+              p.isCurrent && !filled && 'ring-2 ring-kid-purple/70',
+              p.isCurrent && filled && 'ring-2 ring-kid-purple ring-offset-1'
             )}
           >
-            {p.count > 1 ? p.count : ''}
+            {filled ? (p.count > 1 ? p.count : '✓') : ''}
           </div>
         );
       })}

@@ -21,24 +21,31 @@ export const AddChoreDialog: React.FC<AddChoreDialogProps> = ({ categories, onAd
   const [frequency, setFrequency] = useState<ChoreFrequency>('weekly');
   const [newCategory, setNewCategory] = useState('');
   const [creatingCategory, setCreatingCategory] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const isCreatingCategory = creatingCategory || categories.length === 0;
 
   const handleSubmit = async () => {
+    if (submitting) return;
     if (!name.trim()) return;
-    let catId = categoryId;
-    if (isCreatingCategory) {
-      if (!newCategory.trim()) return;
-      const cat = await onAddCategory(newCategory.trim());
-      if (!cat) return;
-      catId = cat.id;
+    setSubmitting(true);
+    try {
+      let catId = categoryId;
+      if (isCreatingCategory) {
+        if (!newCategory.trim()) return;
+        const cat = await onAddCategory(newCategory.trim());
+        if (!cat) return;
+        catId = cat.id;
+      }
+      if (!catId) return;
+      await onAddChore({ name: name.trim(), category_id: catId, frequency });
+      setName('');
+      setNewCategory('');
+      setCreatingCategory(false);
+      setOpen(false);
+    } finally {
+      setSubmitting(false);
     }
-    if (!catId) return;
-    await onAddChore({ name: name.trim(), category_id: catId, frequency });
-    setName('');
-    setNewCategory('');
-    setCreatingCategory(false);
-    setOpen(false);
   };
 
   const canSubmit =
@@ -118,8 +125,8 @@ export const AddChoreDialog: React.FC<AddChoreDialogProps> = ({ categories, onAd
             </RadioGroup>
           </div>
 
-          <Button className="w-full h-11" onClick={handleSubmit} disabled={!canSubmit}>
-            Add chore
+          <Button className="w-full h-11" onClick={handleSubmit} disabled={!canSubmit || submitting}>
+            {submitting ? 'Adding…' : 'Add chore'}
           </Button>
         </div>
       </DialogContent>

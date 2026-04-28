@@ -1,29 +1,58 @@
-## Problem
+## Chores tracker — UX & cleanup pass
 
-The DB is saving correctly (verified — completions are persisting). The flicker is caused by client-side state reconciliation bugs in `useChores.ts`:
+Five focused changes to address accidental taps, category management, density, and clarity.
 
-1. **Pending completions removed too early.** After insert succeeds, we drop the `temp-` row after 600ms. But `fetchAll` is debounced 300ms after the realtime event, AND the realtime event for the inserted row may arrive before the followup fetch completes — there's a window where the pending row is gone but the real row hasn't landed in `completions` yet → count drops, then comes back up.
+### 1. Replace single tap with double-tap (anti-scroll)
 
-2. **`removedCompletionIds` never cleared.** After undo, we add the deleted row's ID to `removedCompletionIds`. The refetch returns a list that no longer contains that ID, but the Set still holds it forever. Not visually wrong yet, but it leaks and can hide a row if the same ID ever reappears.
+In `ChoreCard.tsx`, swap the tap-to-log gesture for a **double-tap** (≤300ms between taps on the same grid). Long-press to undo stays at 600ms. Single tap does nothing — this prevents accidental logs while scrolling.
 
-3. **Year-window mismatch.** `fetchAll` only fetches completions for `selectedYear`. If the user logs while viewing a previous year (edge case), the real row never appears in `completions`, the temp is dropped, and the count permanently reverts.
+Update the helper text below the grid to: *"Double-tap to log. Long-press to undo this {week|month}."*
 
-4. **Race on rapid taps.** Multiple taps in <600ms each schedule their own `setTimeout` to drop their temp row, while the debounced refetch coalesces. Counts can briefly desync.
+We'll also cancel the long-press timer immediately on any pointer-move >10px (already in place) so scrolling never triggers undo either.
 
-## Fix
+### 2. Categories collapsed by default
 
-Rewrite the reconciliation in `src/hooks/useChores.ts` so pending/removed state is cleared **based on what the server returns**, not on timers:
+In `CategoryAccordion.tsx`, remove `defaultValue={data.map(d => d.category.id)}` so all categories start collapsed. The header badge ("`x/y` done this week") already gives an at-a-glance summary, so users can open only what needs attention.
 
-- **Keep pending until reconciled.** Don't `setTimeout` to remove `temp-` rows. Instead, after each `fetchAll` completes, drop any pending rows whose `(chore_id + completed_at within ~10s window)` now exists in the fetched `completions`. Fallback: drop pending older than 30s (covers the cross-year edge case so they don't accumulate).
-- **Clear `removedCompletionIds` on refetch.** After fetch, intersect the set with IDs still present in `completions` — IDs no longer present have been confirmed deleted and can be dropped from the set.
-- **Insert returns the row.** Use `.insert(...).select().single()` so we know the real ID immediately and can map temp → real in one step (more reliable than the time-window match).
-- **Single source of truth for "now".** Use the returned row's `completed_at` to replace the optimistic timestamp.
-- **Refetch immediately on own writes** (not debounced) so the user's own action reconciles fast; keep the 300ms debounce only for realtime events triggered by other tabs/devices.
+### 3. Category management — fix duplicates, allow delete, hide empties
 
-## Files
+**Add-chore duplicate fix (`AddChoreDialog.tsx`)**: the submit handler can fire twice if the button is double-tapped. Disable the button while in-flight (local `submitting` state) and guard `handleSubmit` with an early-return.
 
-- `src/hooks/useChores.ts` — rewrite `logCompletion`, `undoLastCompletionInPeriod`, and `fetchAll` reconciliation logic as above. No UI/component changes needed.
+**Delete category**: `useChores` already exposes `deleteCategory` but it's not wired up. Add a small kebab/trash button on the category accordion header (next to the badge) that opens a confirm dialog. Deleting cascades only if empty; if chores exist, show a toast: *"Move or delete chores first."* (Check `chores.length === 0` client-side before calling.)
 
-## Expected result
+**Hide empty categories**: in `CategoryAccordion.tsx`, filter `data` to `chores.length > 0` by default. Add a small "Manage categories" link/button at the bottom of the page that opens a sheet listing **all** categories (including empty) with rename + delete actions. This keeps the main view clean without losing the ability to clean up empties.
 
-Tap → count goes up instantly and stays up. Long-press → count goes down instantly and stays down. No revert/flicker after the network round-trip.
+### 4. Tighter card UI for mobile density
+
+In `ChoreCard.tsx`:
+- Reduce `Card` padding from `p-3` to `p-2`.
+- Collapse the header row: put the chore name and frequency on one line (`name · weekly` in muted text), drop the separate frequency line.
+- Shrink the trash button from `h-11 w-11` to `h-8 w-8` (still ≥32px; the grid itself is the primary 44px target so this is fine).
+- Remove the helper text line under the grid (move it to a single tooltip/info icon at the page level, or show it once as a dismissible hint on first visit).
+- Reduce grid gap from `gap-[3px]` to `gap-[2px]` in `ChoreGrid.tsx` and tighten card vertical spacing (`space-y-2` → `space-y-1.5`).
+
+Estimated result: ~3–4 chores visible per mobile screen instead of 2.
+
+### 5. Clearer "done this week" indicator
+
+In `ChoreGrid.tsx`, the current week's cell already gets a ring, but it's subtle. Strengthen it:
+- Current week (not yet done): `ring-2 ring-kid-purple/60` + `bg-background` (not muted) so it visually "pops" as the actionable cell.
+- Current week (done): keep filled purple, but add a small **white check mark** glyph (✓) inside instead of leaving it blank, and bump ring to `ring-2 ring-kid-purple ring-offset-1`.
+- Add a short "This week: ✓ Done" or "This week: Not yet" pill in the card header next to the chore name (driven by whether any completion falls in `getThisWeekBounds()`). This gives users an immediate textual answer without scanning the grid.
+
+For monthly chores, same treatment using current-month bounds and label "This month".
+
+### Files to edit
+
+- `src/components/chores/ChoreCard.tsx` — double-tap, tighter header, this-week pill, smaller trash btn
+- `src/components/chores/ChoreGrid.tsx` — tighter gaps, stronger current-period styling, check glyph
+- `src/components/chores/CategoryAccordion.tsx` — collapsed by default, hide empties, delete-category control
+- `src/components/chores/AddChoreDialog.tsx` — submit guard against double-fire
+- `src/pages/ChoresPage.tsx` — wire up `deleteCategory`, add "Manage categories" sheet for empty categories
+
+### Technical notes
+
+- Double-tap implementation: track `lastTapAt` ref; on `pointerup` (when not long-press), if `now - lastTapAt < 300`, fire `onLog` and reset; otherwise store `now`. No reliance on browser `dblclick` (unreliable on touch).
+- "This week" pill: derive from `chore.completions` + `getThisWeekBounds()` inside `ChoreCard` (cheap, already passed in).
+- Manage-categories sheet: simple list using existing `Sheet` UI primitive; calls `deleteCategory` on confirm. No new hook surface needed.
+- No DB migrations required.
