@@ -50,7 +50,36 @@ export const useChores = (selectedYear: number) => {
 
     if (catsRes.data) setCategories(catsRes.data as ChoreCategory[]);
     if (choresRes.data) setChores(choresRes.data as Chore[]);
-    if (compsRes.data) setCompletions(compsRes.data as ChoreCompletion[]);
+    if (compsRes.data) {
+      const fetched = compsRes.data as ChoreCompletion[];
+      const fetchedIds = new Set(fetched.map((c) => c.id));
+      setCompletions(fetched);
+
+      // Reconcile pending: drop temps whose real row has landed (match by chore_id + close timestamp),
+      // and drop any pending older than 30s as a safety net.
+      setPendingCompletions((prev) => {
+        const now = Date.now();
+        return prev.filter((p) => {
+          const pTime = new Date(p.completed_at).getTime();
+          if (now - pTime > 30000) return false;
+          const matched = fetched.some(
+            (f) =>
+              f.chore_id === p.chore_id &&
+              Math.abs(new Date(f.completed_at).getTime() - pTime) < 10000
+          );
+          return !matched;
+        });
+      });
+
+      // Drop removed-IDs that are no longer in the fetched set (server confirmed deletion).
+      setRemovedCompletionIds((prev) => {
+        const next = new Set<string>();
+        prev.forEach((id) => {
+          if (fetchedIds.has(id)) next.add(id);
+        });
+        return next;
+      });
+    }
 
     const currentYear = new Date().getFullYear();
     const earliest = allCompYearsRes.data?.[0]?.completed_at
