@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Menu, Award, Receipt, UtensilsCrossed, ListChecks } from 'lucide-react';
+import { Menu, Award, Receipt, UtensilsCrossed, ListChecks, Scale } from 'lucide-react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
