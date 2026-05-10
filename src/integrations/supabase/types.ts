@@ -410,6 +410,12 @@ export type Database = {
           sort_order: number
           source_type: string
           status: string
+          sw_healthy_extra_amount: number | null
+          sw_healthy_extra_type:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          sw_is_speed: boolean | null
+          sw_swips: number | null
           updated_at: string
         }
         Insert: {
@@ -428,6 +434,12 @@ export type Database = {
           sort_order?: number
           source_type?: string
           status?: string
+          sw_healthy_extra_amount?: number | null
+          sw_healthy_extra_type?:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          sw_is_speed?: boolean | null
+          sw_swips?: number | null
           updated_at?: string
         }
         Update: {
@@ -446,6 +458,12 @@ export type Database = {
           sort_order?: number
           source_type?: string
           status?: string
+          sw_healthy_extra_amount?: number | null
+          sw_healthy_extra_type?:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          sw_is_speed?: boolean | null
+          sw_swips?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -585,6 +603,12 @@ export type Database = {
           servings: number
           source_type: string
           steps: Json
+          sw_healthy_extra_amount: number | null
+          sw_healthy_extra_type:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          sw_is_speed: boolean | null
+          sw_swips: number | null
           updated_at: string
           user_id: string
         }
@@ -601,6 +625,12 @@ export type Database = {
           servings?: number
           source_type: string
           steps?: Json
+          sw_healthy_extra_amount?: number | null
+          sw_healthy_extra_type?:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          sw_is_speed?: boolean | null
+          sw_swips?: number | null
           updated_at?: string
           user_id: string
         }
@@ -617,6 +647,12 @@ export type Database = {
           servings?: number
           source_type?: string
           steps?: Json
+          sw_healthy_extra_amount?: number | null
+          sw_healthy_extra_type?:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          sw_is_speed?: boolean | null
+          sw_swips?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -792,6 +828,199 @@ export type Database = {
           },
         ]
       }
+      sw_foods: {
+        Row: {
+          created_at: string
+          healthy_extra_amount: number
+          healthy_extra_type:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          id: string
+          is_free: boolean
+          is_speed: boolean
+          name: string
+          swips: number
+          updated_at: string
+          user_id: string
+          weight: string | null
+        }
+        Insert: {
+          created_at?: string
+          healthy_extra_amount?: number
+          healthy_extra_type?:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          id?: string
+          is_free?: boolean
+          is_speed?: boolean
+          name: string
+          swips?: number
+          updated_at?: string
+          user_id: string
+          weight?: string | null
+        }
+        Update: {
+          created_at?: string
+          healthy_extra_amount?: number
+          healthy_extra_type?:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          id?: string
+          is_free?: boolean
+          is_speed?: boolean
+          name?: string
+          swips?: number
+          updated_at?: string
+          user_id?: string
+          weight?: string | null
+        }
+        Relationships: []
+      }
+      sw_log_entries: {
+        Row: {
+          created_at: string
+          entry_type: string
+          food_id: string | null
+          healthy_extra_amount_snapshot: number
+          healthy_extra_type_snapshot:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          id: string
+          is_speed_snapshot: boolean
+          log_date: string
+          meal_id: string | null
+          name_snapshot: string
+          quantity: number
+          recipe_id: string | null
+          swips_snapshot: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entry_type: string
+          food_id?: string | null
+          healthy_extra_amount_snapshot?: number
+          healthy_extra_type_snapshot?:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          id?: string
+          is_speed_snapshot?: boolean
+          log_date?: string
+          meal_id?: string | null
+          name_snapshot: string
+          quantity?: number
+          recipe_id?: string | null
+          swips_snapshot?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entry_type?: string
+          food_id?: string | null
+          healthy_extra_amount_snapshot?: number
+          healthy_extra_type_snapshot?:
+            | Database["public"]["Enums"]["sw_healthy_extra_type"]
+            | null
+          id?: string
+          is_speed_snapshot?: boolean
+          log_date?: string
+          meal_id?: string | null
+          name_snapshot?: string
+          quantity?: number
+          recipe_id?: string | null
+          swips_snapshot?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sw_log_entries_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "sw_foods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sw_log_entries_meal_id_fkey"
+            columns: ["meal_id"]
+            isOneToOne: false
+            referencedRelation: "sw_meals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sw_log_entries_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sw_meal_items: {
+        Row: {
+          created_at: string
+          food_id: string
+          id: string
+          meal_id: string
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          food_id: string
+          id?: string
+          meal_id: string
+          quantity?: number
+        }
+        Update: {
+          created_at?: string
+          food_id?: string
+          id?: string
+          meal_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sw_meal_items_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "sw_foods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sw_meal_items_meal_id_fkey"
+            columns: ["meal_id"]
+            isOneToOne: false
+            referencedRelation: "sw_meals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sw_meals: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           color: string | null
@@ -882,7 +1111,7 @@ export type Database = {
       send_scheduled_emails: { Args: never; Returns: undefined }
     }
     Enums: {
-      [_ in never]: never
+      sw_healthy_extra_type: "calcium" | "fibre" | "healthy_fats"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1009,6 +1238,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      sw_healthy_extra_type: ["calcium", "fibre", "healthy_fats"],
+    },
   },
 } as const

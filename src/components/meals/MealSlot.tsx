@@ -30,6 +30,9 @@ import {
 } from '@/components/ui/popover';
 import { SwapMealDialog } from './SwapMealDialog';
 import { RecipeCardDialog } from './RecipeCardDialog';
+import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
+import { HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
+import { Scale } from 'lucide-react';
 
 interface MealSlotProps {
   day: DayOfWeek;
@@ -47,6 +50,27 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
   const [editedUrl, setEditedUrl] = useState('');
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
   const [isRecipeCardOpen, setIsRecipeCardOpen] = useState(false);
+  const swLog = useSwLog(getWeekStartMonday(new Date()));
+  const swSwips = (meal as any)?.sw_swips;
+  const swHe = (meal as any)?.sw_healthy_extra_type;
+  const swHeAmt = (meal as any)?.sw_healthy_extra_amount;
+  const swSpeed = (meal as any)?.sw_is_speed;
+  const hasSw = swSwips != null || swHe;
+  const handleLogToSw = () => {
+    if (!meal) return;
+    swLog.addEntry.mutate({
+      log_date: formatDate(new Date()),
+      entry_type: 'recipe',
+      recipe: {
+        id: meal.recipe_id || meal.id,
+        name: meal.meal_name,
+        sw_swips: swSwips,
+        sw_healthy_extra_type: swHe,
+        sw_healthy_extra_amount: swHeAmt,
+        sw_is_speed: swSpeed,
+      },
+    });
+  };
   
   // Rejection reason dialog state
   const [isRejectReasonOpen, setIsRejectReasonOpen] = useState(false);
@@ -527,6 +551,26 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                       <BookOpen className="h-3 w-3" />
                       Library Recipe
                     </Badge>
+                  )}
+                  {hasSw && (
+                    <>
+                      {swSwips != null && (
+                        <Badge className="text-xs bg-purple-100 text-purple-800 border-purple-200">
+                          {swSwips} Swips
+                        </Badge>
+                      )}
+                      {swHe && (
+                        <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+                          HE {HEALTHY_EXTRA_LABELS[swHe as keyof typeof HEALTHY_EXTRA_LABELS]} {swHeAmt ?? 1}
+                        </Badge>
+                      )}
+                      {swSpeed && (
+                        <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-200">Speed</Badge>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={handleLogToSw}>
+                        <Scale className="h-3 w-3 mr-1" /> Log to SW
+                      </Button>
+                    </>
                   )}
                 </div>
 

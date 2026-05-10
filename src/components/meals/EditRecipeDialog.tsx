@@ -13,6 +13,9 @@ import { StepsEditor } from './StepsEditor';
 import { optimizeImage } from '@/utils/imageOptimization';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { HealthyExtraType, HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
 
 interface EditRecipeDialogProps {
   open: boolean;
@@ -35,6 +38,10 @@ export function EditRecipeDialog({ open, onOpenChange, recipe }: EditRecipeDialo
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [swSwips, setSwSwips] = useState<string>(((recipe as any).sw_swips ?? '').toString());
+  const [swHeType, setSwHeType] = useState<HealthyExtraType | 'none'>(((recipe as any).sw_healthy_extra_type ?? 'none'));
+  const [swHeAmount, setSwHeAmount] = useState<string>(((recipe as any).sw_healthy_extra_amount ?? '').toString());
+  const [swIsSpeed, setSwIsSpeed] = useState<boolean>(!!(recipe as any).sw_is_speed);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -143,7 +150,11 @@ export function EditRecipeDialog({ open, onOpenChange, recipe }: EditRecipeDialo
         ingredients,
         steps,
         image_url: finalImageUrl || null,
-      });
+        sw_swips: swSwips === '' ? null : Number(swSwips),
+        sw_healthy_extra_type: swHeType === 'none' ? null : swHeType,
+        sw_healthy_extra_amount: swHeType === 'none' ? null : (swHeAmount === '' ? null : Number(swHeAmount)),
+        sw_is_speed: swIsSpeed,
+      } as any);
       
       onOpenChange(false);
     } catch (error) {
@@ -280,6 +291,41 @@ export function EditRecipeDialog({ open, onOpenChange, recipe }: EditRecipeDialo
                 steps={steps}
                 onChange={setSteps}
               />
+            </div>
+
+            {/* Slimming World (optional) */}
+            <div className="space-y-3 border rounded-md p-3 bg-muted/30">
+              <Label className="text-base">Slimming World (optional)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Swips per serving</Label>
+                  <Input type="number" step="0.1" inputMode="decimal" value={swSwips} onChange={(e) => setSwSwips(e.target.value)} placeholder="0" />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={swIsSpeed} onCheckedChange={(v) => setSwIsSpeed(!!v)} />
+                    <span className="text-sm">Speed</span>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Healthy Extra</Label>
+                <Select value={swHeType} onValueChange={(v) => setSwHeType(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="calcium">{HEALTHY_EXTRA_LABELS.calcium}</SelectItem>
+                    <SelectItem value="fibre">{HEALTHY_EXTRA_LABELS.fibre}</SelectItem>
+                    <SelectItem value="healthy_fats">{HEALTHY_EXTRA_LABELS.healthy_fats}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {swHeType !== 'none' && (
+                <div>
+                  <Label className="text-xs">HE amount per serving</Label>
+                  <Input type="number" step="0.1" min="0" inputMode="decimal" value={swHeAmount} onChange={(e) => setSwHeAmount(e.target.value)} placeholder="1.0" />
+                </div>
+              )}
             </div>
           </div>
         </ScrollArea>
