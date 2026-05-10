@@ -50,6 +50,27 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
   const [editedUrl, setEditedUrl] = useState('');
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
   const [isRecipeCardOpen, setIsRecipeCardOpen] = useState(false);
+  const swLog = useSwLog(getWeekStartMonday(new Date()));
+  const swSwips = (meal as any)?.sw_swips;
+  const swHe = (meal as any)?.sw_healthy_extra_type;
+  const swHeAmt = (meal as any)?.sw_healthy_extra_amount;
+  const swSpeed = (meal as any)?.sw_is_speed;
+  const hasSw = swSwips != null || swHe;
+  const handleLogToSw = () => {
+    if (!meal) return;
+    swLog.addEntry.mutate({
+      log_date: formatDate(new Date()),
+      entry_type: 'recipe',
+      recipe: {
+        id: meal.recipe_id || meal.id,
+        name: meal.meal_name,
+        sw_swips: swSwips,
+        sw_healthy_extra_type: swHe,
+        sw_healthy_extra_amount: swHeAmt,
+        sw_is_speed: swSpeed,
+      },
+    });
+  };
   
   // Rejection reason dialog state
   const [isRejectReasonOpen, setIsRejectReasonOpen] = useState(false);
