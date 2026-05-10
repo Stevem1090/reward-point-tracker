@@ -15,6 +15,7 @@ import ProfilePage from "./pages/ProfilePage";
 import BillsPage from "./pages/BillsPage";
 import MealPlanningPage from "./pages/MealPlanningPage";
 import ChoresPage from "./pages/ChoresPage";
+import SlimmingWorldPage from "./pages/SlimmingWorldPage";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
