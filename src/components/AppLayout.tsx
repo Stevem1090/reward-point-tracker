@@ -24,6 +24,7 @@ const menuLinks: MenuLink[] = [
   { name: 'Bills', path: '/bills', icon: <Receipt className="h-5 w-5" /> },
   { name: 'Meals', path: '/meals', icon: <UtensilsCrossed className="h-5 w-5" /> },
   { name: 'Chores', path: '/chores', icon: <ListChecks className="h-5 w-5" /> },
+  { name: 'Slimming World', path: '/slimming-world', icon: <Scale className="h-5 w-5" /> },
 ];
 
 const AppLayout = () => {
