@@ -30,6 +30,9 @@ import {
 } from '@/components/ui/popover';
 import { SwapMealDialog } from './SwapMealDialog';
 import { RecipeCardDialog } from './RecipeCardDialog';
+import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
+import { HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
+import { Scale } from 'lucide-react';
 
 interface MealSlotProps {
   day: DayOfWeek;
