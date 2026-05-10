@@ -292,6 +292,41 @@ export function EditRecipeDialog({ open, onOpenChange, recipe }: EditRecipeDialo
                 onChange={setSteps}
               />
             </div>
+
+            {/* Slimming World (optional) */}
+            <div className="space-y-3 border rounded-md p-3 bg-muted/30">
+              <Label className="text-base">Slimming World (optional)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Swips per serving</Label>
+                  <Input type="number" step="0.1" inputMode="decimal" value={swSwips} onChange={(e) => setSwSwips(e.target.value)} placeholder="0" />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={swIsSpeed} onCheckedChange={(v) => setSwIsSpeed(!!v)} />
+                    <span className="text-sm">Speed</span>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Healthy Extra</Label>
+                <Select value={swHeType} onValueChange={(v) => setSwHeType(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="calcium">{HEALTHY_EXTRA_LABELS.calcium}</SelectItem>
+                    <SelectItem value="fibre">{HEALTHY_EXTRA_LABELS.fibre}</SelectItem>
+                    <SelectItem value="healthy_fats">{HEALTHY_EXTRA_LABELS.healthy_fats}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {swHeType !== 'none' && (
+                <div>
+                  <Label className="text-xs">HE amount per serving</Label>
+                  <Input type="number" step="0.1" min="0" inputMode="decimal" value={swHeAmount} onChange={(e) => setSwHeAmount(e.target.value)} placeholder="1.0" />
+                </div>
+              )}
+            </div>
           </div>
         </ScrollArea>
         
