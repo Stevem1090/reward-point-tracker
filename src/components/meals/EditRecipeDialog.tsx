@@ -13,6 +13,9 @@ import { StepsEditor } from './StepsEditor';
 import { optimizeImage } from '@/utils/imageOptimization';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { HealthyExtraType, HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
 
 interface EditRecipeDialogProps {
   open: boolean;
