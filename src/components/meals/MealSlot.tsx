@@ -552,6 +552,26 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                       Library Recipe
                     </Badge>
                   )}
+                  {hasSw && (
+                    <>
+                      {swSwips != null && (
+                        <Badge className="text-xs bg-purple-100 text-purple-800 border-purple-200">
+                          {swSwips} Swips
+                        </Badge>
+                      )}
+                      {swHe && (
+                        <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+                          HE {HEALTHY_EXTRA_LABELS[swHe as keyof typeof HEALTHY_EXTRA_LABELS]} {swHeAmt ?? 1}
+                        </Badge>
+                      )}
+                      {swSpeed && (
+                        <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-200">Speed</Badge>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={handleLogToSw}>
+                        <Scale className="h-3 w-3 mr-1" /> Log to SW
+                      </Button>
+                    </>
+                  )}
                 </div>
 
                 {/* Inline Recipe URL Input - visible before finalisation when no URL and no library recipe */}
