@@ -38,6 +38,10 @@ export function EditRecipeDialog({ open, onOpenChange, recipe }: EditRecipeDialo
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [swSwips, setSwSwips] = useState<string>(((recipe as any).sw_swips ?? '').toString());
+  const [swHeType, setSwHeType] = useState<HealthyExtraType | 'none'>(((recipe as any).sw_healthy_extra_type ?? 'none'));
+  const [swHeAmount, setSwHeAmount] = useState<string>(((recipe as any).sw_healthy_extra_amount ?? '').toString());
+  const [swIsSpeed, setSwIsSpeed] = useState<boolean>(!!(recipe as any).sw_is_speed);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
