@@ -150,7 +150,11 @@ export function EditRecipeDialog({ open, onOpenChange, recipe }: EditRecipeDialo
         ingredients,
         steps,
         image_url: finalImageUrl || null,
-      });
+        sw_swips: swSwips === '' ? null : Number(swSwips),
+        sw_healthy_extra_type: swHeType === 'none' ? null : swHeType,
+        sw_healthy_extra_amount: swHeType === 'none' ? null : (swHeAmount === '' ? null : Number(swHeAmount)),
+        sw_is_speed: swIsSpeed,
+      } as any);
       
       onOpenChange(false);
     } catch (error) {
