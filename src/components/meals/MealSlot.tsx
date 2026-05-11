@@ -53,7 +53,10 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
   const [editedUrl, setEditedUrl] = useState('');
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
   const [isRecipeCardOpen, setIsRecipeCardOpen] = useState(false);
+  const [fetchedRecipeCard, setFetchedRecipeCard] = useState<RecipeCardType | null>(null);
+  const [isLoadingRecipe, setIsLoadingRecipe] = useState(false);
   const swLog = useSwLog(getWeekStartMonday(new Date()));
+  const { data: recipeStats } = useRecipeStats(meal?.recipe_id ?? null);
   const swSwips = (meal as any)?.sw_swips;
   const swHe = (meal as any)?.sw_healthy_extra_type;
   const swHeAmt = (meal as any)?.sw_healthy_extra_amount;
@@ -73,6 +76,33 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
         sw_is_speed: swSpeed,
       },
     });
+  };
+
+  const handleOpenRecipe = async () => {
+    if (meal?.recipe_card) {
+      setIsRecipeCardOpen(true);
+      return;
+    }
+    if (meal?.recipe_id && !fetchedRecipeCard) {
+      setIsLoadingRecipe(true);
+      const { data } = await supabase.from('recipes').select('*').eq('id', meal.recipe_id).maybeSingle();
+      if (data) {
+        setFetchedRecipeCard({
+          id: data.id,
+          meal_id: meal.id,
+          meal_name: data.name,
+          image_url: data.image_url,
+          ingredients: (data.ingredients as unknown as Ingredient[]) || [],
+          steps: (data.steps as unknown as string[]) || [],
+          base_servings: data.servings,
+          html_content: null,
+          estimated_calories_per_serving: null,
+          created_at: data.created_at,
+        });
+      }
+      setIsLoadingRecipe(false);
+    }
+    setIsRecipeCardOpen(true);
   };
   
   // Rejection reason dialog state
