@@ -127,6 +127,14 @@ export function AddRecipeDialog({ open, onOpenChange, defaultTab = 'website' }: 
 
   const handleSaveToLibrary = async () => {
     if (!extractedRecipe) return;
+    if (!extractedRecipe.ingredients?.length || !extractedRecipe.steps?.length) {
+      toast.error("Recipe is missing ingredients or steps — can't save to library");
+      return;
+    }
+    if (!editedName.trim()) {
+      toast.error('Please enter a recipe name');
+      return;
+    }
 
     setDialogState('saving');
 
