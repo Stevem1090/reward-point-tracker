@@ -8,6 +8,8 @@ import { useSwFoods } from '@/hooks/useSwFoods';
 import { useSwMeals } from '@/hooks/useSwMeals';
 import { useSwLog } from '@/hooks/useSwLog';
 import { useRecipes } from '@/hooks/useRecipes';
+import { useMealPlans } from '@/hooks/useMealPlans';
+import { format } from 'date-fns';
 import { Plus } from 'lucide-react';
 
 interface Props {
@@ -22,7 +24,9 @@ export function AddEntryDialog({ open, onOpenChange, logDate, weekStart }: Props
   const { meals } = useSwMeals();
   const { recipes } = useRecipes();
   const { addEntry } = useSwLog(weekStart);
-  const [tab, setTab] = useState('food');
+  const { useMealPlanForWeek } = useMealPlans();
+  const { data: weekPlan } = useMealPlanForWeek(format(weekStart, 'yyyy-MM-dd'));
+  const [tab, setTab] = useState('plan');
   const [search, setSearch] = useState('');
   const [quantity, setQuantity] = useState('1');
 
@@ -30,6 +34,27 @@ export function AddEntryDialog({ open, onOpenChange, logDate, weekStart }: Props
     () => (recipes || []).filter((r: any) => r.sw_swips != null || r.sw_healthy_extra_type),
     [recipes]
   );
+
+  // Build plan items from this week's meals — joined with recipe SW info when available
+  const planItems = useMemo(() => {
+    const planMeals = weekPlan?.meals || [];
+    const recipeMap = new Map<string, any>((recipes || []).map((r: any) => [r.id, r]));
+    return planMeals
+      .filter((m: any) => m.meal_name)
+      .map((m: any) => {
+        const r = m.recipe_id ? recipeMap.get(m.recipe_id) : null;
+        return {
+          id: m.recipe_id || m.id,
+          name: m.meal_name,
+          day: m.day_of_week,
+          sw_swips: r?.sw_swips ?? null,
+          sw_healthy_extra_type: r?.sw_healthy_extra_type ?? null,
+          sw_healthy_extra_amount: r?.sw_healthy_extra_amount ?? null,
+          sw_is_speed: r?.sw_is_speed ?? null,
+          hasSw: !!r && (r.sw_swips != null || r.sw_healthy_extra_type),
+        };
+      });
+  }, [weekPlan, recipes]);
 
   const filteredFoods = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -45,6 +70,11 @@ export function AddEntryDialog({ open, onOpenChange, logDate, weekStart }: Props
     const q = search.toLowerCase().trim();
     return recipesWithSw.filter((r: any) => !q || r.name.toLowerCase().includes(q));
   }, [recipesWithSw, search]);
+
+  const filteredPlan = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return planItems.filter((p) => !q || p.name.toLowerCase().includes(q));
+  }, [planItems, search]);
 
   const handleAdd = async (kind: 'food' | 'meal' | 'recipe', payload: any) => {
     const qty = Number(quantity) || 1;
@@ -73,11 +103,33 @@ export function AddEntryDialog({ open, onOpenChange, logDate, weekStart }: Props
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-3 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
+            <TabsTrigger value="plan">This week</TabsTrigger>
+            <TabsTrigger value="recipe">Library</TabsTrigger>
             <TabsTrigger value="food">Foods</TabsTrigger>
             <TabsTrigger value="meal">Meals</TabsTrigger>
-            <TabsTrigger value="recipe">Recipes</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="plan" className="max-h-72 overflow-y-auto space-y-1">
+            {filteredPlan.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">No meals planned this week.</p>}
+            {filteredPlan.map((p) => (
+              <button
+                key={p.id + p.day}
+                type="button"
+                disabled={!p.hasSw}
+                onClick={() => p.hasSw && handleAdd('recipe', p)}
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center justify-between text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <div className="min-w-0">
+                  <div className="truncate">{p.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {p.day} · {p.hasSw ? `${p.sw_swips ?? 0} swips${p.sw_healthy_extra_type ? ` · HE ${p.sw_healthy_extra_type}` : ''}` : 'No SW info on recipe'}
+                  </div>
+                </div>
+                <Plus className="h-4 w-4 shrink-0" />
+              </button>
+            ))}
+          </TabsContent>
 
           <TabsContent value="food" className="max-h-72 overflow-y-auto space-y-1">
             {filteredFoods.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">No foods.</p>}

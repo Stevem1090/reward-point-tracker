@@ -64,9 +64,10 @@ You may receive family_preferences with learned likes/dislikes extracted from ra
 - These are stronger signals than individual ratings - respect them
 
 SAVED RECIPES (from family recipe library):
-You may receive saved_recipes - these are family favorites from their recipe library.
-- You MAY include 1-2 saved recipes per week (especially for weekend meals)
+You may receive saved_recipes - these are family favorites from their recipe library, with star ratings and cook counts.
+- STRONGLY PREFER these: aim to include 2–3 saved recipes per 7-day plan (more if highly rated)
 - When suggesting a saved recipe, use EXACTLY the name provided (case-sensitive match required)
+- Prioritise higher-rated and less-recently-cooked saved recipes
 - Saved recipes help reduce "cooking fatigue" - families love revisiting favorites
 - Only suggest saved recipes that fit the slot type (don't suggest complex recipes for weekday slots)
 
@@ -469,8 +470,12 @@ async function fetchSavedRecipes(supabase: ReturnType<typeof createClient>): Pro
           name: chosen.name,
           description: chosen.description || '',
           recipe_id: chosen.id,
-          cook_time: chosen.estimated_cook_minutes
-        });
+          cook_time: chosen.estimated_cook_minutes,
+          // @ts-ignore - extended for prompt context
+          avg_rating: chosen.avgRating || 0,
+          // @ts-ignore
+          times_eaten: chosen.useCount || 0,
+        } as any);
         console.log(`Selected recipe: ${chosen.name} (rating: ${chosen.avgRating.toFixed(1)}, weight: ${chosen.weight.toFixed(1)})`);
         break;
       }
@@ -576,8 +581,12 @@ serve(async (req) => {
       : '';
 
     const savedRecipesSection = savedRecipes.length > 0
-      ? `\nsaved_recipes (family favorites you can include 1-2 of, use EXACT names):\n${
-          savedRecipes.map(r => `- "${r.name}" (${r.cook_time || '?'} mins)`).join('\n')
+      ? `\nsaved_recipes (family library favorites — STRONGLY PREFER these; aim to include 2–3 per week using EXACT names; pick from highest-rated/least-recently-eaten first):\n${
+          savedRecipes.map((r: any) => {
+            const rating = r.avg_rating ? ` ★${Number(r.avg_rating).toFixed(1)}` : ' (unrated)';
+            const eaten = r.times_eaten ? ` · cooked ${r.times_eaten}×` : '';
+            return `- "${r.name}" (${r.cook_time || '?'} mins)${rating}${eaten}`;
+          }).join('\n')
         }\n`
       : '';
 

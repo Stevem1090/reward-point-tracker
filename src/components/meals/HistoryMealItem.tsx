@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, ChevronDown, ChevronUp, Star } from 'lucide-react';
+import { Clock, ChevronDown, ChevronUp, Star, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,8 @@ import { StarRating } from './StarRating';
 import { Meal, MealRating } from '@/types/meal';
 import { cn } from '@/lib/utils';
 import { useRecipeStats } from '@/hooks/useRecipeStats';
+import { useRecipes } from '@/hooks/useRecipes';
+import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
 
 interface HistoryMealItemProps {
   meal: Meal;
@@ -30,6 +32,21 @@ export function HistoryMealItem({ meal, rating, onRate, isRating }: HistoryMealI
   const [notes, setNotes] = useState(rating?.notes || '');
   const [pendingRating, setPendingRating] = useState<number | null>(null);
   const { data: recipeStats } = useRecipeStats(meal.recipe_id ?? null);
+  const { recipes } = useRecipes();
+  const today = new Date();
+  const { addEntry } = useSwLog(getWeekStartMonday(today));
+  const recipe = meal.recipe_id ? (recipes || []).find((r: any) => r.id === meal.recipe_id) : null;
+  const hasSw = recipe && ((recipe as any).sw_swips != null || (recipe as any).sw_healthy_extra_type);
+
+  const handleLogSw = () => {
+    if (!recipe) return;
+    addEntry.mutate({
+      log_date: formatDate(today),
+      entry_type: 'recipe',
+      recipe: recipe as any,
+      quantity: 1,
+    });
+  };
 
   const handleRatingChange = (newRating: number) => {
     if (newRating === 0) {
@@ -99,7 +116,19 @@ export function HistoryMealItem({ meal, rating, onRate, isRating }: HistoryMealI
 
         {/* Rating row: aligned right */}
         {meal.meal_name ? (
-          <div className="flex justify-end">
+          <div className="flex justify-end items-center gap-2">
+            {hasSw && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={handleLogSw}
+                disabled={addEntry.isPending}
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                Log to SW
+              </Button>
+            )}
             <StarRating
               rating={displayRating}
               onRatingChange={handleRatingChange}
