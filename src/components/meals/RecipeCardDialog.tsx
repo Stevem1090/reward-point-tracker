@@ -17,6 +17,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRecipeStats } from '@/hooks/useRecipeStats';
 import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
 import { HealthyExtraType, HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
+import { SwInfoDialog } from './SwInfoDialog';
+import { Plus, Pencil } from 'lucide-react';
 
 interface RecipeCardDialogProps {
   open: boolean;
@@ -32,6 +34,8 @@ interface RecipeCardDialogProps {
     sw_healthy_extra_amount: number | null;
     sw_is_speed: boolean | null;
   } | null;
+  /** Pass meal context to enable in-place SW editing (auto-creates a library recipe if needed). */
+  mealId?: string | null;
 }
 
 export function RecipeCardDialog({
@@ -43,14 +47,18 @@ export function RecipeCardDialog({
   estimatedCookMinutes,
   recipeId,
   recipeSwData,
+  mealId,
 }: RecipeCardDialogProps) {
   const queryClient = useQueryClient();
   const [localCalories, setLocalCalories] = useState<number | null>(
     recipeCard.estimated_calories_per_serving ?? null
   );
   const [calorieStatus, setCalorieStatus] = useState<'idle' | 'loading' | 'rate_limited' | 'credits_exhausted' | 'error'>('idle');
+  const [swDialogOpen, setSwDialogOpen] = useState(false);
   const { data: stats } = useRecipeStats(recipeId ?? null);
   const swLog = useSwLog(getWeekStartMonday(new Date()));
+
+  const hasSw = !!(recipeSwData && (recipeSwData.sw_swips != null || recipeSwData.sw_healthy_extra_type));
 
   const handleLogToSw = () => {
     if (!recipeId || !recipeSwData) return;
@@ -183,7 +191,7 @@ export function RecipeCardDialog({
                 Cooked {stats.timesEaten}×
               </Badge>
             )}
-            {recipeId && recipeSwData && (recipeSwData.sw_swips != null || recipeSwData.sw_healthy_extra_type) && (
+            {recipeId && hasSw && (
               <Button
                 size="sm"
                 variant="outline"
@@ -193,6 +201,17 @@ export function RecipeCardDialog({
               >
                 <Scale className="h-3 w-3" />
                 Log to SW
+              </Button>
+            )}
+            {mealId && (
+              <Button
+                size="sm"
+                variant={hasSw ? 'ghost' : 'outline'}
+                className="h-7 gap-1"
+                onClick={() => setSwDialogOpen(true)}
+              >
+                {hasSw ? <Pencil className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                {hasSw ? 'Edit SW info' : 'Add SW info'}
               </Button>
             )}
             {localCalories ? (
@@ -325,6 +344,27 @@ export function RecipeCardDialog({
           )}
         </ScrollArea>
       </DialogContent>
+
+      {mealId && (
+        <SwInfoDialog
+          open={swDialogOpen}
+          onOpenChange={setSwDialogOpen}
+          mealId={mealId}
+          recipeId={recipeId ?? null}
+          mealName={recipeCard.meal_name}
+          servings={recipeCard.base_servings}
+          estimatedCookMinutes={estimatedCookMinutes ?? null}
+          recipeUrl={recipeUrl ?? null}
+          ingredients={recipeCard.ingredients}
+          steps={recipeCard.steps}
+          imageUrl={recipeCard.image_url ?? null}
+          initial={recipeSwData ?? null}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+            queryClient.invalidateQueries({ queryKey: ['recipes'] });
+          }}
+        />
+      )}
     </Dialog>
   );
 }

@@ -873,6 +873,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
           recipeUrl={meal.recipe_url}
           estimatedCookMinutes={meal.estimated_cook_minutes}
           recipeId={meal.recipe_id}
+          mealId={meal.id}
           recipeSwData={hasSw ? {
             sw_swips: swSwips,
             sw_healthy_extra_type: swHe,
