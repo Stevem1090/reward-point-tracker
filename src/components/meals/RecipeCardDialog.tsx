@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { RecipeCard, Ingredient } from '@/types/meal';
-import { Clock, Users, ExternalLink, Printer, AlertCircle, Flame, Loader2, RefreshCw } from 'lucide-react';
+import { Clock, Users, ExternalLink, Printer, AlertCircle, Flame, Loader2, RefreshCw, Star, Scale } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,9 @@ import { scaleIngredients } from '@/utils/scaleIngredients';
 import { generateRecipeCardHtml, RecipeCardData } from '@/utils/generateRecipeCardHtml';
 import { estimateCaloriesForRecipeCard } from '@/hooks/useCalorieEstimation';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRecipeStats } from '@/hooks/useRecipeStats';
+import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
+import { HealthyExtraType, HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
 
 interface RecipeCardDialogProps {
   open: boolean;
@@ -22,6 +25,13 @@ interface RecipeCardDialogProps {
   currentServings: number;
   recipeUrl?: string | null;
   estimatedCookMinutes?: number | null;
+  recipeId?: string | null;
+  recipeSwData?: {
+    sw_swips: number | null;
+    sw_healthy_extra_type: HealthyExtraType | null;
+    sw_healthy_extra_amount: number | null;
+    sw_is_speed: boolean | null;
+  } | null;
 }
 
 export function RecipeCardDialog({
@@ -31,6 +41,8 @@ export function RecipeCardDialog({
   currentServings,
   recipeUrl,
   estimatedCookMinutes,
+  recipeId,
+  recipeSwData,
 }: RecipeCardDialogProps) {
   const queryClient = useQueryClient();
   // Local cache of estimated calories so we can show the result immediately
