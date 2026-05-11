@@ -161,6 +161,13 @@ export function useRecipes() {
         if (updErr) throw updErr;
       }
 
+      // Snapshot SW fields onto the meal row too so the meal slot reflects it immediately.
+      const { error: mealSwErr } = await supabase
+        .from('meals')
+        .update(sw)
+        .eq('id', mealId);
+      if (mealSwErr) throw mealSwErr;
+
       return targetRecipeId as string;
     },
     onSuccess: () => {
