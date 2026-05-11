@@ -32,6 +32,21 @@ export function HistoryMealItem({ meal, rating, onRate, isRating }: HistoryMealI
   const [notes, setNotes] = useState(rating?.notes || '');
   const [pendingRating, setPendingRating] = useState<number | null>(null);
   const { data: recipeStats } = useRecipeStats(meal.recipe_id ?? null);
+  const { recipes } = useRecipes();
+  const today = new Date();
+  const { addEntry } = useSwLog(getWeekStartMonday(today));
+  const recipe = meal.recipe_id ? (recipes || []).find((r: any) => r.id === meal.recipe_id) : null;
+  const hasSw = recipe && ((recipe as any).sw_swips != null || (recipe as any).sw_healthy_extra_type);
+
+  const handleLogSw = () => {
+    if (!recipe) return;
+    addEntry.mutate({
+      log_date: formatDate(today),
+      entry_type: 'recipe',
+      recipe: recipe as any,
+      quantity: 1,
+    });
+  };
 
   const handleRatingChange = (newRating: number) => {
     if (newRating === 0) {
