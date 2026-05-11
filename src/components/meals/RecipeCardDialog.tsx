@@ -17,6 +17,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRecipeStats } from '@/hooks/useRecipeStats';
 import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
 import { HealthyExtraType, HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
+import { SwInfoDialog } from './SwInfoDialog';
+import { Plus, Pencil } from 'lucide-react';
 
 interface RecipeCardDialogProps {
   open: boolean;
