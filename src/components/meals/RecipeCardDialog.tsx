@@ -45,12 +45,28 @@ export function RecipeCardDialog({
   recipeSwData,
 }: RecipeCardDialogProps) {
   const queryClient = useQueryClient();
-  // Local cache of estimated calories so we can show the result immediately
-  // after a lazy backfill, without waiting for the next refetch cycle.
   const [localCalories, setLocalCalories] = useState<number | null>(
     recipeCard.estimated_calories_per_serving ?? null
   );
   const [calorieStatus, setCalorieStatus] = useState<'idle' | 'loading' | 'rate_limited' | 'credits_exhausted' | 'error'>('idle');
+  const { data: stats } = useRecipeStats(recipeId ?? null);
+  const swLog = useSwLog(getWeekStartMonday(new Date()));
+
+  const handleLogToSw = () => {
+    if (!recipeId || !recipeSwData) return;
+    swLog.addEntry.mutate({
+      log_date: formatDate(new Date()),
+      entry_type: 'recipe',
+      recipe: {
+        id: recipeId,
+        name: recipeCard.meal_name,
+        sw_swips: recipeSwData.sw_swips,
+        sw_healthy_extra_type: recipeSwData.sw_healthy_extra_type,
+        sw_healthy_extra_amount: recipeSwData.sw_healthy_extra_amount,
+        sw_is_speed: recipeSwData.sw_is_speed,
+      },
+    });
+  };
 
   useEffect(() => {
     setLocalCalories(recipeCard.estimated_calories_per_serving ?? null);
