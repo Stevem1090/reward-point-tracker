@@ -49,7 +49,7 @@ export function useMealRatings() {
   const upsertRating = useMutation({
     mutationFn: async ({ mealId, rating, notes }: { mealId: string; rating: number; notes?: string }) => {
       const userId = await getCurrentUserId();
-      
+
       // If rating is 0, delete the rating
       if (rating === 0) {
         const { error } = await supabase
@@ -59,7 +59,15 @@ export function useMealRatings() {
         if (error) throw error;
         return;
       }
-      
+
+      // Look up the recipe_id for this meal so the rating follows the recipe
+      const { data: mealRow } = await supabase
+        .from('meals')
+        .select('recipe_id')
+        .eq('id', mealId)
+        .maybeSingle();
+      const recipeId = mealRow?.recipe_id ?? null;
+
       const { data: existing } = await supabase
         .from('meal_ratings')
         .select('id')
@@ -67,16 +75,22 @@ export function useMealRatings() {
         .maybeSingle();
 
       if (existing) {
-        const { error } = await supabase.from('meal_ratings').update({ rating, notes }).eq('id', existing.id);
+        const { error } = await supabase
+          .from('meal_ratings')
+          .update({ rating, notes, recipe_id: recipeId })
+          .eq('id', existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('meal_ratings').insert([{ meal_id: mealId, rating, notes, user_id: userId }]);
+        const { error } = await supabase
+          .from('meal_ratings')
+          .insert([{ meal_id: mealId, rating, notes, user_id: userId, recipe_id: recipeId }]);
         if (error) throw error;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealRating'] });
       queryClient.invalidateQueries({ queryKey: ['mealRatings'] });
+      queryClient.invalidateQueries({ queryKey: ['recipeStats'] });
       toast.success('Rating saved!');
     },
     onError: () => toast.error('Failed to save rating')
