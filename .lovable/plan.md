@@ -1,57 +1,45 @@
-## Problem
+## Goal
 
-The previous migration linked `meal_ratings.recipe_id` only by copying from `meals.recipe_id` — but most historical meals never had `recipe_id` populated (it's only set when the AI matches a generated meal name to a library recipe at plan-generation time). Result:
+Let you add Slimming World info (Swips, Healthy Extra type/amount, Speed) to any recipe straight from the weekly plan — without needing to find it in the Library first.
 
-- 35 total ratings, only **1** linked to a recipe
-- 121 total meals, only **31** linked to a recipe
-- Library shows "no history" for almost every recipe
+## UX
 
-## Fix: name-based backfill
+In the recipe preview that opens when you tap **View recipe** on a meal slot (`RecipeCardDialog`):
 
-Add a single migration that fuzzy-matches by `lower(trim(name))` scoped to `user_id`, so every past meal/rating that shares a name with a library recipe gets linked. Verified counts:
+- If the recipe has no SW info yet: show a small **"Add SW info"** button next to the existing SW summary area.
+- If it does: show **"Edit SW info"**.
 
-- **62 of 90** unlinked historical meals will link to a library recipe
-- **30 of 34** unlinked rated meals will link → ratings start showing in the library
+Tapping it opens a focused dialog with just four fields:
 
-### Migration steps
-
-1. Update `meals.recipe_id` for any meal where `recipe_id IS NULL` and a recipe with the same case-insensitive name exists for the meal-plan's owner.
-2. Update `meal_ratings.recipe_id` for any rating where `recipe_id IS NULL`, by joining through `meals` (now backfilled) → `recipes`.
-3. Add a small "soft" auto-link going forward: when a meal is inserted/updated without `recipe_id`, a trigger looks up `recipes` by name+user and sets it. (Prevents the gap reopening for any meals created outside the AI flow.)
-
-### What the user will see
-
-- Library cards show real ★ averages, rating counts, "cooked N times", and last-eaten dates for ~62 recipes that were previously blank
-- The History tab's "Past avg" hint populates for older weeks
-- AI generation gets richer signal (ratings/cook counts) for those recipes
-
-### Out of scope
-
-- The remaining ~28 unlinked meals where the recipe was deleted, renamed, or never saved to the library — these stay unlinked (correct behaviour)
-- Cross-user matching (each user's meals only link to their own recipes)
-
-### Technical detail
-
-```sql
--- 1. Link historical meals to library recipes by name
-UPDATE meals m
-SET recipe_id = r.id
-FROM meal_plans mp, recipes r
-WHERE m.meal_plan_id = mp.id
-  AND m.recipe_id IS NULL
-  AND r.user_id = mp.user_id
-  AND lower(trim(r.name)) = lower(trim(m.meal_name));
-
--- 2. Backfill rating links via the now-populated meals.recipe_id
-UPDATE meal_ratings mr
-SET recipe_id = m.recipe_id
-FROM meals m
-WHERE mr.meal_id = m.id
-  AND mr.recipe_id IS NULL
-  AND m.recipe_id IS NOT NULL;
-
--- 3. Trigger to keep new meals auto-linked
-CREATE FUNCTION auto_link_meal_recipe() RETURNS trigger ...
-  -- on INSERT/UPDATE of meals, if recipe_id IS NULL,
-  -- look up matching recipe by user + name and set it
 ```
+Swips           [ number ]
+Healthy Extra   [ none | A | B ]
+Amount          [ number ]   (hidden when type = none)
+Speed food      [ toggle ]
+```
+
+Save → updates the linked recipe → toast → preview refreshes immediately.
+
+## Handling unlinked meals
+
+If the meal slot has no `recipe_id` (AI meal that wasn't saved to the library yet), the save flow does this in one step:
+
+1. Create a recipe in `recipes` using the meal's name, description, cook time, servings, and — if the meal has a `recipe_card` — its `ingredients`, `steps`, and `image_url`.
+2. Update the `meals` row's `recipe_id` to point at the new recipe.
+3. Save the SW fields onto that recipe.
+
+(The DB trigger added previously will also auto-link other meals with the same name going forward.)
+
+## Files to change
+
+- `src/components/meals/SwInfoDialog.tsx` *(new)* — the SW-only quick editor.
+- `src/components/meals/RecipeCardDialog.tsx` — add the "Add/Edit SW info" button and wire it to the new dialog. Reuse the existing `recipeSwData` + refetch path.
+- `src/hooks/useRecipes.ts` — add an `upsertSwInfo({ mealId, recipeId, sw })` mutation that handles both the linked and unlinked cases (auto-creates a recipe if needed, sets `meals.recipe_id`, then writes SW fields).
+
+No DB migration needed — `recipes.sw_*` columns and the `meals.recipe_id` link already exist.
+
+## Out of scope
+
+- Editing SW info from the meal slot dropdown or the History tab.
+- Bulk "tag this whole week" workflow.
+- Changing how SW info is displayed elsewhere (already shown in slot, preview, library, SW log).
