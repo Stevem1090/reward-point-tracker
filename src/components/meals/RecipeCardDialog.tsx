@@ -344,6 +344,27 @@ export function RecipeCardDialog({
           )}
         </ScrollArea>
       </DialogContent>
+
+      {mealId && (
+        <SwInfoDialog
+          open={swDialogOpen}
+          onOpenChange={setSwDialogOpen}
+          mealId={mealId}
+          recipeId={recipeId ?? null}
+          mealName={recipeCard.meal_name}
+          servings={recipeCard.base_servings}
+          estimatedCookMinutes={estimatedCookMinutes ?? null}
+          recipeUrl={recipeUrl ?? null}
+          ingredients={recipeCard.ingredients}
+          steps={recipeCard.steps}
+          imageUrl={recipeCard.image_url ?? null}
+          initial={recipeSwData ?? null}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ['mealPlan'] });
+            queryClient.invalidateQueries({ queryKey: ['recipes'] });
+          }}
+        />
+      )}
     </Dialog>
   );
 }
