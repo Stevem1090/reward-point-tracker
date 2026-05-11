@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, ChevronDown, ChevronUp, Star } from 'lucide-react';
+import { Clock, ChevronDown, ChevronUp, Star, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,8 @@ import { StarRating } from './StarRating';
 import { Meal, MealRating } from '@/types/meal';
 import { cn } from '@/lib/utils';
 import { useRecipeStats } from '@/hooks/useRecipeStats';
+import { useRecipes } from '@/hooks/useRecipes';
+import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
 
 interface HistoryMealItemProps {
   meal: Meal;
