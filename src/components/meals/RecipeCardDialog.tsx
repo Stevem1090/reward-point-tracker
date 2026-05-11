@@ -45,14 +45,18 @@ export function RecipeCardDialog({
   estimatedCookMinutes,
   recipeId,
   recipeSwData,
+  mealId,
 }: RecipeCardDialogProps) {
   const queryClient = useQueryClient();
   const [localCalories, setLocalCalories] = useState<number | null>(
     recipeCard.estimated_calories_per_serving ?? null
   );
   const [calorieStatus, setCalorieStatus] = useState<'idle' | 'loading' | 'rate_limited' | 'credits_exhausted' | 'error'>('idle');
+  const [swDialogOpen, setSwDialogOpen] = useState(false);
   const { data: stats } = useRecipeStats(recipeId ?? null);
   const swLog = useSwLog(getWeekStartMonday(new Date()));
+
+  const hasSw = !!(recipeSwData && (recipeSwData.sw_swips != null || recipeSwData.sw_healthy_extra_type));
 
   const handleLogToSw = () => {
     if (!recipeId || !recipeSwData) return;
