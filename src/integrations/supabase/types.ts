@@ -365,6 +365,7 @@ export type Database = {
           meal_id: string
           notes: string | null
           rating: number
+          recipe_id: string | null
           user_id: string
         }
         Insert: {
@@ -373,6 +374,7 @@ export type Database = {
           meal_id: string
           notes?: string | null
           rating: number
+          recipe_id?: string | null
           user_id: string
         }
         Update: {
@@ -381,6 +383,7 @@ export type Database = {
           meal_id?: string
           notes?: string | null
           rating?: number
+          recipe_id?: string | null
           user_id?: string
         }
         Relationships: [

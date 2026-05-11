@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { RecipeCard, Ingredient } from '@/types/meal';
-import { Clock, Users, ExternalLink, Printer, AlertCircle, Flame, Loader2, RefreshCw } from 'lucide-react';
+import { Clock, Users, ExternalLink, Printer, AlertCircle, Flame, Loader2, RefreshCw, Star, Scale } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,9 @@ import { scaleIngredients } from '@/utils/scaleIngredients';
 import { generateRecipeCardHtml, RecipeCardData } from '@/utils/generateRecipeCardHtml';
 import { estimateCaloriesForRecipeCard } from '@/hooks/useCalorieEstimation';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRecipeStats } from '@/hooks/useRecipeStats';
+import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
+import { HealthyExtraType, HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
 
 interface RecipeCardDialogProps {
   open: boolean;
@@ -22,6 +25,13 @@ interface RecipeCardDialogProps {
   currentServings: number;
   recipeUrl?: string | null;
   estimatedCookMinutes?: number | null;
+  recipeId?: string | null;
+  recipeSwData?: {
+    sw_swips: number | null;
+    sw_healthy_extra_type: HealthyExtraType | null;
+    sw_healthy_extra_amount: number | null;
+    sw_is_speed: boolean | null;
+  } | null;
 }
 
 export function RecipeCardDialog({
@@ -31,14 +41,32 @@ export function RecipeCardDialog({
   currentServings,
   recipeUrl,
   estimatedCookMinutes,
+  recipeId,
+  recipeSwData,
 }: RecipeCardDialogProps) {
   const queryClient = useQueryClient();
-  // Local cache of estimated calories so we can show the result immediately
-  // after a lazy backfill, without waiting for the next refetch cycle.
   const [localCalories, setLocalCalories] = useState<number | null>(
     recipeCard.estimated_calories_per_serving ?? null
   );
   const [calorieStatus, setCalorieStatus] = useState<'idle' | 'loading' | 'rate_limited' | 'credits_exhausted' | 'error'>('idle');
+  const { data: stats } = useRecipeStats(recipeId ?? null);
+  const swLog = useSwLog(getWeekStartMonday(new Date()));
+
+  const handleLogToSw = () => {
+    if (!recipeId || !recipeSwData) return;
+    swLog.addEntry.mutate({
+      log_date: formatDate(new Date()),
+      entry_type: 'recipe',
+      recipe: {
+        id: recipeId,
+        name: recipeCard.meal_name,
+        sw_swips: recipeSwData.sw_swips,
+        sw_healthy_extra_type: recipeSwData.sw_healthy_extra_type,
+        sw_healthy_extra_amount: recipeSwData.sw_healthy_extra_amount,
+        sw_is_speed: recipeSwData.sw_is_speed,
+      },
+    });
+  };
 
   useEffect(() => {
     setLocalCalories(recipeCard.estimated_calories_per_serving ?? null);
@@ -144,6 +172,29 @@ export function RecipeCardDialog({
               <Users className="h-3 w-3" />
               {currentServings} servings
             </Badge>
+            {stats && stats.avgRating != null && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                {stats.avgRating.toFixed(1)} ({stats.ratingCount})
+              </Badge>
+            )}
+            {stats && stats.timesEaten > 0 && (
+              <Badge variant="outline" className="text-xs">
+                Cooked {stats.timesEaten}×
+              </Badge>
+            )}
+            {recipeId && recipeSwData && (recipeSwData.sw_swips != null || recipeSwData.sw_healthy_extra_type) && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1"
+                onClick={handleLogToSw}
+                disabled={swLog.addEntry.isPending}
+              >
+                <Scale className="h-3 w-3" />
+                Log to SW
+              </Button>
+            )}
             {localCalories ? (
               <Badge variant="secondary" className="flex items-center gap-1">
                 <Flame className="h-3 w-3 text-orange-500" />

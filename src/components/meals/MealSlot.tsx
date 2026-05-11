@@ -32,7 +32,10 @@ import { SwapMealDialog } from './SwapMealDialog';
 import { RecipeCardDialog } from './RecipeCardDialog';
 import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
 import { HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
-import { Scale } from 'lucide-react';
+import { Scale, Star } from 'lucide-react';
+import { useRecipeStats } from '@/hooks/useRecipeStats';
+import { supabase } from '@/integrations/supabase/client';
+import { Ingredient, RecipeCard as RecipeCardType } from '@/types/meal';
 
 interface MealSlotProps {
   day: DayOfWeek;
@@ -50,7 +53,10 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
   const [editedUrl, setEditedUrl] = useState('');
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
   const [isRecipeCardOpen, setIsRecipeCardOpen] = useState(false);
+  const [fetchedRecipeCard, setFetchedRecipeCard] = useState<RecipeCardType | null>(null);
+  const [isLoadingRecipe, setIsLoadingRecipe] = useState(false);
   const swLog = useSwLog(getWeekStartMonday(new Date()));
+  const { data: recipeStats } = useRecipeStats(meal?.recipe_id ?? null);
   const swSwips = (meal as any)?.sw_swips;
   const swHe = (meal as any)?.sw_healthy_extra_type;
   const swHeAmt = (meal as any)?.sw_healthy_extra_amount;
@@ -70,6 +76,33 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
         sw_is_speed: swSpeed,
       },
     });
+  };
+
+  const handleOpenRecipe = async () => {
+    if (meal?.recipe_card) {
+      setIsRecipeCardOpen(true);
+      return;
+    }
+    if (meal?.recipe_id && !fetchedRecipeCard) {
+      setIsLoadingRecipe(true);
+      const { data } = await supabase.from('recipes').select('*').eq('id', meal.recipe_id).maybeSingle();
+      if (data) {
+        setFetchedRecipeCard({
+          id: data.id,
+          meal_id: meal.id,
+          meal_name: data.name,
+          image_url: data.image_url,
+          ingredients: (data.ingredients as unknown as Ingredient[]) || [],
+          steps: (data.steps as unknown as string[]) || [],
+          base_servings: data.servings,
+          html_content: null,
+          estimated_calories_per_serving: null,
+          created_at: data.created_at,
+        });
+      }
+      setIsLoadingRecipe(false);
+    }
+    setIsRecipeCardOpen(true);
   };
   
   // Rejection reason dialog state
@@ -525,15 +558,23 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                       </span>
                     )}
 
-                    {/* View Recipe button - only for finalised meals with recipe card */}
-                    {isPlanFinalised && meal.recipe_card && !(meal.recipe_id && meal.recipe_card.ingredients.length === 0) && (
+                    {/* View Recipe button - works for any meal with recipe_card OR library recipe_id */}
+                    {(meal.recipe_card || meal.recipe_id) && (
                       <button
-                        onClick={() => setIsRecipeCardOpen(true)}
-                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+                        onClick={handleOpenRecipe}
+                        disabled={isLoadingRecipe}
+                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer disabled:opacity-50"
                       >
-                        <BookOpen className="h-3.5 w-3.5" />
-                        {meal.recipe_card.ingredients.length === 0 ? 'View Link' : 'View Recipe'}
+                        {isLoadingRecipe ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookOpen className="h-3.5 w-3.5" />}
+                        View Recipe
                       </button>
+                    )}
+                    {recipeStats && recipeStats.avgRating != null && (
+                      <span className="flex items-center gap-0.5 text-amber-600">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        {recipeStats.avgRating.toFixed(1)}
+                        <span className="text-muted-foreground">({recipeStats.ratingCount})</span>
+                      </span>
                     )}
                   </div>
                 )}
@@ -822,15 +863,22 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
         isSwapping={replaceMeal.isPending}
       />
 
-      {/* Recipe Card Dialog */}
-      {meal.recipe_card && (
+      {/* Recipe Card Dialog (uses fetched card for library meals when no recipe_card present) */}
+      {(meal.recipe_card || fetchedRecipeCard) && (
         <RecipeCardDialog
           open={isRecipeCardOpen}
           onOpenChange={setIsRecipeCardOpen}
-          recipeCard={meal.recipe_card}
+          recipeCard={(meal.recipe_card || fetchedRecipeCard)!}
           currentServings={meal.servings}
           recipeUrl={meal.recipe_url}
           estimatedCookMinutes={meal.estimated_cook_minutes}
+          recipeId={meal.recipe_id}
+          recipeSwData={hasSw ? {
+            sw_swips: swSwips,
+            sw_healthy_extra_type: swHe,
+            sw_healthy_extra_amount: swHeAmt,
+            sw_is_speed: swSpeed,
+          } : null}
         />
       )}
     </>
