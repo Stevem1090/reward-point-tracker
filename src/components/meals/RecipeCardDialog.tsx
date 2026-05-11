@@ -172,6 +172,29 @@ export function RecipeCardDialog({
               <Users className="h-3 w-3" />
               {currentServings} servings
             </Badge>
+            {stats && stats.avgRating != null && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                {stats.avgRating.toFixed(1)} ({stats.ratingCount})
+              </Badge>
+            )}
+            {stats && stats.timesEaten > 0 && (
+              <Badge variant="outline" className="text-xs">
+                Cooked {stats.timesEaten}×
+              </Badge>
+            )}
+            {recipeId && recipeSwData && (recipeSwData.sw_swips != null || recipeSwData.sw_healthy_extra_type) && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1"
+                onClick={handleLogToSw}
+                disabled={swLog.addEntry.isPending}
+              >
+                <Scale className="h-3 w-3" />
+                Log to SW
+              </Button>
+            )}
             {localCalories ? (
               <Badge variant="secondary" className="flex items-center gap-1">
                 <Flame className="h-3 w-3 text-orange-500" />
