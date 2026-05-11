@@ -32,6 +32,8 @@ interface RecipeCardDialogProps {
     sw_healthy_extra_amount: number | null;
     sw_is_speed: boolean | null;
   } | null;
+  /** Pass meal context to enable in-place SW editing (auto-creates a library recipe if needed). */
+  mealId?: string | null;
 }
 
 export function RecipeCardDialog({
