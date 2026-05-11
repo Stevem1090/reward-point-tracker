@@ -191,7 +191,7 @@ export function RecipeCardDialog({
                 Cooked {stats.timesEaten}×
               </Badge>
             )}
-            {recipeId && recipeSwData && (recipeSwData.sw_swips != null || recipeSwData.sw_healthy_extra_type) && (
+            {recipeId && hasSw && (
               <Button
                 size="sm"
                 variant="outline"
@@ -201,6 +201,17 @@ export function RecipeCardDialog({
               >
                 <Scale className="h-3 w-3" />
                 Log to SW
+              </Button>
+            )}
+            {mealId && (
+              <Button
+                size="sm"
+                variant={hasSw ? 'ghost' : 'outline'}
+                className="h-7 gap-1"
+                onClick={() => setSwDialogOpen(true)}
+              >
+                {hasSw ? <Pencil className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                {hasSw ? 'Edit SW info' : 'Add SW info'}
               </Button>
             )}
             {localCalories ? (
