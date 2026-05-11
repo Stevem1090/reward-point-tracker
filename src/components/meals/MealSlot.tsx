@@ -558,15 +558,23 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                       </span>
                     )}
 
-                    {/* View Recipe button - finalised OR pending if we have a recipe card / library link */}
-                    {meal.recipe_card && !(meal.recipe_id && meal.recipe_card.ingredients.length === 0) && (
+                    {/* View Recipe button - works for any meal with recipe_card OR library recipe_id */}
+                    {(meal.recipe_card || meal.recipe_id) && (
                       <button
-                        onClick={() => setIsRecipeCardOpen(true)}
-                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+                        onClick={handleOpenRecipe}
+                        disabled={isLoadingRecipe}
+                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer disabled:opacity-50"
                       >
-                        <BookOpen className="h-3.5 w-3.5" />
-                        {meal.recipe_card.ingredients.length === 0 ? 'View Link' : 'View Recipe'}
+                        {isLoadingRecipe ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookOpen className="h-3.5 w-3.5" />}
+                        View Recipe
                       </button>
+                    )}
+                    {recipeStats && recipeStats.avgRating != null && (
+                      <span className="flex items-center gap-0.5 text-amber-600">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        {recipeStats.avgRating.toFixed(1)}
+                        <span className="text-muted-foreground">({recipeStats.ratingCount})</span>
+                      </span>
                     )}
                   </div>
                 )}
@@ -855,15 +863,22 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
         isSwapping={replaceMeal.isPending}
       />
 
-      {/* Recipe Card Dialog */}
-      {meal.recipe_card && (
+      {/* Recipe Card Dialog (uses fetched card for library meals when no recipe_card present) */}
+      {(meal.recipe_card || fetchedRecipeCard) && (
         <RecipeCardDialog
           open={isRecipeCardOpen}
           onOpenChange={setIsRecipeCardOpen}
-          recipeCard={meal.recipe_card}
+          recipeCard={(meal.recipe_card || fetchedRecipeCard)!}
           currentServings={meal.servings}
           recipeUrl={meal.recipe_url}
           estimatedCookMinutes={meal.estimated_cook_minutes}
+          recipeId={meal.recipe_id}
+          recipeSwData={hasSw ? {
+            sw_swips: swSwips,
+            sw_healthy_extra_type: swHe,
+            sw_healthy_extra_amount: swHeAmt,
+            sw_is_speed: swSpeed,
+          } : null}
         />
       )}
     </>
