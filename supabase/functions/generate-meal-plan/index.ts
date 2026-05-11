@@ -469,8 +469,12 @@ async function fetchSavedRecipes(supabase: ReturnType<typeof createClient>): Pro
           name: chosen.name,
           description: chosen.description || '',
           recipe_id: chosen.id,
-          cook_time: chosen.estimated_cook_minutes
-        });
+          cook_time: chosen.estimated_cook_minutes,
+          // @ts-ignore - extended for prompt context
+          avg_rating: chosen.avgRating || 0,
+          // @ts-ignore
+          times_eaten: chosen.useCount || 0,
+        } as any);
         console.log(`Selected recipe: ${chosen.name} (rating: ${chosen.avgRating.toFixed(1)}, weight: ${chosen.weight.toFixed(1)})`);
         break;
       }
