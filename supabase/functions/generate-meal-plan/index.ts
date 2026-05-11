@@ -64,9 +64,10 @@ You may receive family_preferences with learned likes/dislikes extracted from ra
 - These are stronger signals than individual ratings - respect them
 
 SAVED RECIPES (from family recipe library):
-You may receive saved_recipes - these are family favorites from their recipe library.
-- You MAY include 1-2 saved recipes per week (especially for weekend meals)
+You may receive saved_recipes - these are family favorites from their recipe library, with star ratings and cook counts.
+- STRONGLY PREFER these: aim to include 2–3 saved recipes per 7-day plan (more if highly rated)
 - When suggesting a saved recipe, use EXACTLY the name provided (case-sensitive match required)
+- Prioritise higher-rated and less-recently-cooked saved recipes
 - Saved recipes help reduce "cooking fatigue" - families love revisiting favorites
 - Only suggest saved recipes that fit the slot type (don't suggest complex recipes for weekday slots)
 
