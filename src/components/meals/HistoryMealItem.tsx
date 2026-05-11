@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { Clock, ChevronDown, ChevronUp, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { StarRating } from './StarRating';
 import { Meal, MealRating } from '@/types/meal';
 import { cn } from '@/lib/utils';
+import { useRecipeStats } from '@/hooks/useRecipeStats';
 
 interface HistoryMealItemProps {
   meal: Meal;
@@ -28,6 +29,7 @@ export function HistoryMealItem({ meal, rating, onRate, isRating }: HistoryMealI
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState(rating?.notes || '');
   const [pendingRating, setPendingRating] = useState<number | null>(null);
+  const { data: recipeStats } = useRecipeStats(meal.recipe_id ?? null);
 
   const handleRatingChange = (newRating: number) => {
     if (newRating === 0) {
@@ -84,6 +86,12 @@ export function HistoryMealItem({ meal, rating, onRate, isRating }: HistoryMealI
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                 <Clock className="h-3 w-3" />
                 <span>{meal.estimated_cook_minutes} mins</span>
+              </div>
+            )}
+            {!rating && recipeStats && recipeStats.avgRating != null && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                <Star className="h-3 w-3 fill-amber-300 text-amber-300" />
+                <span>Past avg {recipeStats.avgRating.toFixed(1)} ({recipeStats.ratingCount})</span>
               </div>
             )}
           </div>
