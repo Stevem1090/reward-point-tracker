@@ -580,8 +580,12 @@ serve(async (req) => {
       : '';
 
     const savedRecipesSection = savedRecipes.length > 0
-      ? `\nsaved_recipes (family favorites you can include 1-2 of, use EXACT names):\n${
-          savedRecipes.map(r => `- "${r.name}" (${r.cook_time || '?'} mins)`).join('\n')
+      ? `\nsaved_recipes (family library favorites — STRONGLY PREFER these; aim to include 2–3 per week using EXACT names; pick from highest-rated/least-recently-eaten first):\n${
+          savedRecipes.map((r: any) => {
+            const rating = r.avg_rating ? ` ★${Number(r.avg_rating).toFixed(1)}` : ' (unrated)';
+            const eaten = r.times_eaten ? ` · cooked ${r.times_eaten}×` : '';
+            return `- "${r.name}" (${r.cook_time || '?'} mins)${rating}${eaten}`;
+          }).join('\n')
         }\n`
       : '';
 
