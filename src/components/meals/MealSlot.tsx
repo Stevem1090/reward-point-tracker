@@ -32,7 +32,10 @@ import { SwapMealDialog } from './SwapMealDialog';
 import { RecipeCardDialog } from './RecipeCardDialog';
 import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
 import { HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
-import { Scale } from 'lucide-react';
+import { Scale, Star } from 'lucide-react';
+import { useRecipeStats } from '@/hooks/useRecipeStats';
+import { supabase } from '@/integrations/supabase/client';
+import { Ingredient, RecipeCard as RecipeCardType } from '@/types/meal';
 
 interface MealSlotProps {
   day: DayOfWeek;
