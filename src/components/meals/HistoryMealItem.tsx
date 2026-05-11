@@ -116,7 +116,19 @@ export function HistoryMealItem({ meal, rating, onRate, isRating }: HistoryMealI
 
         {/* Rating row: aligned right */}
         {meal.meal_name ? (
-          <div className="flex justify-end">
+          <div className="flex justify-end items-center gap-2">
+            {hasSw && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={handleLogSw}
+                disabled={addEntry.isPending}
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                Log to SW
+              </Button>
+            )}
             <StarRating
               rating={displayRating}
               onRatingChange={handleRatingChange}
