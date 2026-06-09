@@ -5,7 +5,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are a recipe extraction assistant. Extract recipe details from the provided cookbook page.
+const SYSTEM_PROMPT = `You are a recipe extraction assistant. Extract recipe details from the provided cookbook page(s).
+
+MULTI-IMAGE NOTE:
+- The user may provide multiple photos of the SAME recipe (e.g. an ingredients page and a method page, or several screenshots).
+- Treat all provided images as ONE recipe and merge information across them.
+- Do not duplicate ingredients or steps that appear in more than one image.
 
 STEP RULES (CRITICAL):
 - Extract ALL steps from the recipe - do not skip any
@@ -30,18 +35,26 @@ serve(async (req) => {
   }
 
   try {
-    const { imageData, cookbookTitle, recipeName } = await req.json();
+    const body = await req.json();
+    const { imageData, imagesData, cookbookTitle, recipeName } = body ?? {};
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
+
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    if (!imageData) {
-      throw new Error("Cookbook photo is required");
+    const images: string[] = Array.isArray(imagesData) && imagesData.length > 0
+      ? imagesData
+      : (typeof imageData === "string" && imageData ? [imageData] : []);
+
+    if (images.length === 0) {
+      throw new Error("At least one cookbook photo is required");
+    }
+    if (images.length > 5) {
+      throw new Error("A maximum of 5 photos is allowed");
     }
 
-    const textPrompt = `Extract the recipe from this cookbook page photo.${cookbookTitle ? ` Cookbook: "${cookbookTitle}".` : ''}${recipeName ? ` Recipe name hint: "${recipeName}".` : ''}`;
+    const textPrompt = `Extract the recipe from ${images.length > 1 ? `these ${images.length} cookbook page photos (they are all the same recipe — merge information across them)` : 'this cookbook page photo'}.${cookbookTitle ? ` Cookbook: "${cookbookTitle}".` : ''}${recipeName ? ` Recipe name hint: "${recipeName}".` : ''}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -53,11 +66,11 @@ serve(async (req) => {
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { 
-            role: "user", 
+          {
+            role: "user",
             content: [
               { type: "text", text: textPrompt },
-              { type: "image_url", image_url: { url: imageData } }
+              ...images.map((url) => ({ type: "image_url", image_url: { url } })),
             ]
           },
         ],

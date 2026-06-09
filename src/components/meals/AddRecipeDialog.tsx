@@ -26,12 +26,13 @@ export function AddRecipeDialog({ open, onOpenChange, defaultTab = 'website' }: 
   // Website tab state
   const [url, setUrl] = useState('');
   
-  // Cookbook tab state - image upload
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  // Cookbook tab state - multi-image upload
+  const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
   const [cookbookTitle, setCookbookTitle] = useState('');
   const [recipeName, setRecipeName] = useState('');
-  
+
+  const MAX_IMAGES = 5;
+
   // Preview state
   const [extractedRecipe, setExtractedRecipe] = useState<ExtractedRecipe | null>(null);
   const [editedName, setEditedName] = useState('');
@@ -43,28 +44,44 @@ export function AddRecipeDialog({ open, onOpenChange, defaultTab = 'website' }: 
   const { createRecipe } = useRecipes();
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    const remaining = MAX_IMAGES - images.length;
+    if (remaining <= 0) {
+      toast.error(`You can add up to ${MAX_IMAGES} photos.`);
+      e.target.value = '';
+      return;
+    }
+
+    const toAdd = files.slice(0, remaining);
+    if (files.length > remaining) {
+      toast.error(`Only the first ${remaining} photo(s) were added (max ${MAX_IMAGES}).`);
+    }
+
+    toAdd.forEach((file) => {
       if (file.size > 10 * 1024 * 1024) {
-        toast.error('Image too large. Please use an image under 10MB.');
+        toast.error(`"${file.name}" is too large. Use images under 10MB.`);
         return;
       }
-      setImageFile(file);
       const reader = new FileReader();
-      reader.onload = (e) => setImagePreview(e.target?.result as string);
+      reader.onload = (ev) => {
+        const preview = ev.target?.result as string;
+        setImages((prev) => (prev.length >= MAX_IMAGES ? prev : [...prev, { file, preview }]));
+      };
       reader.readAsDataURL(file);
-    }
+    });
+
+    e.target.value = '';
   };
 
-  const clearImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
+  const removeImage = (idx: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const resetForm = () => {
     setUrl('');
-    setImageFile(null);
-    setImagePreview(null);
+    setImages([]);
     setCookbookTitle('');
     setRecipeName('');
     setExtractedRecipe(null);
@@ -103,14 +120,14 @@ export function AddRecipeDialog({ open, onOpenChange, defaultTab = 'website' }: 
   };
 
   const handleProcessCookbook = async () => {
-    if (!imagePreview) {
-      toast.error('Please upload a cookbook photo');
+    if (images.length === 0) {
+      toast.error('Please upload at least one cookbook photo');
       return;
     }
 
     try {
       const recipe = await processCookbook.mutateAsync({
-        imageData: imagePreview,
+        imagesData: images.map((i) => i.preview),
         cookbookTitle: cookbookTitle.trim() || undefined,
         recipeName: recipeName.trim() || undefined
       });
@@ -245,52 +262,58 @@ export function AddRecipeDialog({ open, onOpenChange, defaultTab = 'website' }: 
               </div>
 
               <div className="space-y-2">
-                <Label>Cookbook Photo</Label>
-                {imagePreview ? (
-                  <div className="relative">
-                    <img 
-                      src={imagePreview} 
-                      alt="Cookbook page" 
-                      className="w-full rounded-lg border max-h-[200px] object-contain bg-muted"
-                    />
-                    <Button 
-                      variant="destructive" 
-                      size="icon"
-                      className="absolute top-2 right-2 h-8 w-8"
-                      onClick={clearImage}
-                      disabled={isExtracting}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-                    <Camera className="h-8 w-8 text-muted-foreground mb-2" />
-                    <span className="text-sm text-muted-foreground">Tap to upload photo</span>
-                    <span className="text-xs text-muted-foreground mt-1">or take a picture</span>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleImageUpload}
-                  disabled={isExtracting}
-                />
-                  </label>
-                )}
+                <Label>Cookbook Photos</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {images.map((img, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-lg border overflow-hidden bg-muted">
+                      <img
+                        src={img.preview}
+                        alt={`Cookbook page ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => removeImage(idx)}
+                        disabled={isExtracting}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                  {images.length < MAX_IMAGES && (
+                    <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                      <Camera className="h-6 w-6 text-muted-foreground mb-1" />
+                      <span className="text-xs text-muted-foreground text-center px-1">
+                        {images.length === 0 ? 'Add photo' : 'Add more'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleImageUpload}
+                        disabled={isExtracting}
+                      />
+                    </label>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Take a photo of your cookbook recipe page
+                  Add one or more photos — e.g. the ingredients page and the method page (max {MAX_IMAGES}).
                 </p>
               </div>
 
-              <Button 
-                onClick={handleProcessCookbook} 
-                disabled={isExtracting || !imagePreview}
+              <Button
+                onClick={handleProcessCookbook}
+                disabled={isExtracting || images.length === 0}
                 className="w-full min-h-[44px]"
               >
                 {processCookbook.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Extracting Recipe...
+                    {`Extracting from ${images.length} photo${images.length === 1 ? '' : 's'}…`}
                   </>
                 ) : (
                   'Extract Recipe'

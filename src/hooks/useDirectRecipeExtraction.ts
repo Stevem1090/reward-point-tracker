@@ -19,7 +19,7 @@ interface ExtractFromUrlParams {
 }
 
 interface ProcessCookbookParams {
-  imageData: string;
+  imagesData: string[];
   cookbookTitle?: string;
   recipeName?: string;
 }
@@ -49,7 +49,6 @@ export function useDirectRecipeExtraction() {
         throw new Error('No recipe data returned');
       }
 
-      // The edge function returns { recipe: {...}, sourceUrl: "..." }
       const recipe = data.recipe;
 
       if (!recipe) {
@@ -76,9 +75,9 @@ export function useDirectRecipeExtraction() {
   });
 
   const processCookbook = useMutation({
-    mutationFn: async ({ imageData, cookbookTitle, recipeName }: ProcessCookbookParams): Promise<ExtractedRecipe> => {
+    mutationFn: async ({ imagesData, cookbookTitle, recipeName }: ProcessCookbookParams): Promise<ExtractedRecipe> => {
       const { data, error } = await supabase.functions.invoke('process-cookbook-recipe', {
-        body: { imageData, cookbookTitle, recipeName }
+        body: { imagesData, cookbookTitle, recipeName }
       });
 
       if (error) {
@@ -90,7 +89,6 @@ export function useDirectRecipeExtraction() {
         throw new Error('No recipe data returned');
       }
 
-      // The edge function returns { recipe: {...}, cookbookTitle: "..." }
       const recipe = data.recipe;
 
       if (!recipe) {
