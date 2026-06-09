@@ -1,45 +1,37 @@
-## Goal
+# Multi-image cookbook recipe upload
 
-Let you add Slimming World info (Swips, Healthy Extra type/amount, Speed) to any recipe straight from the weekly plan — without needing to find it in the Library first.
+Let users attach multiple photos (e.g. cover, ingredients page, steps page) in the **From Cookbook** tab so the AI can combine them into a single recipe extraction.
 
-## UX
+## UX changes (`AddRecipeDialog.tsx`)
 
-In the recipe preview that opens when you tap **View recipe** on a meal slot (`RecipeCardDialog`):
+- Replace the single image slot in the Cookbook tab with a **gallery of thumbnails + an "Add photo" tile**.
+- Each thumbnail has a small × to remove it. Tiles render in a responsive grid (3 per row on mobile).
+- File input keeps `accept="image/*"` and gains `multiple`. Selecting more images appends to the existing list rather than replacing it.
+- Limits: **max 5 images**, each ≤10MB. Show toast if exceeded.
+- Helper copy updates to: "Add one or more photos — e.g. the ingredients page and the method page".
+- Extract button enabled when at least one image is present; label becomes "Extract Recipe" (unchanged), spinner copy: "Extracting from N photo(s)…".
+- State refactor: `imageFile/imagePreview` → `images: { file: File; preview: string }[]`. `resetForm` clears the array.
 
-- If the recipe has no SW info yet: show a small **"Add SW info"** button next to the existing SW summary area.
-- If it does: show **"Edit SW info"**.
+## Hook changes (`useDirectRecipeExtraction.ts`)
 
-Tapping it opens a focused dialog with just four fields:
+- `ProcessCookbookParams.imageData: string` → `imagesData: string[]` (array of data URLs). Keep `cookbookTitle` and `recipeName`.
+- Pass `imagesData` through to the edge function body.
 
-```
-Swips           [ number ]
-Healthy Extra   [ none | A | B ]
-Amount          [ number ]   (hidden when type = none)
-Speed food      [ toggle ]
-```
+## Edge function changes (`process-cookbook-recipe/index.ts`)
 
-Save → updates the linked recipe → toast → preview refreshes immediately.
-
-## Handling unlinked meals
-
-If the meal slot has no `recipe_id` (AI meal that wasn't saved to the library yet), the save flow does this in one step:
-
-1. Create a recipe in `recipes` using the meal's name, description, cook time, servings, and — if the meal has a `recipe_card` — its `ingredients`, `steps`, and `image_url`.
-2. Update the `meals` row's `recipe_id` to point at the new recipe.
-3. Save the SW fields onto that recipe.
-
-(The DB trigger added previously will also auto-link other meals with the same name going forward.)
-
-## Files to change
-
-- `src/components/meals/SwInfoDialog.tsx` *(new)* — the SW-only quick editor.
-- `src/components/meals/RecipeCardDialog.tsx` — add the "Add/Edit SW info" button and wire it to the new dialog. Reuse the existing `recipeSwData` + refetch path.
-- `src/hooks/useRecipes.ts` — add an `upsertSwInfo({ mealId, recipeId, sw })` mutation that handles both the linked and unlinked cases (auto-creates a recipe if needed, sets `meals.recipe_id`, then writes SW fields).
-
-No DB migration needed — `recipes.sw_*` columns and the `meals.recipe_id` link already exist.
+- Accept `imagesData: string[]` (with backward-compatible fallback: if `imageData` string is sent, wrap to array).
+- Build the user message with one `text` part plus **one `image_url` part per photo**, in the order received.
+- Update system prompt with a short note: "The user may provide multiple photos of the same recipe (e.g. ingredients page and method page). Treat them as one recipe and merge information across images."
+- Reject if `imagesData` is empty or longer than 5.
+- Model stays `google/gemini-2.5-flash` (multimodal, supports multiple image parts).
 
 ## Out of scope
 
-- Editing SW info from the meal slot dropdown or the History tab.
-- Bulk "tag this whole week" workflow.
-- Changing how SW info is displayed elsewhere (already shown in slot, preview, library, SW log).
+- No DB schema changes. Only the first photo (if any) is still used as `image_url` when the AI returns one; we don't persist the uploaded photos themselves.
+- Website tab is unchanged.
+
+## Files touched
+
+- `src/components/meals/AddRecipeDialog.tsx`
+- `src/hooks/useDirectRecipeExtraction.ts`
+- `supabase/functions/process-cookbook-recipe/index.ts`
