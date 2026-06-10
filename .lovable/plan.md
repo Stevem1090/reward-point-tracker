@@ -1,37 +1,67 @@
-# Multi-image cookbook recipe upload
+# Tidy up Meal Cards and Recipe Modal
 
-Let users attach multiple photos (e.g. cover, ingredients page, steps page) in the **From Cookbook** tab so the AI can combine them into a single recipe extraction.
+The cards and the recipe modal have grown organically — every feature (SW, calories, cooked count, edit, print, log) added its own coloured pill or button at the top level. The result reads as a stack of bright chips rather than a recipe. This plan refocuses both surfaces on what matters at a glance (meal name, cook time, servings) and demotes everything else to a single overflow menu, using neutral tokens instead of orange/purple/green pills.
 
-## UX changes (`AddRecipeDialog.tsx`)
+## Design principles
 
-- Replace the single image slot in the Cookbook tab with a **gallery of thumbnails + an "Add photo" tile**.
-- Each thumbnail has a small × to remove it. Tiles render in a responsive grid (3 per row on mobile).
-- File input keeps `accept="image/*"` and gains `multiple`. Selecting more images appends to the existing list rather than replacing it.
-- Limits: **max 5 images**, each ≤10MB. Show toast if exceeded.
-- Helper copy updates to: "Add one or more photos — e.g. the ingredients page and the method page".
-- Extract button enabled when at least one image is present; label becomes "Extract Recipe" (unchanged), spinner copy: "Extracting from N photo(s)…".
-- State refactor: `imageFile/imagePreview` → `images: { file: File; preview: string }[]`. `resetForm` clears the array.
+- **One accent only.** Use neutral `muted`/`secondary` tokens for metadata. Reserve the primary colour for the recipe name link and a single primary action. Drop the orange "Library Recipe" pill, orange calories pill, and standalone purple "Swips" pill from the card.
+- **Glanceable facts vs. actions.** Cook time, servings, calories, rating live as small inline icon+number metadata (no coloured backgrounds). Actions (Edit, Replace, Log to SW, Edit SW info, Print) live behind a `⋯` menu.
+- **Primary tap target = open recipe.** The whole card body opens the recipe modal. "View Recipe" link and "Edit Meal" button are removed from the card face.
+- **SW info is contextual.** Show a small discreet "SW" chip with the Swips number only when present; full SW management lives inside the modal's menu.
 
-## Hook changes (`useDirectRecipeExtraction.ts`)
+## Meal Card (MealSlot) — new layout
 
-- `ProcessCookbookParams.imageData: string` → `imagesData: string[]` (array of data URLs). Keep `cookbookTitle` and `recipeName`.
-- Pass `imagesData` through to the edge function body.
+```text
+┌──────────────────────────────────────────────────┐
+│ ⋮⋮  [Tue]  Andalusian Meatballs           ⋯     │
+│           Flavourful meatballs with spices…      │
+│           ⏱ 25m   👥 4   🔥 350 kcal   SW 2     │
+└──────────────────────────────────────────────────┘
+```
 
-## Edge function changes (`process-cookbook-recipe/index.ts`)
+- Tap card → opens recipe modal.
+- `⋯` menu (only one button visible): Replace meal, Edit servings, Edit SW info, Skip day, Log to SW (when SW present), Edit URL.
+- During planning (pre-finalise), the green ✓ / red ✕ approve/reject buttons stay — those are the core planning action and remain on the card.
+- Remove: "View Recipe" link, "Library Recipe" pill, standalone "Swips" pill, "Log to SW" inline button, "Edit Meal" button.
+- Metadata row uses `text-muted-foreground text-xs` with lucide icons — no coloured backgrounds.
 
-- Accept `imagesData: string[]` (with backward-compatible fallback: if `imageData` string is sent, wrap to array).
-- Build the user message with one `text` part plus **one `image_url` part per photo**, in the order received.
-- Update system prompt with a short note: "The user may provide multiple photos of the same recipe (e.g. ingredients page and method page). Treat them as one recipe and merge information across images."
-- Reject if `imagesData` is empty or longer than 5.
-- Model stays `google/gemini-2.5-flash` (multimodal, supports multiple image parts).
+## Recipe Modal (RecipeCardDialog) — new layout
+
+```text
+┌──────────────────────────────────────────────────┐
+│ Andalusian Meatballs                       ⋯  ✕ │
+│ ⏱ 25 min · 👥 4 servings · 🔥 350 kcal · ★ 4.2 │
+│                                                  │
+│ [hero image]                                     │
+│                                                  │
+│ Ingredients                                      │
+│  …                                               │
+│ Instructions                                     │
+│  …                                               │
+└──────────────────────────────────────────────────┘
+```
+
+- Header: title + single muted metadata strip (cook time, servings, calories, rating, cooked-count merged into rating area as "★ 4.2 · cooked 3×").
+- `⋯` overflow menu replaces the row of buttons. Items: **Log to SW**, **Edit SW info** (or *Add SW info*), **Print A4**, **View original** (when URL), **Retry calories** (only when failed).
+- Calorie loading/error states become subtle inline text under the metadata strip, not a coloured pill.
+- SW data, when present, surfaces as a single neutral inline chip in the metadata strip ("SW 2 Swips · Speed") rather than dedicated buttons.
+- Keep ingredient list and steps exactly as they are — they're already clean.
+
+## Colour cleanup
+
+- Replace `bg-orange-*`, `bg-purple-*`, `bg-green-*`, `bg-yellow-*` pills with `variant="secondary"` Badges using `text-muted-foreground`.
+- Keep the day-of-week tile as is (it's a useful colour anchor) but unify weekend amber and weekday primary into a single muted tile for the modal; cards can keep the subtle day tile.
+- Approve/reject buttons keep semantic green/red — they're action affordances, not decoration.
+
+## Files to change
+
+- `src/components/meals/MealSlot.tsx` — restructure card body, move actions into `⋯` menu, swap pill styles for neutral metadata row.
+- `src/components/meals/RecipeCardDialog.tsx` — collapse header button row into a single `⋯` `DropdownMenu`, unify metadata strip, neutralise calorie/SW pills.
 
 ## Out of scope
 
-- No DB schema changes. Only the first photo (if any) is still used as `image_url` when the AI returns one; we don't persist the uploaded photos themselves.
-- Website tab is unchanged.
+- No changes to data models, SW logic, calorie estimation, drag-and-drop, or the meal-planning flow.
+- `SwInfoDialog`, `SwapMealDialog`, print template untouched — only the entry points move.
+- Recipe Library cards (separate component) untouched unless you want them included in a follow-up.
 
-## Files touched
-
-- `src/components/meals/AddRecipeDialog.tsx`
-- `src/hooks/useDirectRecipeExtraction.ts`
-- `supabase/functions/process-cookbook-recipe/index.ts`
+Want me to proceed with this, or adjust the hierarchy (e.g. keep "View Recipe" as a visible link, or surface SW more prominently)?
