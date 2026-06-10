@@ -487,7 +487,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                     </div>
                   )}
 
-                  {/* Edit button for finalized plans */}
+                  {/* Overflow menu for finalized plans */}
                   {isPlanFinalised && onEditFinalisedMeal && (
                     <div className="hidden sm:block">
                       <DropdownMenu>
@@ -501,6 +501,12 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit Meal
                           </DropdownMenuItem>
+                          {hasSw && (
+                            <DropdownMenuItem onClick={handleLogToSw}>
+                              <Scale className="h-4 w-4 mr-2" />
+                              Log to SW
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
