@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MealWithRecipeCard, DayOfWeek, REJECTION_REASONS, RejectionReasonCode, MealType } from '@/types/meal';
-import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen, Search, Loader2, SkipForward, UtensilsCrossed, Flame } from 'lucide-react';
+import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, Search, Loader2, SkipForward, UtensilsCrossed, Flame } from 'lucide-react';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { cn } from '@/lib/utils';
 import {
@@ -31,7 +31,7 @@ import {
 import { SwapMealDialog } from './SwapMealDialog';
 import { RecipeCardDialog } from './RecipeCardDialog';
 import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
-import { HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
+
 import { Scale, Star } from 'lucide-react';
 import { useRecipeStats } from '@/hooks/useRecipeStats';
 import { supabase } from '@/integrations/supabase/client';
@@ -361,13 +361,24 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                   <div className="min-w-0 flex-1">
                     {/* Meal name with search button */}
                     <div className="flex items-center gap-1.5">
-                      <h3 className="font-medium text-base leading-snug">
-                        {isBlankMeal ? (
-                          <span className="text-muted-foreground italic">Add a recipe</span>
-                        ) : (
-                          meal.meal_name
-                        )}
-                      </h3>
+                      {(meal.recipe_card || meal.recipe_id) && !isBlankMeal ? (
+                        <button
+                          onClick={handleOpenRecipe}
+                          disabled={isLoadingRecipe}
+                          className="font-medium text-base leading-snug text-left hover:text-primary transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {meal.meal_name}
+                          {isLoadingRecipe && <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />}
+                        </button>
+                      ) : (
+                        <h3 className="font-medium text-base leading-snug">
+                          {isBlankMeal ? (
+                            <span className="text-muted-foreground italic">Add a recipe</span>
+                          ) : (
+                            meal.meal_name
+                          )}
+                        </h3>
+                      )}
                       {!isPlanFinalised && !isBlankMeal && (
                         <Button
                           variant="ghost"
@@ -476,7 +487,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                     </div>
                   )}
 
-                  {/* Edit button for finalized plans */}
+                  {/* Overflow menu for finalized plans */}
                   {isPlanFinalised && onEditFinalisedMeal && (
                     <div className="hidden sm:block">
                       <DropdownMenu>
@@ -490,6 +501,12 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit Meal
                           </DropdownMenuItem>
+                          {hasSw && (
+                            <DropdownMenuItem onClick={handleLogToSw}>
+                              <Scale className="h-4 w-4 mr-2" />
+                              Log to SW
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -510,7 +527,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                     {/* Calories per serving (if estimated) */}
                     {meal.recipe_card?.estimated_calories_per_serving ? (
                       <span className="flex items-center gap-1">
-                        <Flame className="h-3.5 w-3.5 text-orange-500" />
+                        <Flame className="h-3.5 w-3.5" />
                         ~{meal.recipe_card.estimated_calories_per_serving} kcal
                       </span>
                     ) : null}
@@ -558,62 +575,34 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                       </span>
                     )}
 
-                    {/* View Recipe button - works for any meal with recipe_card OR library recipe_id */}
-                    {(meal.recipe_card || meal.recipe_id) && (
-                      <button
-                        onClick={handleOpenRecipe}
-                        disabled={isLoadingRecipe}
-                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer disabled:opacity-50"
-                      >
-                        {isLoadingRecipe ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookOpen className="h-3.5 w-3.5" />}
-                        View Recipe
-                      </button>
-                    )}
                     {recipeStats && recipeStats.avgRating != null && (
-                      <span className="flex items-center gap-0.5 text-amber-600">
+                      <span className="flex items-center gap-1">
                         <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                         {recipeStats.avgRating.toFixed(1)}
-                        <span className="text-muted-foreground">({recipeStats.ratingCount})</span>
+                        {recipeStats.ratingCount > 0 && (
+                          <span className="text-muted-foreground/70">({recipeStats.ratingCount})</span>
+                        )}
+                      </span>
+                    )}
+                    {hasSw && (
+                      <span className="flex items-center gap-1">
+                        <Scale className="h-3.5 w-3.5" />
+                        {swSwips != null ? `${swSwips} Swips` : 'SW'}
+                        {swSpeed ? ' · Speed' : ''}
                       </span>
                     )}
                   </div>
                 )}
 
-                {/* Badges row: meal type + library recipe */}
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  {mealTypeLabel && (
-                    <Badge variant="outline" className="text-xs gap-1">
+                {/* Meal type badge (only non-dinner — kept as neutral chip) */}
+                {mealTypeLabel && (
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <Badge variant="outline" className="text-xs gap-1 text-muted-foreground">
                       <UtensilsCrossed className="h-3 w-3" />
                       {mealTypeLabel}
                     </Badge>
-                  )}
-                  {meal.recipe_id && (
-                    <Badge variant="secondary" className="text-xs gap-1">
-                      <BookOpen className="h-3 w-3" />
-                      Library Recipe
-                    </Badge>
-                  )}
-                  {hasSw && (
-                    <>
-                      {swSwips != null && (
-                        <Badge className="text-xs bg-purple-100 text-purple-800 border-purple-200">
-                          {swSwips} Swips
-                        </Badge>
-                      )}
-                      {swHe && (
-                        <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200">
-                          HE {HEALTHY_EXTRA_LABELS[swHe as keyof typeof HEALTHY_EXTRA_LABELS]} {swHeAmt ?? 1}
-                        </Badge>
-                      )}
-                      {swSpeed && (
-                        <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-200">Speed</Badge>
-                      )}
-                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={handleLogToSw}>
-                        <Scale className="h-3 w-3 mr-1" /> Log to SW
-                      </Button>
-                    </>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Inline Recipe URL Input - visible before finalisation when no URL and no library recipe */}
                 {/* For blank meals, always show prominently */}
@@ -750,18 +739,29 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
               </div>
             )}
 
-            {/* Mobile edit for finalized plans */}
+            {/* Mobile menu for finalized plans */}
             {isPlanFinalised && onEditFinalisedMeal && (
               <div className="flex sm:hidden justify-end pt-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="min-h-[44px]"
-                  onClick={() => onEditFinalisedMeal(meal)}
-                >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  Edit Meal
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="min-h-[44px]">
+                      <MoreVertical className="h-4 w-4 mr-1" />
+                      More
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onEditFinalisedMeal(meal)}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Meal
+                    </DropdownMenuItem>
+                    {hasSw && (
+                      <DropdownMenuItem onClick={handleLogToSw}>
+                        <Scale className="h-4 w-4 mr-2" />
+                        Log to SW
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
           </div>

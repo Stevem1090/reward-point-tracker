@@ -6,19 +6,38 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { RecipeCard, Ingredient } from '@/types/meal';
-import { Clock, Users, ExternalLink, Printer, AlertCircle, Flame, Loader2, RefreshCw, Star, Scale } from 'lucide-react';
+import {
+  Clock,
+  Users,
+  ExternalLink,
+  Printer,
+  AlertCircle,
+  Flame,
+  Loader2,
+  RefreshCw,
+  Star,
+  Scale,
+  MoreHorizontal,
+  Plus,
+  Pencil,
+} from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { scaleIngredients } from '@/utils/scaleIngredients';
 import { generateRecipeCardHtml, RecipeCardData } from '@/utils/generateRecipeCardHtml';
 import { estimateCaloriesForRecipeCard } from '@/hooks/useCalorieEstimation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRecipeStats } from '@/hooks/useRecipeStats';
 import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
-import { HealthyExtraType, HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
+import { HealthyExtraType } from '@/types/slimmingWorld';
 import { SwInfoDialog } from './SwInfoDialog';
-import { Plus, Pencil } from 'lucide-react';
 
 interface RecipeCardDialogProps {
   open: boolean;
@@ -109,8 +128,6 @@ export function RecipeCardDialog({
     }
   };
 
-  // Lazy backfill: when dialog opens for a card with ingredients but no calorie
-  // estimate yet, trigger one. Skipped for library previews (synthetic recipe cards).
   useEffect(() => {
     if (open && canEstimate && !recipeCard.estimated_calories_per_serving) {
       runEstimate();
@@ -118,28 +135,23 @@ export function RecipeCardDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, recipeCard.id]);
 
-  // Check if extraction failed (empty ingredients and steps)
   const extractionFailed = recipeCard.ingredients.length === 0 && recipeCard.steps.length === 0;
 
-  // Scale ingredients based on current servings vs base servings
   const scaledIngredients = scaleIngredients(
     recipeCard.ingredients,
     recipeCard.base_servings,
     currentServings
   );
 
-  // Extract domain from URL for display
   const getUrlDomain = (url: string) => {
     try {
-      const domain = new URL(url).hostname.replace('www.', '');
-      return domain;
+      return new URL(url).hostname.replace('www.', '');
     } catch {
       return url;
     }
   };
 
   const handlePrint = () => {
-    // Pass ORIGINAL ingredients - generateRecipeCardHtml will scale them
     const recipeData: RecipeCardData = {
       title: recipeCard.meal_name,
       servings: currentServings,
@@ -150,144 +162,132 @@ export function RecipeCardDialog({
       sourceUrl: recipeUrl,
       baseServings: recipeCard.base_servings,
     };
-    
     const htmlContent = generateRecipeCardHtml(recipeData);
-    
-    // Open in new window and trigger print
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(htmlContent);
       printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.print();
-      };
+      printWindow.onload = () => printWindow.print();
     }
   };
+
+  // Inline metadata item — neutral muted styling, no coloured pills.
+  const MetaItem = ({ icon: Icon, children }: { icon: any; children: React.ReactNode }) => (
+    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+      <Icon className="h-3.5 w-3.5" />
+      {children}
+    </span>
+  );
+
+  const hasOverflowActions =
+    !!mealId || (recipeId && hasSw) || true; // print always available
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] !grid !grid-rows-[auto_1fr] overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="text-xl">{recipeCard.meal_name}</DialogTitle>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          <div className="flex items-start justify-between gap-3 pr-6">
+            <DialogTitle className="text-xl leading-tight">{recipeCard.meal_name}</DialogTitle>
+            {hasOverflowActions && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 -mt-1 text-muted-foreground"
+                    aria-label="More actions"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {recipeId && hasSw && (
+                    <DropdownMenuItem
+                      onClick={handleLogToSw}
+                      disabled={swLog.addEntry.isPending}
+                    >
+                      <Scale className="h-4 w-4 mr-2" />
+                      Log to SW
+                    </DropdownMenuItem>
+                  )}
+                  {mealId && (
+                    <DropdownMenuItem onClick={() => setSwDialogOpen(true)}>
+                      {hasSw ? (
+                        <Pencil className="h-4 w-4 mr-2" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      {hasSw ? 'Edit SW info' : 'Add SW info'}
+                    </DropdownMenuItem>
+                  )}
+                  {(recipeId && hasSw) || mealId ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuItem onClick={handlePrint}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print A4
+                  </DropdownMenuItem>
+                  {recipeUrl && (
+                    <DropdownMenuItem asChild>
+                      <a href={recipeUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        View original
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                  {calorieStatus === 'rate_limited' || calorieStatus === 'error' ? (
+                    <DropdownMenuItem onClick={runEstimate}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Retry calorie estimate
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+
+          {/* Single neutral metadata strip */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2">
             {estimatedCookMinutes && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {estimatedCookMinutes} mins
-              </Badge>
+              <MetaItem icon={Clock}>{estimatedCookMinutes} min</MetaItem>
             )}
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <Users className="h-3 w-3" />
-              {currentServings} servings
-            </Badge>
-            {stats && stats.avgRating != null && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                {stats.avgRating.toFixed(1)} ({stats.ratingCount})
-              </Badge>
-            )}
-            {stats && stats.timesEaten > 0 && (
-              <Badge variant="outline" className="text-xs">
-                Cooked {stats.timesEaten}×
-              </Badge>
-            )}
-            {recipeId && hasSw && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1"
-                onClick={handleLogToSw}
-                disabled={swLog.addEntry.isPending}
-              >
-                <Scale className="h-3 w-3" />
-                Log to SW
-              </Button>
-            )}
-            {mealId && (
-              <Button
-                size="sm"
-                variant={hasSw ? 'ghost' : 'outline'}
-                className="h-7 gap-1"
-                onClick={() => setSwDialogOpen(true)}
-              >
-                {hasSw ? <Pencil className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                {hasSw ? 'Edit SW info' : 'Add SW info'}
-              </Button>
-            )}
+            <MetaItem icon={Users}>{currentServings} servings</MetaItem>
             {localCalories ? (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Flame className="h-3 w-3 text-orange-500" />
-                ~{localCalories} kcal / serving
-              </Badge>
+              <MetaItem icon={Flame}>~{localCalories} kcal</MetaItem>
             ) : calorieStatus === 'loading' ? (
-              <Badge variant="secondary" className="flex items-center gap-1 text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Estimating calories…
-              </Badge>
-            ) : calorieStatus === 'rate_limited' ? (
-              <Badge
-                variant="outline"
-                className="flex items-center gap-1 text-muted-foreground cursor-pointer"
-                title="AI rate limit reached. Try again shortly."
-                onClick={runEstimate}
-              >
-                <RefreshCw className="h-3 w-3" />
-                Calories rate-limited
-              </Badge>
-            ) : calorieStatus === 'credits_exhausted' ? (
-              <Badge
-                variant="outline"
-                className="flex items-center gap-1 text-muted-foreground"
-                title="AI credits exhausted."
-              >
-                <AlertCircle className="h-3 w-3" />
-                Calories unavailable
-              </Badge>
-            ) : calorieStatus === 'error' ? (
-              <Badge
-                variant="outline"
-                className="flex items-center gap-1 text-muted-foreground cursor-pointer"
-                title="Calorie estimate failed. Tap to retry."
-                onClick={runEstimate}
-              >
-                <RefreshCw className="h-3 w-3" />
-                Retry calories
-              </Badge>
+              <MetaItem icon={Loader2}>
+                <span className="inline-flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Estimating…
+                </span>
+              </MetaItem>
             ) : null}
-            {recipeUrl && (
-              <a
-                href={recipeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-primary hover:underline flex items-center gap-1"
-              >
-                <ExternalLink className="h-3 w-3" />
-                View original
-              </a>
+            {stats && stats.avgRating != null && (
+              <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                {stats.avgRating.toFixed(1)}
+                {stats.ratingCount > 0 && ` (${stats.ratingCount})`}
+                {stats.timesEaten > 0 && ` · cooked ${stats.timesEaten}×`}
+              </span>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1.5"
-              onClick={handlePrint}
-            >
-              <Printer className="h-3.5 w-3.5" />
-              Print A4
-            </Button>
+            {hasSw && recipeSwData && (
+              <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                <Scale className="h-3.5 w-3.5" />
+                {recipeSwData.sw_swips != null ? `${recipeSwData.sw_swips} Swips` : 'SW'}
+                {recipeSwData.sw_is_speed ? ' · Speed' : ''}
+              </span>
+            )}
           </div>
         </DialogHeader>
 
         <ScrollArea className="h-full overflow-hidden pr-4">
           {extractionFailed ? (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-4">
-              <AlertCircle className="h-12 w-12 text-orange-500" />
+              <AlertCircle className="h-12 w-12 text-muted-foreground" />
               <div>
                 <h3 className="font-medium text-lg">Unable to Extract Recipe</h3>
                 <p className="text-sm text-muted-foreground mt-2">
                   We couldn't automatically extract the recipe from this website.
                 </p>
               </div>
-              
               {recipeUrl && (
                 <a
                   href={recipeUrl}
@@ -302,7 +302,6 @@ export function RecipeCardDialog({
             </div>
           ) : (
             <div className="space-y-6 pb-4">
-              {/* Image */}
               {recipeCard.image_url && (
                 <img
                   src={recipeCard.image_url}
@@ -311,7 +310,6 @@ export function RecipeCardDialog({
                 />
               )}
 
-              {/* Ingredients */}
               <div>
                 <h3 className="font-semibold text-lg mb-3">Ingredients</h3>
                 <ul className="space-y-2">
@@ -326,13 +324,12 @@ export function RecipeCardDialog({
                 </ul>
               </div>
 
-              {/* Steps */}
               <div>
                 <h3 className="font-semibold text-lg mb-3">Instructions</h3>
                 <ol className="space-y-4">
                   {recipeCard.steps.map((step: string, index: number) => (
                     <li key={index} className="flex gap-3 text-sm">
-                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-medium">
                         {index + 1}
                       </span>
                       <p className="pt-0.5">{step}</p>
