@@ -739,18 +739,29 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
               </div>
             )}
 
-            {/* Mobile edit for finalized plans */}
+            {/* Mobile menu for finalized plans */}
             {isPlanFinalised && onEditFinalisedMeal && (
               <div className="flex sm:hidden justify-end pt-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="min-h-[44px]"
-                  onClick={() => onEditFinalisedMeal(meal)}
-                >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  Edit Meal
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="min-h-[44px]">
+                      <MoreVertical className="h-4 w-4 mr-1" />
+                      More
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onEditFinalisedMeal(meal)}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Meal
+                    </DropdownMenuItem>
+                    {hasSw && (
+                      <DropdownMenuItem onClick={handleLogToSw}>
+                        <Scale className="h-4 w-4 mr-2" />
+                        Log to SW
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
           </div>
