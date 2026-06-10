@@ -558,62 +558,34 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                       </span>
                     )}
 
-                    {/* View Recipe button - works for any meal with recipe_card OR library recipe_id */}
-                    {(meal.recipe_card || meal.recipe_id) && (
-                      <button
-                        onClick={handleOpenRecipe}
-                        disabled={isLoadingRecipe}
-                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer disabled:opacity-50"
-                      >
-                        {isLoadingRecipe ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookOpen className="h-3.5 w-3.5" />}
-                        View Recipe
-                      </button>
-                    )}
                     {recipeStats && recipeStats.avgRating != null && (
-                      <span className="flex items-center gap-0.5 text-amber-600">
+                      <span className="flex items-center gap-1">
                         <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                         {recipeStats.avgRating.toFixed(1)}
-                        <span className="text-muted-foreground">({recipeStats.ratingCount})</span>
+                        {recipeStats.ratingCount > 0 && (
+                          <span className="text-muted-foreground/70">({recipeStats.ratingCount})</span>
+                        )}
+                      </span>
+                    )}
+                    {hasSw && (
+                      <span className="flex items-center gap-1">
+                        <Scale className="h-3.5 w-3.5" />
+                        {swSwips != null ? `${swSwips} Swips` : 'SW'}
+                        {swSpeed ? ' · Speed' : ''}
                       </span>
                     )}
                   </div>
                 )}
 
-                {/* Badges row: meal type + library recipe */}
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  {mealTypeLabel && (
-                    <Badge variant="outline" className="text-xs gap-1">
+                {/* Meal type badge (only non-dinner — kept as neutral chip) */}
+                {mealTypeLabel && (
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <Badge variant="outline" className="text-xs gap-1 text-muted-foreground">
                       <UtensilsCrossed className="h-3 w-3" />
                       {mealTypeLabel}
                     </Badge>
-                  )}
-                  {meal.recipe_id && (
-                    <Badge variant="secondary" className="text-xs gap-1">
-                      <BookOpen className="h-3 w-3" />
-                      Library Recipe
-                    </Badge>
-                  )}
-                  {hasSw && (
-                    <>
-                      {swSwips != null && (
-                        <Badge className="text-xs bg-purple-100 text-purple-800 border-purple-200">
-                          {swSwips} Swips
-                        </Badge>
-                      )}
-                      {swHe && (
-                        <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200">
-                          HE {HEALTHY_EXTRA_LABELS[swHe as keyof typeof HEALTHY_EXTRA_LABELS]} {swHeAmt ?? 1}
-                        </Badge>
-                      )}
-                      {swSpeed && (
-                        <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-200">Speed</Badge>
-                      )}
-                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={handleLogToSw}>
-                        <Scale className="h-3 w-3 mr-1" /> Log to SW
-                      </Button>
-                    </>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Inline Recipe URL Input - visible before finalisation when no URL and no library recipe */}
                 {/* For blank meals, always show prominently */}
