@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MealWithRecipeCard, DayOfWeek, REJECTION_REASONS, RejectionReasonCode, MealType } from '@/types/meal';
-import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, BookOpen, Search, Loader2, SkipForward, UtensilsCrossed, Flame } from 'lucide-react';
+import { Clock, Users, Check, X, MoreVertical, Plus, ExternalLink, Pencil, RefreshCw, Minus, Search, Loader2, SkipForward, UtensilsCrossed, Flame } from 'lucide-react';
 import { useMealPlans } from '@/hooks/useMealPlans';
 import { cn } from '@/lib/utils';
 import {
