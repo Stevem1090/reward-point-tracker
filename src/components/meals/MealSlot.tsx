@@ -510,7 +510,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                     {/* Calories per serving (if estimated) */}
                     {meal.recipe_card?.estimated_calories_per_serving ? (
                       <span className="flex items-center gap-1">
-                        <Flame className="h-3.5 w-3.5 text-orange-500" />
+                        <Flame className="h-3.5 w-3.5" />
                         ~{meal.recipe_card.estimated_calories_per_serving} kcal
                       </span>
                     ) : null}
