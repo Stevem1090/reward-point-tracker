@@ -361,13 +361,24 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                   <div className="min-w-0 flex-1">
                     {/* Meal name with search button */}
                     <div className="flex items-center gap-1.5">
-                      <h3 className="font-medium text-base leading-snug">
-                        {isBlankMeal ? (
-                          <span className="text-muted-foreground italic">Add a recipe</span>
-                        ) : (
-                          meal.meal_name
-                        )}
-                      </h3>
+                      {(meal.recipe_card || meal.recipe_id) && !isBlankMeal ? (
+                        <button
+                          onClick={handleOpenRecipe}
+                          disabled={isLoadingRecipe}
+                          className="font-medium text-base leading-snug text-left hover:text-primary transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {meal.meal_name}
+                          {isLoadingRecipe && <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />}
+                        </button>
+                      ) : (
+                        <h3 className="font-medium text-base leading-snug">
+                          {isBlankMeal ? (
+                            <span className="text-muted-foreground italic">Add a recipe</span>
+                          ) : (
+                            meal.meal_name
+                          )}
+                        </h3>
+                      )}
                       {!isPlanFinalised && !isBlankMeal && (
                         <Button
                           variant="ghost"
