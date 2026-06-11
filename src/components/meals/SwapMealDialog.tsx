@@ -7,8 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { useRecipes } from '@/hooks/useRecipes';
+import { useDirectRecipeExtraction } from '@/hooks/useDirectRecipeExtraction';
 import { Recipe, DayOfWeek } from '@/types/meal';
-import { Clock, Users, BookOpen, Pencil, Loader2, Search } from 'lucide-react';
+import { Clock, Users, BookOpen, Pencil, Loader2, Search, Camera, X, Image as ImageIcon } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SwapMealDialogProps {
   open: boolean;
@@ -26,6 +28,8 @@ interface SwapMealDialogProps {
   isSwapping?: boolean;
 }
 
+const MAX_IMAGES = 5;
+
 export function SwapMealDialog({ 
   open, 
   onOpenChange, 
@@ -35,7 +39,8 @@ export function SwapMealDialog({
   isSwapping 
 }: SwapMealDialogProps) {
   const { recipes, isLoading: recipesLoading } = useRecipes();
-  const [activeTab, setActiveTab] = useState<'library' | 'custom'>('custom');
+  const { processCookbook } = useDirectRecipeExtraction();
+  const [activeTab, setActiveTab] = useState<'library' | 'custom' | 'photo'>('custom');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Custom meal form state
@@ -46,6 +51,11 @@ export function SwapMealDialog({
     servings: 4,
     estimatedCookMinutes: 30,
   });
+
+  // Photo tab state
+  const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
+  const [cookbookTitle, setCookbookTitle] = useState('');
+  const [photoRecipeName, setPhotoRecipeName] = useState('');
 
   const filteredRecipes = recipes.filter(r =>
     r.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -74,6 +84,66 @@ export function SwapMealDialog({
     });
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    const remaining = MAX_IMAGES - images.length;
+    if (remaining <= 0) {
+      toast.error(`You can add up to ${MAX_IMAGES} photos.`);
+      e.target.value = '';
+      return;
+    }
+
+    const toAdd = files.slice(0, remaining);
+    if (files.length > remaining) {
+      toast.error(`Only the first ${remaining} photo(s) were added (max ${MAX_IMAGES}).`);
+    }
+
+    toAdd.forEach((file) => {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`"${file.name}" is too large. Use images under 10MB.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const preview = ev.target?.result as string;
+        setImages((prev) => (prev.length >= MAX_IMAGES ? prev : [...prev, { file, preview }]));
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  const removeImage = (idx: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handlePhotoSubmit = async () => {
+    if (images.length === 0) {
+      toast.error('Please add at least one photo');
+      return;
+    }
+    try {
+      const recipe = await processCookbook.mutateAsync({
+        imagesData: images.map((i) => i.preview),
+        cookbookTitle: cookbookTitle.trim() || undefined,
+        recipeName: photoRecipeName.trim() || undefined,
+      });
+
+      onSwap({
+        mealName: recipe.name,
+        description: recipe.description || undefined,
+        recipeUrl: recipe.source_url || undefined,
+        servings: recipe.servings,
+        estimatedCookMinutes: recipe.estimated_cook_minutes,
+      });
+    } catch {
+      // toast handled in hook
+    }
+  };
+
   const resetForm = () => {
     setCustomMeal({
       mealName: '',
@@ -84,7 +154,12 @@ export function SwapMealDialog({
     });
     setSearchQuery('');
     setActiveTab('custom');
+    setImages([]);
+    setCookbookTitle('');
+    setPhotoRecipeName('');
   };
+
+  const isExtractingPhoto = processCookbook.isPending;
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -98,15 +173,19 @@ export function SwapMealDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'library' | 'custom')}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="library" className="gap-2">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'library' | 'custom' | 'photo')}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="library" className="gap-1.5">
               <BookOpen className="h-4 w-4" />
-              From Library
+              <span className="hidden sm:inline">Library</span>
             </TabsTrigger>
-            <TabsTrigger value="custom" className="gap-2">
+            <TabsTrigger value="custom" className="gap-1.5">
               <Pencil className="h-4 w-4" />
-              Custom Meal
+              <span className="hidden sm:inline">Custom</span>
+            </TabsTrigger>
+            <TabsTrigger value="photo" className="gap-1.5">
+              <ImageIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Photo</span>
             </TabsTrigger>
           </TabsList>
 
@@ -240,6 +319,93 @@ export function SwapMealDialog({
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Saving...
+                  </>
+                ) : (
+                  mealId ? 'Replace Meal' : 'Add Meal'
+                )}
+              </Button>
+            </DialogFooter>
+          </TabsContent>
+
+          <TabsContent value="photo" className="mt-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cookbook-title-swap">Cookbook Title (optional)</Label>
+              <Input
+                id="cookbook-title-swap"
+                value={cookbookTitle}
+                onChange={(e) => setCookbookTitle(e.target.value)}
+                placeholder="e.g., The Joy of Cooking"
+                disabled={isExtractingPhoto}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="recipe-name-swap">Recipe Name (optional)</Label>
+              <Input
+                id="recipe-name-swap"
+                value={photoRecipeName}
+                onChange={(e) => setPhotoRecipeName(e.target.value)}
+                placeholder="e.g., Chicken Tikka Masala"
+                disabled={isExtractingPhoto}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Cookbook Photos</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {images.map((img, idx) => (
+                  <div key={idx} className="relative aspect-square rounded-lg border overflow-hidden bg-muted">
+                    <img
+                      src={img.preview}
+                      alt={`Page ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6"
+                      onClick={() => removeImage(idx)}
+                      disabled={isExtractingPhoto}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                {images.length < MAX_IMAGES && (
+                  <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                    <Camera className="h-6 w-6 text-muted-foreground mb-1" />
+                    <span className="text-xs text-muted-foreground text-center px-1">
+                      {images.length === 0 ? 'Add photo' : 'Add more'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={handleImageUpload}
+                      disabled={isExtractingPhoto}
+                    />
+                  </label>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Add one or more photos — e.g. ingredients page and method page (max {MAX_IMAGES}).
+              </p>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isExtractingPhoto || isSwapping}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handlePhotoSubmit}
+                disabled={images.length === 0 || isExtractingPhoto || isSwapping}
+              >
+                {isExtractingPhoto || isSwapping ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {isExtractingPhoto ? `Extracting from ${images.length} photo${images.length === 1 ? '' : 's'}…` : 'Saving...'}
                   </>
                 ) : (
                   mealId ? 'Replace Meal' : 'Add Meal'

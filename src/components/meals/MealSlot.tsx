@@ -735,6 +735,23 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                       Reject
                     </Button>
                   )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="min-h-[44px] w-11 shrink-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setIsSwapDialogOpen(true)}>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Replace Meal
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => skipMeal.mutate(meal.id)}>
+                        <SkipForward className="h-4 w-4 mr-2" />
+                        Skip Day
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             )}
