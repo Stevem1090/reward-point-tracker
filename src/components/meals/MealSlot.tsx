@@ -611,8 +611,11 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                     {hasSw && (
                       <span className="flex items-center gap-1">
                         <Scale className="h-3.5 w-3.5" />
-                        {swSwips != null ? `${swSwips} Swips` : 'SW'}
-                        {swSpeed ? ' · Speed' : ''}
+                        {[
+                          swSwips != null ? `${swSwips} Swips` : (swHe ? null : 'SW'),
+                          swSpeed ? 'Speed' : null,
+                          swHe ? `HE: ${swHeAmt || 1}× ${HEALTHY_EXTRA_LABELS[swHe as keyof typeof HEALTHY_EXTRA_LABELS]}` : null,
+                        ].filter(Boolean).join(' · ')}
                       </span>
                     )}
                   </div>
