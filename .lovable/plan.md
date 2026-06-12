@@ -1,54 +1,46 @@
-# Improve Replace/Reject Flow in Meal Planning
+# Meal card tap-to-open + Healthy Extra display
 
-Two related changes in the meal planning UI.
+## 1. Whole meal card opens the recipe modal
 
-## 1. Restore full action set after a meal is rejected
+**File:** `src/components/meals/MealSlot.tsx`
 
-**Problem:** Once a meal in a plan is approved, the user can change their mind and reject it. But on mobile, a rejected (or approved) meal only shows a single button (Approve or Reject) — there is no way to manually **Replace** the meal or **Skip** the day without going through AI regeneration. Desktop already exposes these via the `⋯` menu; mobile does not.
+- Add an `onClick` handler to the main `<Card>` (the non-empty / non-skipped render path around line 341) that calls `handleOpenRecipe()` when the meal has a `recipe_card` or `recipe_id` and isn't a blank placeholder.
+- Add `role="button"`, `tabIndex={0}` and a keyboard handler (Enter / Space) for accessibility, plus `cursor-pointer` styling when openable.
+- Stop event propagation on every interactive child so they keep their own behaviour and don't also trigger the card open:
+  - Meal-name button (can keep — same action, but stop propagation to avoid double-open)
+  - Google "Search recipe" icon button
+  - Approve / Reject buttons (desktop + mobile)
+  - The `MoreVertical` `DropdownMenuTrigger` (desktop pending, desktop non-pending, mobile pending, mobile non-pending, finalised desktop, finalised mobile)
+  - Servings `Popover` trigger and its `+ / -` buttons
+  - URL `<Input>` and Save button
+  - Recipe URL `<a>` link and its edit pencil button
+  - Empty-slot `+` button and skipped-slot "Restore" button stay as-is (no card-level click on those branches)
+- Done via a single `stopPropagation` wrapper on each `onClick`, e.g. `onClick={(e) => { e.stopPropagation(); handleApprove(); }}`.
 
-**Fix in `src/components/meals/MealSlot.tsx`:**
+When the meal has no recipe to open (e.g. blank meal, or URL-only meal with no `recipe_id` / `recipe_card`), the card click is a no-op and `cursor-pointer` is not applied.
 
-- In the mobile "non-pending" action row (currently only shows the opposite-status button), add a `⋯` overflow menu with:
-  - **Approve** (when status is `rejected`)
-  - **Reject** (when status is `approved`)
-  - **Replace Meal** (opens `SwapMealDialog`) — available for both approved and rejected
-  - **Skip Day** — available for both approved and rejected
-- Keep the existing single inline button as a fast-tap shortcut, or fold everything into the menu — pick the menu-only approach for consistency with the pending state on mobile (Approve/Reject/⋯).
-- On desktop, the dropdown for non-pending already contains Replace + Skip; just confirm both Approve and Reject entries are present depending on current status (Reject already shown for approved; Approve already shown for rejected). No structural change needed there.
+## 2. Show Slimming World Healthy Extras
 
-Scope is the in-planning state (`isPlanFinalised === false`). The finalised-plan menu (Edit Meal / Log to SW) is unchanged.
+Healthy Extra data already lives on the meal/recipe (`sw_healthy_extra_type`, `sw_healthy_extra_amount`) and is read in both components, but never rendered. Use `HEALTHY_EXTRA_LABELS` from `src/types/slimmingWorld.ts` for display.
 
-## 2. Add photo upload to the Replace Meal dialog
+### `src/components/meals/MealSlot.tsx` (~line 587)
 
-**Problem:** `SwapMealDialog` lets the user pick from Library or enter a Custom Meal manually. There is no way to add a meal from a cookbook photo the way `AddRecipeDialog` already supports.
-
-**Fix in `src/components/meals/SwapMealDialog.tsx`:**
-
-- Add a third tab **From Photo** alongside `From Library` and `Custom Meal`.
-- Reuse the same multi-image upload UX as `AddRecipeDialog`'s cookbook tab (up to 5 photos, 10MB each, grid preview with remove button, optional cookbook title and recipe name fields).
-- On Extract, call the existing `processCookbook` mutation from `useDirectRecipeExtraction`.
-- When extraction returns, immediately call `onSwap({...})` with the extracted recipe's name, description, servings, estimated cook time, and `recipe_url` (if any) so the meal slot is replaced/added. The extracted ingredients/steps are not saved to the user's recipe library from this flow (the dialog's job is to swap a meal, not to save a library recipe) — this matches the current Custom Meal behaviour. If the user wants it in the library, they use the Recipes tab.
-
-UI shape:
+Extend the SW meta row so a Healthy Extra is shown when present:
 
 ```text
-Tabs: [ From Library ] [ Custom Meal ] [ From Photo ]
-                                         └── cookbook title (optional)
-                                             recipe name (optional)
-                                             [photo grid + add tile, max 5]
-                                             [ Extract Recipe ] button
+[scale icon] {swips} Swips · Speed · HE: {amount}× {Calcium|Fibre|Healthy Fats}
 ```
 
-## Technical notes
+- If `swHe` is set, append `· HE: {swHeAmt || 1}× {HEALTHY_EXTRA_LABELS[swHe]}`.
+- If only `swHe` is set (no `swSwips`), drop the "Swips" segment so the row reads `HE: 1× Calcium`.
+- Import `HEALTHY_EXTRA_LABELS` from `@/types/slimmingWorld`.
 
-- `SwapMealDialog` already imports `Tabs`, `Input`, `Label`, `Button`. Add `Camera`, `X`, `Loader2` icons (Loader2 already imported).
-- Import `useDirectRecipeExtraction` and follow the cookbook flow used in `AddRecipeDialog.tsx`.
-- Image state shape: `{ file: File; preview: string }[]` with `MAX_IMAGES = 5`.
-- After successful extraction, map to the existing `onSwap` payload — no new prop needed on `SwapMealDialog`.
-- For `MealSlot.tsx` mobile menu, reuse the existing `DropdownMenu` pattern already used in the pending state (lines 684–701) to keep visual consistency.
+### `src/components/meals/RecipeCardDialog.tsx` (~line 257)
+
+Same change in the modal's metadata strip — append the HE segment to the existing SW `<span>` using the same formatting and `HEALTHY_EXTRA_LABELS` import.
 
 ## Out of scope
 
-- No changes to AI regeneration, edge functions, recipe library, or finalised-plan editing.
-- No DB or schema changes.
-- Extracted photo meals during a swap are not auto-saved to the user's recipe library.
+- No DB / edge-function changes.
+- No changes to `SwInfoDialog` editing UI, finalised-plan editing flow, or any other component.
+- Empty / skipped meal cards remain non-tappable (nothing to open).

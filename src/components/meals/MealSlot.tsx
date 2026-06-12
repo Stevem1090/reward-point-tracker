@@ -36,6 +36,9 @@ import { Scale, Star } from 'lucide-react';
 import { useRecipeStats } from '@/hooks/useRecipeStats';
 import { supabase } from '@/integrations/supabase/client';
 import { Ingredient, RecipeCard as RecipeCardType } from '@/types/meal';
+import { HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
+
+const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
 interface MealSlotProps {
   day: DayOfWeek;
