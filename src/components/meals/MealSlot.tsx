@@ -339,12 +339,26 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
     );
   }
 
+  const canOpenRecipe = !!(meal.recipe_card || meal.recipe_id) && !isBlankMeal;
+
   return (
     <>
-      <Card className={cn(
-        "transition-all",
-        meal.status === 'rejected' && "opacity-60"
-      )}>
+      <Card
+        className={cn(
+          "transition-all",
+          meal.status === 'rejected' && "opacity-60",
+          canOpenRecipe && "cursor-pointer hover:border-primary/40"
+        )}
+        onClick={canOpenRecipe ? () => handleOpenRecipe() : undefined}
+        onKeyDown={canOpenRecipe ? (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleOpenRecipe();
+          }
+        } : undefined}
+        role={canOpenRecipe ? 'button' : undefined}
+        tabIndex={canOpenRecipe ? 0 : undefined}
+      >
         <CardContent className="py-4">
           {/* Mobile-first stacked layout */}
           <div className="flex flex-col gap-3">
