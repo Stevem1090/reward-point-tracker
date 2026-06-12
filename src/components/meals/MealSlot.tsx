@@ -349,9 +349,16 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
           meal.status === 'rejected' && "opacity-60",
           canOpenRecipe && "cursor-pointer hover:border-primary/40"
         )}
-        onClick={canOpenRecipe ? () => handleOpenRecipe() : undefined}
+        onClick={canOpenRecipe ? (e) => {
+          // Ignore clicks that originate from interactive children
+          const target = e.target as HTMLElement;
+          if (target.closest('button, a, input, textarea, select, [role="menuitem"], [role="dialog"], [data-radix-popper-content-wrapper]')) {
+            return;
+          }
+          handleOpenRecipe();
+        } : undefined}
         onKeyDown={canOpenRecipe ? (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
             e.preventDefault();
             handleOpenRecipe();
           }
