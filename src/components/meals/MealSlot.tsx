@@ -380,7 +380,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                     <div className="flex items-center gap-1.5">
                       {(meal.recipe_card || meal.recipe_id) && !isBlankMeal ? (
                         <button
-                          onClick={handleOpenRecipe}
+                          onClick={(e) => { e.stopPropagation(); handleOpenRecipe(); }}
                           disabled={isLoadingRecipe}
                           className="font-medium text-base leading-snug text-left hover:text-primary transition-colors flex items-center gap-1.5 disabled:opacity-50"
                         >
