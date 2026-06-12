@@ -36,7 +36,7 @@ import { estimateCaloriesForRecipeCard } from '@/hooks/useCalorieEstimation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRecipeStats } from '@/hooks/useRecipeStats';
 import { useSwLog, getWeekStartMonday, formatDate } from '@/hooks/useSwLog';
-import { HealthyExtraType } from '@/types/slimmingWorld';
+import { HealthyExtraType, HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
 import { SwInfoDialog } from './SwInfoDialog';
 
 interface RecipeCardDialogProps {
@@ -271,8 +271,15 @@ export function RecipeCardDialog({
             {hasSw && recipeSwData && (
               <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
                 <Scale className="h-3.5 w-3.5" />
-                {recipeSwData.sw_swips != null ? `${recipeSwData.sw_swips} Swips` : 'SW'}
-                {recipeSwData.sw_is_speed ? ' · Speed' : ''}
+                {[
+                  recipeSwData.sw_swips != null
+                    ? `${recipeSwData.sw_swips} Swips`
+                    : (recipeSwData.sw_healthy_extra_type ? null : 'SW'),
+                  recipeSwData.sw_is_speed ? 'Speed' : null,
+                  recipeSwData.sw_healthy_extra_type
+                    ? `HE: ${recipeSwData.sw_healthy_extra_amount || 1}× ${HEALTHY_EXTRA_LABELS[recipeSwData.sw_healthy_extra_type]}`
+                    : null,
+                ].filter(Boolean).join(' · ')}
               </span>
             )}
           </div>

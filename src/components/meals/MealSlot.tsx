@@ -36,6 +36,9 @@ import { Scale, Star } from 'lucide-react';
 import { useRecipeStats } from '@/hooks/useRecipeStats';
 import { supabase } from '@/integrations/supabase/client';
 import { Ingredient, RecipeCard as RecipeCardType } from '@/types/meal';
+import { HEALTHY_EXTRA_LABELS } from '@/types/slimmingWorld';
+
+const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
 interface MealSlotProps {
   day: DayOfWeek;
@@ -336,12 +339,33 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
     );
   }
 
+  const canOpenRecipe = !!(meal.recipe_card || meal.recipe_id) && !isBlankMeal;
+
   return (
     <>
-      <Card className={cn(
-        "transition-all",
-        meal.status === 'rejected' && "opacity-60"
-      )}>
+      <Card
+        className={cn(
+          "transition-all",
+          meal.status === 'rejected' && "opacity-60",
+          canOpenRecipe && "cursor-pointer hover:border-primary/40"
+        )}
+        onClick={canOpenRecipe ? (e) => {
+          // Ignore clicks that originate from interactive children
+          const target = e.target as HTMLElement;
+          if (target.closest('button, a, input, textarea, select, [role="menuitem"], [role="dialog"], [data-radix-popper-content-wrapper]')) {
+            return;
+          }
+          handleOpenRecipe();
+        } : undefined}
+        onKeyDown={canOpenRecipe ? (e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+            e.preventDefault();
+            handleOpenRecipe();
+          }
+        } : undefined}
+        role={canOpenRecipe ? 'button' : undefined}
+        tabIndex={canOpenRecipe ? 0 : undefined}
+      >
         <CardContent className="py-4">
           {/* Mobile-first stacked layout */}
           <div className="flex flex-col gap-3">
@@ -363,7 +387,7 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                     <div className="flex items-center gap-1.5">
                       {(meal.recipe_card || meal.recipe_id) && !isBlankMeal ? (
                         <button
-                          onClick={handleOpenRecipe}
+                          onClick={(e) => { e.stopPropagation(); handleOpenRecipe(); }}
                           disabled={isLoadingRecipe}
                           className="font-medium text-base leading-snug text-left hover:text-primary transition-colors flex items-center gap-1.5 disabled:opacity-50"
                         >
@@ -587,8 +611,11 @@ export function MealSlot({ day, meal, isPlanFinalised, mealPlanId, onAddExtraMea
                     {hasSw && (
                       <span className="flex items-center gap-1">
                         <Scale className="h-3.5 w-3.5" />
-                        {swSwips != null ? `${swSwips} Swips` : 'SW'}
-                        {swSpeed ? ' · Speed' : ''}
+                        {[
+                          swSwips != null ? `${swSwips} Swips` : (swHe ? null : 'SW'),
+                          swSpeed ? 'Speed' : null,
+                          swHe ? `HE: ${swHeAmt || 1}× ${HEALTHY_EXTRA_LABELS[swHe as keyof typeof HEALTHY_EXTRA_LABELS]}` : null,
+                        ].filter(Boolean).join(' · ')}
                       </span>
                     )}
                   </div>
