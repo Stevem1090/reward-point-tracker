@@ -271,8 +271,15 @@ export function RecipeCardDialog({
             {hasSw && recipeSwData && (
               <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
                 <Scale className="h-3.5 w-3.5" />
-                {recipeSwData.sw_swips != null ? `${recipeSwData.sw_swips} Swips` : 'SW'}
-                {recipeSwData.sw_is_speed ? ' · Speed' : ''}
+                {[
+                  recipeSwData.sw_swips != null
+                    ? `${recipeSwData.sw_swips} Swips`
+                    : (recipeSwData.sw_healthy_extra_type ? null : 'SW'),
+                  recipeSwData.sw_is_speed ? 'Speed' : null,
+                  recipeSwData.sw_healthy_extra_type
+                    ? `HE: ${recipeSwData.sw_healthy_extra_amount || 1}× ${HEALTHY_EXTRA_LABELS[recipeSwData.sw_healthy_extra_type]}`
+                    : null,
+                ].filter(Boolean).join(' · ')}
               </span>
             )}
           </div>
