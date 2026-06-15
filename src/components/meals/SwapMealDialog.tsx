@@ -12,6 +12,7 @@ import { Recipe, DayOfWeek } from '@/types/meal';
 import { Clock, Users, BookOpen, Pencil, Loader2, Search, Camera, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
+
 interface SwapMealDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
