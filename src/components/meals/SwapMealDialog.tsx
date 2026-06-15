@@ -39,9 +39,10 @@ export function SwapMealDialog({
   onSwap,
   isSwapping 
 }: SwapMealDialogProps) {
-  const { recipes, isLoading: recipesLoading } = useRecipes();
+  const { recipes, isLoading: recipesLoading, createRecipe } = useRecipes();
   const { processCookbook } = useDirectRecipeExtraction();
   const [activeTab, setActiveTab] = useState<'library' | 'custom' | 'photo'>('custom');
+
   const [searchQuery, setSearchQuery] = useState('');
   
   // Custom meal form state
