@@ -134,12 +134,30 @@ export function SwapMealDialog({
         recipeName: photoRecipeName.trim() || undefined,
       });
 
+      if (!recipe.ingredients?.length || !recipe.steps?.length) {
+        toast.error("Couldn't read ingredients/steps from those photos — try clearer pages");
+        return;
+      }
+
+      const created = await createRecipe.mutateAsync({
+        name: recipe.name,
+        description: recipe.description || null,
+        servings: recipe.servings,
+        estimated_cook_minutes: recipe.estimated_cook_minutes || null,
+        ingredients: recipe.ingredients,
+        steps: recipe.steps,
+        image_url: recipe.image_url || null,
+        recipe_url: null,
+        source_type: 'cookbook',
+        cookbook_title: cookbookTitle.trim() || null,
+      });
+
       onSwap({
         mealName: recipe.name,
         description: recipe.description || undefined,
-        recipeUrl: recipe.source_url || undefined,
         servings: recipe.servings,
         estimatedCookMinutes: recipe.estimated_cook_minutes,
+        recipeId: created.id,
       });
     } catch {
       // toast handled in hook
@@ -161,7 +179,8 @@ export function SwapMealDialog({
     setPhotoRecipeName('');
   };
 
-  const isExtractingPhoto = processCookbook.isPending;
+  const isExtractingPhoto = processCookbook.isPending || createRecipe.isPending;
+
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
