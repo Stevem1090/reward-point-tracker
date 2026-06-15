@@ -12,6 +12,7 @@ import { Recipe, DayOfWeek } from '@/types/meal';
 import { Clock, Users, BookOpen, Pencil, Loader2, Search, Camera, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
+
 interface SwapMealDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -38,9 +39,10 @@ export function SwapMealDialog({
   onSwap,
   isSwapping 
 }: SwapMealDialogProps) {
-  const { recipes, isLoading: recipesLoading } = useRecipes();
+  const { recipes, isLoading: recipesLoading, createRecipe } = useRecipes();
   const { processCookbook } = useDirectRecipeExtraction();
   const [activeTab, setActiveTab] = useState<'library' | 'custom' | 'photo'>('custom');
+
   const [searchQuery, setSearchQuery] = useState('');
   
   // Custom meal form state
@@ -132,12 +134,30 @@ export function SwapMealDialog({
         recipeName: photoRecipeName.trim() || undefined,
       });
 
+      if (!recipe.ingredients?.length || !recipe.steps?.length) {
+        toast.error("Couldn't read ingredients/steps from those photos — try clearer pages");
+        return;
+      }
+
+      const created = await createRecipe.mutateAsync({
+        name: recipe.name,
+        description: recipe.description || null,
+        servings: recipe.servings,
+        estimated_cook_minutes: recipe.estimated_cook_minutes || null,
+        ingredients: recipe.ingredients,
+        steps: recipe.steps,
+        image_url: recipe.image_url || null,
+        recipe_url: null,
+        source_type: 'cookbook',
+        cookbook_title: cookbookTitle.trim() || null,
+      });
+
       onSwap({
         mealName: recipe.name,
         description: recipe.description || undefined,
-        recipeUrl: recipe.source_url || undefined,
         servings: recipe.servings,
         estimatedCookMinutes: recipe.estimated_cook_minutes,
+        recipeId: created.id,
       });
     } catch {
       // toast handled in hook
@@ -159,7 +179,8 @@ export function SwapMealDialog({
     setPhotoRecipeName('');
   };
 
-  const isExtractingPhoto = processCookbook.isPending;
+  const isExtractingPhoto = processCookbook.isPending || createRecipe.isPending;
+
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {

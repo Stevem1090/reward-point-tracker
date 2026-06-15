@@ -1,46 +1,28 @@
-# Meal card tap-to-open + Healthy Extra display
+## Problem
 
-## 1. Whole meal card opens the recipe modal
+When a user replaces/adds a meal via the new **Photo** tab in `SwapMealDialog`, the cookbook extraction succeeds (name, description, servings, cook time, ingredients, steps are returned by `process-cookbook-recipe`) — but only the four scalar fields are forwarded to `onSwap`. The `ingredients` and `steps` arrays are discarded, so the meal is created as a bare row with no recipe content attached and the recipe modal shows nothing.
 
-**File:** `src/components/meals/MealSlot.tsx`
+The Library tab works because it passes `recipeId`, which links the meal to an existing `recipes` row that already holds ingredients/steps. The Photo tab has no such row to link to.
 
-- Add an `onClick` handler to the main `<Card>` (the non-empty / non-skipped render path around line 341) that calls `handleOpenRecipe()` when the meal has a `recipe_card` or `recipe_id` and isn't a blank placeholder.
-- Add `role="button"`, `tabIndex={0}` and a keyboard handler (Enter / Space) for accessibility, plus `cursor-pointer` styling when openable.
-- Stop event propagation on every interactive child so they keep their own behaviour and don't also trigger the card open:
-  - Meal-name button (can keep — same action, but stop propagation to avoid double-open)
-  - Google "Search recipe" icon button
-  - Approve / Reject buttons (desktop + mobile)
-  - The `MoreVertical` `DropdownMenuTrigger` (desktop pending, desktop non-pending, mobile pending, mobile non-pending, finalised desktop, finalised mobile)
-  - Servings `Popover` trigger and its `+ / -` buttons
-  - URL `<Input>` and Save button
-  - Recipe URL `<a>` link and its edit pencil button
-  - Empty-slot `+` button and skipped-slot "Restore" button stay as-is (no card-level click on those branches)
-- Done via a single `stopPropagation` wrapper on each `onClick`, e.g. `onClick={(e) => { e.stopPropagation(); handleApprove(); }}`.
+## Fix
 
-When the meal has no recipe to open (e.g. blank meal, or URL-only meal with no `recipe_id` / `recipe_card`), the card click is a no-op and `cursor-pointer` is not applied.
+Mirror the AddRecipeDialog flow: after a successful photo extraction, **persist the extracted recipe into the user's `recipes` library**, then pass its new `recipeId` through `onSwap` (alongside the existing scalar fields). This guarantees ingredients/steps survive and the meal slot/modal can render them — and as a bonus the recipe is reusable from the Library tab next time.
 
-## 2. Show Slimming World Healthy Extras
+### Changes
 
-Healthy Extra data already lives on the meal/recipe (`sw_healthy_extra_type`, `sw_healthy_extra_amount`) and is read in both components, but never rendered. Use `HEALTHY_EXTRA_LABELS` from `src/types/slimmingWorld.ts` for display.
+**`src/components/meals/SwapMealDialog.tsx`**
+- Import `useRecipes` and call `createRecipe` from it.
+- In `handlePhotoSubmit`, after `processCookbook.mutateAsync(...)` resolves:
+  1. Guard: if `recipe.ingredients.length === 0` or `recipe.steps.length === 0`, toast an error ("Couldn't read ingredients/steps from those photos — try clearer pages") and stop, matching `AddRecipeDialog`'s validation.
+  2. Call `createRecipe.mutateAsync({...})` with the extracted fields, `source_type: 'cookbook'`, `cookbook_title: cookbookTitle || null`, `recipe_url: null`, `image_url: recipe.image_url ?? null`.
+  3. Call `onSwap({ mealName, description, servings, estimatedCookMinutes, recipeId: created.id })` so the meal links to the new library row.
+- Suppress the duplicate "Recipe saved!" toast from `createRecipe` for this flow by showing a single success toast here (or leave it — minor; prefer leaving the default toast for consistency).
+- Extend the button's loading state to also reflect `createRecipe.isPending` so the UI shows progress through both steps.
 
-### `src/components/meals/MealSlot.tsx` (~line 587)
+### Out of scope
+- No edge-function changes — `process-cookbook-recipe` already returns ingredients/steps correctly.
+- No changes to the Library or Custom tabs.
+- No changes to `MealSlot`/`MealPlanView` swap handlers; they already accept `recipeId`.
 
-Extend the SW meta row so a Healthy Extra is shown when present:
-
-```text
-[scale icon] {swips} Swips · Speed · HE: {amount}× {Calcium|Fibre|Healthy Fats}
-```
-
-- If `swHe` is set, append `· HE: {swHeAmt || 1}× {HEALTHY_EXTRA_LABELS[swHe]}`.
-- If only `swHe` is set (no `swSwips`), drop the "Swips" segment so the row reads `HE: 1× Calcium`.
-- Import `HEALTHY_EXTRA_LABELS` from `@/types/slimmingWorld`.
-
-### `src/components/meals/RecipeCardDialog.tsx` (~line 257)
-
-Same change in the modal's metadata strip — append the HE segment to the existing SW `<span>` using the same formatting and `HEALTHY_EXTRA_LABELS` import.
-
-## Out of scope
-
-- No DB / edge-function changes.
-- No changes to `SwInfoDialog` editing UI, finalised-plan editing flow, or any other component.
-- Empty / skipped meal cards remain non-tappable (nothing to open).
+### Files touched
+- `src/components/meals/SwapMealDialog.tsx`
