@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, ShoppingCart, Plus, Trash2 } from 'lucide-react';
 import { SHOPPING_CATEGORIES, ShoppingListItem } from '@/types/meal';
+import { ShoppingItemDialog, ShoppingItemDraft } from './ShoppingItemDialog';
+
 import { cn } from '@/lib/utils';
 import {
   Collapsible,
@@ -27,16 +29,57 @@ export function ShoppingListView({ weekStartDate }: ShoppingListViewProps) {
     groupedItems, 
     isLoading: listLoading, 
     toggleItem, 
+    addItem,
+    updateItem,
+    deleteItem,
     clearChecked 
   } = useShoppingList(mealPlan?.id || null);
 
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<ShoppingListItem | null>(null);
 
   const toggleCategory = (category: string) => {
     setOpenCategories(prev => ({ ...prev, [category]: !prev[category] }));
   };
 
+  const openAdd = () => {
+    setEditingItem(null);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (item: ShoppingListItem) => {
+    setEditingItem(item);
+    setDialogOpen(true);
+  };
+
+  const handleSave = (draft: ShoppingItemDraft) => {
+    if (editingItem) {
+      updateItem.mutate({ itemId: editingItem.id, updates: draft });
+    } else {
+      addItem.mutate({ ...draft, checked: false });
+    }
+    setDialogOpen(false);
+  };
+
+  const handleDelete = () => {
+    if (editingItem) deleteItem.mutate(editingItem.id);
+    setDialogOpen(false);
+  };
+
+  const itemDialog = (
+    <ShoppingItemDialog
+      open={dialogOpen}
+      onOpenChange={setDialogOpen}
+      item={editingItem}
+      onSave={handleSave}
+      onDelete={editingItem ? handleDelete : undefined}
+      isSaving={addItem.isPending || updateItem.isPending}
+    />
+  );
+
   const isLoading = planLoading || listLoading;
+
 
   if (isLoading) {
     return (
@@ -64,17 +107,31 @@ export function ShoppingListView({ weekStartDate }: ShoppingListViewProps) {
   // No shopping list generated yet
   if (!shoppingList || shoppingList.items.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardHeader className="text-center">
-          <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-          <CardTitle className="text-xl">Shopping list is empty</CardTitle>
-          <CardDescription>
-            Your shopping list will appear here after the meal plan is processed
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <>
+        <Card className="border-dashed">
+          <CardHeader className="text-center">
+            <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+            <CardTitle className="text-xl">Shopping list is empty</CardTitle>
+            <CardDescription>
+              {shoppingList
+                ? 'Add your first item below'
+                : 'Your shopping list will appear here after the meal plan is processed'}
+            </CardDescription>
+          </CardHeader>
+          {shoppingList && (
+            <CardContent>
+              <Button variant="outline" className="w-full gap-2 min-h-[48px]" onClick={openAdd}>
+                <Plus className="h-5 w-5" />
+                Add Item
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+        {shoppingList && itemDialog}
+      </>
     );
   }
+
 
   const checkedCount = shoppingList.items.filter(i => i.checked).length;
   const totalCount = shoppingList.items.length;
@@ -150,6 +207,7 @@ export function ShoppingListView({ weekStartDate }: ShoppingListViewProps) {
                           key={item.id}
                           item={item}
                           onToggle={(checked) => toggleItem.mutate({ itemId: item.id, checked })}
+                          onEdit={() => openEdit(item)}
                         />
                       ))}
                     </div>
@@ -162,41 +220,51 @@ export function ShoppingListView({ weekStartDate }: ShoppingListViewProps) {
       </div>
 
       {/* Add item button */}
-      <Button variant="outline" className="w-full gap-2 min-h-[48px]">
+      <Button variant="outline" className="w-full gap-2 min-h-[48px]" onClick={openAdd}>
         <Plus className="h-5 w-5" />
         Add Item
       </Button>
+
+      {itemDialog}
     </div>
   );
 }
 
+
 interface ShoppingItemRowProps {
   item: ShoppingListItem;
   onToggle: (checked: boolean) => void;
+  onEdit: () => void;
 }
 
-function ShoppingItemRow({ item, onToggle }: ShoppingItemRowProps) {
+function ShoppingItemRow({ item, onToggle, onEdit }: ShoppingItemRowProps) {
   return (
-    <label 
+    <div
       className={cn(
-        "flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors min-h-[52px]",
+        "flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors min-h-[52px]",
         item.checked && "bg-muted/20"
       )}
     >
       <Checkbox
         checked={item.checked}
         onCheckedChange={onToggle}
+        aria-label={`Mark ${item.name} as bought`}
         className="h-6 w-6"
       />
-      <div className={cn(
-        "flex-1 flex items-center justify-between",
-        item.checked && "text-muted-foreground line-through"
-      )}>
+      <button
+        type="button"
+        onClick={onEdit}
+        className={cn(
+          "flex-1 flex items-center justify-between text-left gap-3 min-h-[44px]",
+          item.checked && "text-muted-foreground line-through"
+        )}
+      >
         <span className="font-medium">{item.name}</span>
         <span className="text-sm text-muted-foreground">
           {item.quantity} {item.unit}
         </span>
-      </div>
-    </label>
+      </button>
+    </div>
   );
+
 }

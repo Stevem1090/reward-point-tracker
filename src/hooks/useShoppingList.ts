@@ -84,7 +84,75 @@ export function useShoppingList(mealPlanId: string | null) {
     onError: () => toast.error('Failed to add item')
   });
 
+  const updateItem = useMutation({
+    mutationFn: async ({ itemId, updates }: { itemId: string; updates: Partial<ShoppingListItem> }) => {
+      const currentList = shoppingListQuery.data;
+      if (!currentList) throw new Error('No shopping list');
+
+      const updatedItems = currentList.items.map(item =>
+        item.id === itemId ? { ...item, ...updates } : item
+      );
+
+      const { error } = await supabase
+        .from('shopping_lists')
+        .update({ items: updatedItems as unknown as Json })
+        .eq('id', currentList.id);
+
+      if (error) throw error;
+    },
+    onMutate: async ({ itemId, updates }) => {
+      await queryClient.cancelQueries({ queryKey: ['shoppingList', mealPlanId] });
+      const previousList = queryClient.getQueryData(['shoppingList', mealPlanId]);
+
+      queryClient.setQueryData(['shoppingList', mealPlanId], (old: ShoppingList | null) => {
+        if (!old) return old;
+        return { ...old, items: old.items.map(item => item.id === itemId ? { ...item, ...updates } : item) };
+      });
+
+      return { previousList };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousList) queryClient.setQueryData(['shoppingList', mealPlanId], context.previousList);
+      toast.error('Failed to update item');
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['shoppingList', mealPlanId] })
+  });
+
+  const deleteItem = useMutation({
+    mutationFn: async (itemId: string) => {
+      const currentList = shoppingListQuery.data;
+      if (!currentList) throw new Error('No shopping list');
+
+      const updatedItems = currentList.items.filter(item => item.id !== itemId);
+
+      const { error } = await supabase
+        .from('shopping_lists')
+        .update({ items: updatedItems as unknown as Json })
+        .eq('id', currentList.id);
+
+      if (error) throw error;
+    },
+    onMutate: async (itemId) => {
+      await queryClient.cancelQueries({ queryKey: ['shoppingList', mealPlanId] });
+      const previousList = queryClient.getQueryData(['shoppingList', mealPlanId]);
+
+      queryClient.setQueryData(['shoppingList', mealPlanId], (old: ShoppingList | null) => {
+        if (!old) return old;
+        return { ...old, items: old.items.filter(item => item.id !== itemId) };
+      });
+
+      return { previousList };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousList) queryClient.setQueryData(['shoppingList', mealPlanId], context.previousList);
+      toast.error('Failed to delete item');
+    },
+    onSuccess: () => toast.success('Item removed'),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['shoppingList', mealPlanId] })
+  });
+
   const clearChecked = useMutation({
+
     mutationFn: async () => {
       const currentList = shoppingListQuery.data;
       if (!currentList) throw new Error('No shopping list');
@@ -137,7 +205,10 @@ export function useShoppingList(mealPlanId: string | null) {
     isLoading: shoppingListQuery.isLoading,
     toggleItem,
     addItem,
+    updateItem,
+    deleteItem,
     clearChecked,
     deleteShoppingList
   };
 }
+
