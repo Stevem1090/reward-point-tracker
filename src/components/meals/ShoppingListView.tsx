@@ -107,17 +107,31 @@ export function ShoppingListView({ weekStartDate }: ShoppingListViewProps) {
   // No shopping list generated yet
   if (!shoppingList || shoppingList.items.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardHeader className="text-center">
-          <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-          <CardTitle className="text-xl">Shopping list is empty</CardTitle>
-          <CardDescription>
-            Your shopping list will appear here after the meal plan is processed
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <>
+        <Card className="border-dashed">
+          <CardHeader className="text-center">
+            <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+            <CardTitle className="text-xl">Shopping list is empty</CardTitle>
+            <CardDescription>
+              {shoppingList
+                ? 'Add your first item below'
+                : 'Your shopping list will appear here after the meal plan is processed'}
+            </CardDescription>
+          </CardHeader>
+          {shoppingList && (
+            <CardContent>
+              <Button variant="outline" className="w-full gap-2 min-h-[48px]" onClick={openAdd}>
+                <Plus className="h-5 w-5" />
+                Add Item
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+        {shoppingList && itemDialog}
+      </>
     );
   }
+
 
   const checkedCount = shoppingList.items.filter(i => i.checked).length;
   const totalCount = shoppingList.items.length;
