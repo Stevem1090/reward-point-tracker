@@ -27,16 +27,57 @@ export function ShoppingListView({ weekStartDate }: ShoppingListViewProps) {
     groupedItems, 
     isLoading: listLoading, 
     toggleItem, 
+    addItem,
+    updateItem,
+    deleteItem,
     clearChecked 
   } = useShoppingList(mealPlan?.id || null);
 
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<ShoppingListItem | null>(null);
 
   const toggleCategory = (category: string) => {
     setOpenCategories(prev => ({ ...prev, [category]: !prev[category] }));
   };
 
+  const openAdd = () => {
+    setEditingItem(null);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (item: ShoppingListItem) => {
+    setEditingItem(item);
+    setDialogOpen(true);
+  };
+
+  const handleSave = (draft: ShoppingItemDraft) => {
+    if (editingItem) {
+      updateItem.mutate({ itemId: editingItem.id, updates: draft });
+    } else {
+      addItem.mutate({ ...draft, checked: false });
+    }
+    setDialogOpen(false);
+  };
+
+  const handleDelete = () => {
+    if (editingItem) deleteItem.mutate(editingItem.id);
+    setDialogOpen(false);
+  };
+
+  const itemDialog = (
+    <ShoppingItemDialog
+      open={dialogOpen}
+      onOpenChange={setDialogOpen}
+      item={editingItem}
+      onSave={handleSave}
+      onDelete={editingItem ? handleDelete : undefined}
+      isSaving={addItem.isPending || updateItem.isPending}
+    />
+  );
+
   const isLoading = planLoading || listLoading;
+
 
   if (isLoading) {
     return (
