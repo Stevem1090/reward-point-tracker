@@ -207,6 +207,7 @@ export function ShoppingListView({ weekStartDate }: ShoppingListViewProps) {
                           key={item.id}
                           item={item}
                           onToggle={(checked) => toggleItem.mutate({ itemId: item.id, checked })}
+                          onEdit={() => openEdit(item)}
                         />
                       ))}
                     </div>
@@ -219,13 +220,16 @@ export function ShoppingListView({ weekStartDate }: ShoppingListViewProps) {
       </div>
 
       {/* Add item button */}
-      <Button variant="outline" className="w-full gap-2 min-h-[48px]">
+      <Button variant="outline" className="w-full gap-2 min-h-[48px]" onClick={openAdd}>
         <Plus className="h-5 w-5" />
         Add Item
       </Button>
+
+      {itemDialog}
     </div>
   );
 }
+
 
 interface ShoppingItemRowProps {
   item: ShoppingListItem;
