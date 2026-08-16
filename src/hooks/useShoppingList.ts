@@ -205,7 +205,10 @@ export function useShoppingList(mealPlanId: string | null) {
     isLoading: shoppingListQuery.isLoading,
     toggleItem,
     addItem,
+    updateItem,
+    deleteItem,
     clearChecked,
     deleteShoppingList
   };
 }
+
