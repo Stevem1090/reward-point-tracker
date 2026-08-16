@@ -1,28 +1,27 @@
-## Problem
+# Shopping list: fix Add Item, add Edit/Delete
 
-When a user replaces/adds a meal via the new **Photo** tab in `SwapMealDialog`, the cookbook extraction succeeds (name, description, servings, cook time, ingredients, steps are returned by `process-cookbook-recipe`) — but only the four scalar fields are forwarded to `onSwap`. The `ingredients` and `steps` arrays are discarded, so the meal is created as a bare row with no recipe content attached and the recipe modal shows nothing.
+## What's wrong
 
-The Library tab works because it passes `recipeId`, which links the meal to an existing `recipes` row that already holds ingredients/steps. The Photo tab has no such row to link to.
+The "Add Item" button at the bottom of the shopping list is a plain button with no click handler — it does nothing. The underlying `addItem` mutation already exists and works; it was simply never wired to the UI.
 
-## Fix
+## What to build
 
-Mirror the AddRecipeDialog flow: after a successful photo extraction, **persist the extracted recipe into the user's `recipes` library**, then pass its new `recipeId` through `onSwap` (alongside the existing scalar fields). This guarantees ingredients/steps survive and the meal slot/modal can render them — and as a bonus the recipe is reusable from the Library tab next time.
+**1. Add item (fix)**
+- Tapping "Add Item" opens a small dialog: Name, Quantity, Unit, Category (dropdown of the existing shopping categories, default "Other").
+- Save calls the existing `addItem` mutation; the item appears immediately in its category group.
+- Save disabled until a name is entered.
 
-### Changes
+**2. Edit an item**
+- Tapping an item's name (rather than the checkbox) opens the same dialog pre-filled, in edit mode.
+- Editable: name, quantity, unit, category (moving it between category groups).
+- Checkbox still toggles checked state as today — tapping the row's tick area never opens the dialog.
 
-**`src/components/meals/SwapMealDialog.tsx`**
-- Import `useRecipes` and call `createRecipe` from it.
-- In `handlePhotoSubmit`, after `processCookbook.mutateAsync(...)` resolves:
-  1. Guard: if `recipe.ingredients.length === 0` or `recipe.steps.length === 0`, toast an error ("Couldn't read ingredients/steps from those photos — try clearer pages") and stop, matching `AddRecipeDialog`'s validation.
-  2. Call `createRecipe.mutateAsync({...})` with the extracted fields, `source_type: 'cookbook'`, `cookbook_title: cookbookTitle || null`, `recipe_url: null`, `image_url: recipe.image_url ?? null`.
-  3. Call `onSwap({ mealName, description, servings, estimatedCookMinutes, recipeId: created.id })` so the meal links to the new library row.
-- Suppress the duplicate "Recipe saved!" toast from `createRecipe` for this flow by showing a single success toast here (or leave it — minor; prefer leaving the default toast for consistency).
-- Extend the button's loading state to also reflect `createRecipe.isPending` so the UI shows progress through both steps.
+**3. Delete an item**
+- The edit dialog gets a Delete action, so a mistakenly added or unwanted item can be removed individually (today only "Clear Checked" exists).
 
-### Out of scope
-- No edge-function changes — `process-cookbook-recipe` already returns ingredients/steps correctly.
-- No changes to the Library or Custom tabs.
-- No changes to `MealSlot`/`MealPlanView` swap handlers; they already accept `recipeId`.
+## Technical notes
 
-### Files touched
-- `src/components/meals/SwapMealDialog.tsx`
+- New component `src/components/meals/ShoppingItemDialog.tsx` — shared for add and edit, mobile-friendly touch targets (min 44px).
+- `src/hooks/useShoppingList.ts` — add `updateItem` and `deleteItem` mutations following the existing pattern (read current `items` JSON, map/filter, update the row), with optimistic cache updates like `toggleItem` so changes feel instant.
+- `src/components/meals/ShoppingListView.tsx` — wire the Add button, add dialog state, make `ShoppingItemRow`'s label area open the edit dialog while the checkbox keeps its own handler.
+- No database or edge function changes; items live in the `shopping_lists.items` JSON column.
