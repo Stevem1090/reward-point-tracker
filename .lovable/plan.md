@@ -1,53 +1,46 @@
-# Google Home, Keep, and the voice shopping list
+# Google Home, Keep, and voice shopping list items
 
-## How it works today by default
+## Current default behaviour
 
-Google Home no longer adds shopping list items to Google Keep by default. Several years ago Google switched the default list to its own **Google Shopping list** (a simple, built-in list inside Assistant/Hub, not Keep). You can still ask it to save items to a third-party list if you set that up, but out of the box "Hey Google, add bananas to my shopping list" adds to the Google Shopping list, not Keep.
-
-However, there are still ways to redirect the phrase so it goes into this app instead of (or as well as) Google's own list.
-
-## What IFTTT can and cannot do
-
-IFTTT cannot "overwrite" Google Shopping list in the sense of removing the item from Google's built-in list. What IFTTT does is intercept the *command* you speak and forward it to a custom webhook. So you say something like:
+Google Assistant uses **Google Keep** as the default shopping list. When you say:
 
 ```
-"Hey Google, add bananas to my shopping list in the app"
+"Hey Google, add bananas to my shopping list"
 ```
 
-IFTTT hears that exact phrase, then makes a web request to this app's endpoint. The app adds "bananas" to your standing shopping list. The Google Shopping list may also receive it if Google still recognises the command, or it may not if the wording is specific enough to only trigger the IFTTT applet.
+the item goes straight into the Google Keep note named "Shopping list".
 
-In practice, people usually do one of these two things:
+A direct integration with Keep is not possible for a personal @gmail.com account, because Keep's API is restricted to Google Workspace Enterprise accounts. There is also no Keep connector in Lovable.
 
-1. **Use a distinct trigger phrase** so Google ignores it and only IFTTT acts. Example: "Hey Google, log bananas to the app shopping list" or "Hey Google, add bananas to my meal planner shopping list". This avoids the duplicate Google list entry.
-2. **Let Google keep doing its thing**, and also send the item to the app. Then you have the item in both places. The Google one might be slightly redundant, but you can treat the app as the master.
+## How to redirect the item to this app
 
-## The better option: Google Home routines
+The app cannot intercept or replace the Google Assistant → Keep flow directly. What it can do is listen for a *different* phrase that you (or IFTTT) recognises, and add the item to the app's own shopping list.
 
-Google Home supports **Routines**. You can create a routine:
+The practical route is:
 
-```
-When I say "add bananas to my shopping list" (or any phrase)
-  → Action: adjust lights, or run a custom command.
-```
-
-Routines cannot directly call a webhook, but they can run a custom command like "Ask IFTTT to add bananas to my shopping list". That then fires the IFTTT trigger. This is slightly more flexible because you can keep the natural wording and let the routine forward it.
-
-## The cleanest practical solution for this app
-
-Since the plan uses a shared household shopping list in the app, the recommended phrasing is:
-
-```
-"Hey Google, add {item} to my meal planner list"
+```text
+"Hey Google, add bananas to my meal planner list"
+        |
+   IFTTT applet (Google Assistant trigger)
+        |
+   Webhook POST to this app
+        |
+   Item parsed and added to app's standing shopping list
 ```
 
-IFTTT applet: "Google Assistant voice command" → "Webhooks" → POST to the app's endpoint with the phrase. The app parses the phrase and adds the item to the standing list.
+IFTTT cannot stop the same item from also going to Keep if you use the exact words "shopping list". That is why the plan uses a distinct trigger phrase such as "meal planner list" or any phrase you choose.
 
-This keeps the Google Home default list untouched (or only adds to it if you want), and the app becomes the place where you tick things off.
+## Why IFTTT and not a Google Home routine?
 
-## If you want to avoid IFTTT entirely
+Google Home routines cannot make arbitrary webhook calls. They can run voice commands, adjust devices, and send notifications, but they cannot POST to a custom URL. A routine can say "ask IFTTT to add bananas to my meal planner list", which then fires the IFTTT webhook. That works, but IFTTT is still the bridge.
 
-Google Home's native list can be exported to Google Keep via the Google Home app settings, but it is one-way and delayed. If you want real app control and to keep things in one place, the IFTTT/webhook route is the current realistic option for a personal @gmail.com account. Home Assistant can do it for free, but only if you run it.
+## Plan
 
-## Plan update
+Build the app side regardless of how the voice command is triggered:
 
-The plan remains the same: build a standing shopping list and a secure webhook, but the setup instructions will show how to use an IFTTT/Google Home routine with a specific phrasing so the item lands in the app without relying on Google Keep.
+1. **Standing shopping list** — a household list that exists independently of any week's meal plan, so voice items have a home even when no plan is approved.
+2. **Secure webhook endpoint** — accepts a spoken phrase, parses it with AI into quantity/unit/name/category, and inserts items into the standing list.
+3. **Voice marker** — items added by voice show a small microphone icon in the app.
+4. **Setup panel** — shows the webhook URL and the exact IFTTT applet settings to paste in, using a phrase like "add {item} to my meal planner list".
+
+The Google Keep list will continue to receive items for the default "shopping list" phrase. The app's list is the master for anything you want shared, edited, and ticked off in the app.
