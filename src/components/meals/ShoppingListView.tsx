@@ -234,30 +234,37 @@ export function ShoppingListView({ weekStartDate }: ShoppingListViewProps) {
 interface ShoppingItemRowProps {
   item: ShoppingListItem;
   onToggle: (checked: boolean) => void;
+  onEdit: () => void;
 }
 
-function ShoppingItemRow({ item, onToggle }: ShoppingItemRowProps) {
+function ShoppingItemRow({ item, onToggle, onEdit }: ShoppingItemRowProps) {
   return (
-    <label 
+    <div
       className={cn(
-        "flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors min-h-[52px]",
+        "flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors min-h-[52px]",
         item.checked && "bg-muted/20"
       )}
     >
       <Checkbox
         checked={item.checked}
         onCheckedChange={onToggle}
+        aria-label={`Mark ${item.name} as bought`}
         className="h-6 w-6"
       />
-      <div className={cn(
-        "flex-1 flex items-center justify-between",
-        item.checked && "text-muted-foreground line-through"
-      )}>
+      <button
+        type="button"
+        onClick={onEdit}
+        className={cn(
+          "flex-1 flex items-center justify-between text-left gap-3 min-h-[44px]",
+          item.checked && "text-muted-foreground line-through"
+        )}
+      >
         <span className="font-medium">{item.name}</span>
         <span className="text-sm text-muted-foreground">
           {item.quantity} {item.unit}
         </span>
-      </div>
-    </label>
+      </button>
+    </div>
   );
+
 }
