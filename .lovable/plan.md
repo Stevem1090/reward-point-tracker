@@ -43,3 +43,5 @@ Below it, one collapsible row per account showing the account total and share of
 - `src/utils/billCalculations.ts`: handle `custom` (count x amount), apply expiry filtering in `calculateBillTotalForPayPeriod`, and add income/difference aggregation to `calculatePayPeriodTotal`.
 - New hooks `useBillAccounts.ts` and `useIncomes.ts` following the `useBillTypes` pattern.
 - UI: `BillForm` gains frequency `custom` + count input, expiry date, account select; new `BillAccountManager.tsx` and `IncomeManager.tsx`; `MonthlySummary.tsx` rebuilt around income vs outgoings with collapsible accounts; `BillsPage` tabs become Bills, Summary, Income, Accounts, Types.
+- Export: new `src/utils/billExport.ts` building the row set once; CSV via a Blob download, PDF via `jspdf` + `jspdf-autotable` (client-side, no backend).
+
