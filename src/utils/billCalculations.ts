@@ -1,4 +1,10 @@
-import { Bill, MonthlyBillCalculation } from '@/types/bill';
+import {
+  AccountBreakdown,
+  Bill,
+  Income,
+  MonthlyBillCalculation,
+  PayPeriodSummary,
+} from '@/types/bill';
 
 // Hardcoded pay day (27th of each month)
 const PAY_DAY = 27;
@@ -40,6 +46,31 @@ export const isDateInPayPeriod = (
   return date >= startDate && date <= endDate;
 };
 
+// Parse an expiry (or payment) date string into a local Date at end of day
+const parseDate = (value?: string | null): Date | null => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return isNaN(parsed.getTime()) ? null : parsed;
+};
+
+// The effective end of a bill within a period, capped by its expiry date
+export const getEffectiveEndDate = (bill: Bill, endDate: Date): Date => {
+  const expiry = parseDate(bill.expiry_date);
+  if (!expiry) return endDate;
+  return expiry < endDate ? expiry : endDate;
+};
+
+export const isBillExpiredForPeriod = (bill: Bill, startDate: Date): boolean => {
+  const expiry = parseDate(bill.expiry_date);
+  return !!expiry && expiry < startDate;
+};
+
+export const isBillExpiredNow = (bill: Bill): boolean => {
+  const expiry = parseDate(bill.expiry_date);
+  if (!expiry) return false;
+  return expiry < new Date(new Date().toDateString());
+};
+
 // Count occurrences of a specific weekday within a date range
 export const countWeekdayOccurrencesInRange = (
   startDate: Date,
@@ -74,6 +105,7 @@ export const countWeekdayOccurrencesInRange = (
 
 // Count number of days between two dates (inclusive)
 export const countDaysInRange = (startDate: Date, endDate: Date): number => {
+  if (endDate < startDate) return 0;
   const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end
 };
@@ -151,36 +183,55 @@ export const calculateBillTotalForPayPeriod = (
   let paymentCount = 0;
   let totalAmount = 0;
 
+  // Bill has already stopped before this period started
+  if (isBillExpiredForPeriod(bill, startDate)) {
+    return {
+      bill,
+      paymentCount: 0,
+      individualAmount: bill.amount,
+      totalAmount: 0,
+    };
+  }
+
+  // Cap the period end at the bill's expiry date
+  const effectiveEnd = getEffectiveEndDate(bill, endDate);
+
   switch (bill.frequency) {
     case 'daily':
-      paymentCount = countDaysInRange(startDate, endDate);
+      paymentCount = countDaysInRange(startDate, effectiveEnd);
       totalAmount = bill.amount * paymentCount;
       break;
 
     case 'weekly':
       if (bill.weekly_days && bill.weekly_days.length > 0) {
         paymentCount = bill.weekly_days.reduce((total, day) => {
-          return total + countWeekdayOccurrencesInRange(startDate, endDate, day);
+          return total + countWeekdayOccurrencesInRange(startDate, effectiveEnd, day);
         }, 0);
         totalAmount = bill.amount * paymentCount;
       }
       break;
 
-    case 'monthly':
-      const monthlyData = calculateMonthlyPaymentsInPeriod(bill, startDate, endDate);
+    case 'monthly': {
+      const monthlyData = calculateMonthlyPaymentsInPeriod(bill, startDate, effectiveEnd);
       paymentCount = monthlyData.paymentCount;
       totalAmount = monthlyData.totalAmount;
       break;
+    }
+
+    case 'custom':
+      paymentCount = bill.custom_count && bill.custom_count > 0 ? bill.custom_count : 0;
+      totalAmount = bill.amount * paymentCount;
+      break;
 
     case 'yearly':
-      if (isPaymentDueInPayPeriod(bill, startDate, endDate)) {
+      if (isPaymentDueInPayPeriod(bill, startDate, effectiveEnd)) {
         paymentCount = 1;
         totalAmount = bill.amount;
       }
       break;
 
     case 'one-time':
-      if (isOneTimeBillInPayPeriod(bill, startDate, endDate)) {
+      if (isOneTimeBillInPayPeriod(bill, startDate, effectiveEnd)) {
         paymentCount = 1;
         totalAmount = bill.amount;
       }
@@ -195,17 +246,61 @@ export const calculateBillTotalForPayPeriod = (
   };
 };
 
+// Income counts for a period unless it has expired before the period started
+export const calculateIncomeForPayPeriod = (
+  incomes: Income[],
+  startDate: Date
+): { activeIncomes: Income[]; incomeTotal: number } => {
+  const activeIncomes = incomes.filter((income) => {
+    if (!income.active) return false;
+    const expiry = parseDate(income.expiry_date);
+    return !expiry || expiry >= startDate;
+  });
+
+  const incomeTotal = activeIncomes.reduce(
+    (sum, income) => sum + Number(income.amount || 0),
+    0
+  );
+
+  return { activeIncomes, incomeTotal };
+};
+
+const UNASSIGNED_COLOR = '#94a3b8';
+
+export const buildAccountBreakdowns = (
+  calculations: MonthlyBillCalculation[]
+): AccountBreakdown[] => {
+  const groups = new Map<string, AccountBreakdown>();
+
+  calculations.forEach((calc) => {
+    const account = calc.bill.account;
+    const key = account?.id || 'unassigned';
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        accountId: account?.id || null,
+        accountName: account?.name || 'Unassigned',
+        accountColor: account?.color || UNASSIGNED_COLOR,
+        total: 0,
+        calculations: [],
+      });
+    }
+
+    const group = groups.get(key)!;
+    group.total += calc.totalAmount;
+    group.calculations.push(calc);
+  });
+
+  return Array.from(groups.values()).sort((a, b) => b.total - a.total);
+};
+
 // Calculate all bills for a specific pay period
 export const calculatePayPeriodTotal = (
   bills: Bill[],
   displayYear: number,
-  displayMonth: number
-): {
-  calculations: MonthlyBillCalculation[];
-  grandTotal: number;
-  startDate: Date;
-  endDate: Date;
-} => {
+  displayMonth: number,
+  incomes: Income[] = []
+): PayPeriodSummary => {
   const { startDate, endDate } = getPayPeriodRange(displayYear, displayMonth);
   const activeBills = bills.filter((bill) => bill.active);
   
@@ -214,11 +309,16 @@ export const calculatePayPeriodTotal = (
   );
   
   const grandTotal = calculations.reduce((sum, calc) => sum + calc.totalAmount, 0);
+  const { activeIncomes, incomeTotal } = calculateIncomeForPayPeriod(incomes, startDate);
 
   return {
     calculations,
     grandTotal,
     startDate,
     endDate,
+    incomeTotal,
+    incomes: activeIncomes,
+    difference: incomeTotal - grandTotal,
+    accountBreakdowns: buildAccountBreakdowns(calculations),
   };
 };
