@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Bill } from '@/types/bill';
+import { isBillExpiredNow } from '@/utils/billCalculations';
+
 import { useBills } from '@/hooks/useBills';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
