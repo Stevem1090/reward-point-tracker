@@ -272,7 +272,23 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
             </div>
           )}
 
+          <div>
+            <Label htmlFor="expiry_date">Stops after (optional)</Label>
+            <Input
+              id="expiry_date"
+              type="date"
+              value={formData.expiry_date || ''}
+              onChange={(e) =>
+                setFormData({ ...formData, expiry_date: e.target.value || null })
+              }
+            />
+            <p className="text-sm text-muted-foreground mt-1">
+              After this date the bill is no longer counted in monthly totals
+            </p>
+          </div>
+
           <div className="flex gap-2">
+
             <Button type="submit">{bill ? 'Update' : 'Create'} Bill</Button>
             <Button type="button" variant="outline" onClick={onCancel}>
               <X className="h-4 w-4 mr-2" />
