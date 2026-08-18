@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Bill } from '@/types/bill';
+import { isBillExpiredNow } from '@/utils/billCalculations';
+
 import { useBills } from '@/hooks/useBills';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,6 +48,7 @@ export const BillList = () => {
       monthly: 'bg-purple-100 text-purple-800',
       yearly: 'bg-orange-100 text-orange-800',
       'one-time': 'bg-pink-100 text-pink-800',
+      custom: 'bg-amber-100 text-amber-800',
     };
 
     const frequencyLabels: Record<string, string> = {
@@ -54,6 +57,7 @@ export const BillList = () => {
       monthly: 'Monthly',
       yearly: 'Yearly',
       'one-time': 'One-Time',
+      custom: 'Custom',
     };
 
     return (
@@ -62,6 +66,13 @@ export const BillList = () => {
       </span>
     );
   };
+
+  const formatDate = (value: string) =>
+    new Date(value).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
 
   const getFrequencyDisplay = (bill: Bill): string => {
     switch (bill.frequency) {
@@ -72,22 +83,21 @@ export const BillList = () => {
       case 'monthly':
         const day = bill.payment_day || 1;
         return day === 1 ? 'Monthly (1st of month)' : `Monthly (${day}th of month)`;
+      case 'custom':
+        return `${bill.custom_count || 0}× per pay period`;
       case 'yearly':
         return bill.payment_date
           ? `Yearly (${new Date(bill.payment_date).toLocaleDateString()})`
           : 'Yearly';
       case 'one-time':
         return bill.payment_date
-          ? `One-Time (${new Date(bill.payment_date).toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric'
-            })})`
+          ? `One-Time (${formatDate(bill.payment_date)})`
           : 'One-Time';
       default:
         return bill.frequency;
     }
   };
+
 
   if (loading) return <div>Loading...</div>;
 
@@ -184,6 +194,23 @@ export const BillList = () => {
                         {bill.bill_type.name}
                       </Badge>
                     )}
+                    {bill.account && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] md:text-xs"
+                        style={{
+                          borderColor: bill.account.color || undefined,
+                          color: bill.account.color || undefined,
+                        }}
+                      >
+                        {bill.account.name}
+                      </Badge>
+                    )}
+                    {isBillExpiredNow(bill) && (
+                      <Badge variant="secondary" className="text-[10px] md:text-xs">
+                        Expired
+                      </Badge>
+                    )}
                   </div>
 
                   {/* Row 3: Amount */}
@@ -194,7 +221,9 @@ export const BillList = () => {
                   {/* Row 4: Description */}
                   <p className="text-xs md:text-sm text-muted-foreground">
                     {getFrequencyDisplay(bill)}
+                    {bill.expiry_date && ` · Ends ${formatDate(bill.expiry_date)}`}
                   </p>
+
 
                   {/* Row 5: Action buttons */}
                   <div className="flex gap-2 pt-2 border-t">

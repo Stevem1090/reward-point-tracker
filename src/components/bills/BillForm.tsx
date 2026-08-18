@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Bill, BillFrequency } from '@/types/bill';
 import { useBillTypes } from '@/hooks/useBillTypes';
+import { useBillAccounts } from '@/hooks/useBillAccounts';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,16 +22,21 @@ const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 
 export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
   const { billTypes } = useBillTypes();
+  const { accounts } = useBillAccounts();
   const [formData, setFormData] = useState({
     name: bill?.name || '',
     amount: bill?.amount || 0,
     bill_type_id: bill?.bill_type_id || null,
+    account_id: bill?.account_id || null,
     frequency: (bill?.frequency || 'monthly') as BillFrequency,
     payment_day: bill?.payment_day || null,
     payment_date: bill?.payment_date || null,
     weekly_days: bill?.weekly_days || [],
+    custom_count: bill?.custom_count ?? null,
+    expiry_date: bill?.expiry_date || null,
     active: bill?.active ?? true,
   });
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +46,12 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
       alert('One-time bills require a payment date');
       return;
     }
+
+    if (formData.frequency === 'custom' && (!formData.custom_count || formData.custom_count < 1)) {
+      alert('Custom bills need the number of payments per pay period');
+      return;
+    }
+
     
     await onSubmit(formData as any);
   };
@@ -104,6 +117,28 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
             </Select>
           </div>
 
+
+          <div>
+            <Label htmlFor="account">Account (where the money goes)</Label>
+            <Select
+              value={formData.account_id || undefined}
+              onValueChange={(value) =>
+                setFormData({ ...formData, account_id: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select an account" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <Label>Frequency</Label>
             <RadioGroup
@@ -115,6 +150,7 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
                   payment_day: value === 'monthly' ? 1 : null,
                   payment_date: null,
                   weekly_days: [],
+                  custom_count: value === 'custom' ? formData.custom_count || 1 : null,
                 })
               }
             >
@@ -138,8 +174,35 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
                 <RadioGroupItem value="one-time" id="one-time" />
                 <Label htmlFor="one-time">One-Time</Label>
               </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="custom" id="custom" />
+                <Label htmlFor="custom">Custom (set number of payments)</Label>
+              </div>
             </RadioGroup>
           </div>
+
+          {formData.frequency === 'custom' && (
+            <div>
+              <Label htmlFor="custom_count">Payments per pay period</Label>
+              <Input
+                id="custom_count"
+                type="number"
+                min="1"
+                value={formData.custom_count ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    custom_count: e.target.value ? parseInt(e.target.value) : null,
+                  })
+                }
+                required
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                e.g. 3 means this bill comes out three times each pay period
+              </p>
+            </div>
+          )}
+
 
           {formData.frequency === 'weekly' && (
             <div>
@@ -215,7 +278,23 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
             </div>
           )}
 
+          <div>
+            <Label htmlFor="expiry_date">Stops after (optional)</Label>
+            <Input
+              id="expiry_date"
+              type="date"
+              value={formData.expiry_date || ''}
+              onChange={(e) =>
+                setFormData({ ...formData, expiry_date: e.target.value || null })
+              }
+            />
+            <p className="text-sm text-muted-foreground mt-1">
+              After this date the bill is no longer counted in monthly totals
+            </p>
+          </div>
+
           <div className="flex gap-2">
+
             <Button type="submit">{bill ? 'Update' : 'Create'} Bill</Button>
             <Button type="button" variant="outline" onClick={onCancel}>
               <X className="h-4 w-4 mr-2" />

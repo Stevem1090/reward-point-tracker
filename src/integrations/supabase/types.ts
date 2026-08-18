@@ -38,6 +38,30 @@ export type Database = {
         }
         Relationships: []
       }
+      bill_accounts: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       bill_types: {
         Row: {
           color: string | null
@@ -64,10 +88,13 @@ export type Database = {
       }
       bills: {
         Row: {
+          account_id: string | null
           active: boolean
           amount: number
           bill_type_id: string | null
           created_at: string
+          custom_count: number | null
+          expiry_date: string | null
           frequency: string
           id: string
           name: string
@@ -77,10 +104,13 @@ export type Database = {
           weekly_days: string[] | null
         }
         Insert: {
+          account_id?: string | null
           active?: boolean
           amount: number
           bill_type_id?: string | null
           created_at?: string
+          custom_count?: number | null
+          expiry_date?: string | null
           frequency: string
           id?: string
           name: string
@@ -90,10 +120,13 @@ export type Database = {
           weekly_days?: string[] | null
         }
         Update: {
+          account_id?: string | null
           active?: boolean
           amount?: number
           bill_type_id?: string | null
           created_at?: string
+          custom_count?: number | null
+          expiry_date?: string | null
           frequency?: string
           id?: string
           name?: string
@@ -103,6 +136,13 @@ export type Database = {
           weekly_days?: string[] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "bills_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "bill_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bills_bill_type_id_fkey"
             columns: ["bill_type_id"]
@@ -330,6 +370,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      incomes: {
+        Row: {
+          active: boolean
+          amount: number
+          created_at: string
+          expiry_date: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount?: number
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       meal_plans: {
         Row: {
