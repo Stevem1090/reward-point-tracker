@@ -111,6 +111,28 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
             </Select>
           </div>
 
+
+          <div>
+            <Label htmlFor="account">Account (where the money goes)</Label>
+            <Select
+              value={formData.account_id || undefined}
+              onValueChange={(value) =>
+                setFormData({ ...formData, account_id: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select an account" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <Label>Frequency</Label>
             <RadioGroup
@@ -122,6 +144,7 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
                   payment_day: value === 'monthly' ? 1 : null,
                   payment_date: null,
                   weekly_days: [],
+                  custom_count: value === 'custom' ? formData.custom_count || 1 : null,
                 })
               }
             >
@@ -145,8 +168,35 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
                 <RadioGroupItem value="one-time" id="one-time" />
                 <Label htmlFor="one-time">One-Time</Label>
               </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="custom" id="custom" />
+                <Label htmlFor="custom">Custom (set number of payments)</Label>
+              </div>
             </RadioGroup>
           </div>
+
+          {formData.frequency === 'custom' && (
+            <div>
+              <Label htmlFor="custom_count">Payments per pay period</Label>
+              <Input
+                id="custom_count"
+                type="number"
+                min="1"
+                value={formData.custom_count ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    custom_count: e.target.value ? parseInt(e.target.value) : null,
+                  })
+                }
+                required
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                e.g. 3 means this bill comes out three times each pay period
+              </p>
+            </div>
+          )}
+
 
           {formData.frequency === 'weekly' && (
             <div>
