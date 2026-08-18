@@ -14,9 +14,11 @@ export const useBills = () => {
         .from('bills')
         .select(`
           *,
-          bill_type:bill_types(*)
+          bill_type:bill_types(*),
+          account:bill_accounts(*)
         `)
         .order('name');
+
 
       if (error) throw error;
       setBills((data as Bill[]) || []);
