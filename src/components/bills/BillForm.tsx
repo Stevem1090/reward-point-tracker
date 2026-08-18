@@ -20,16 +20,21 @@ const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 
 export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
   const { billTypes } = useBillTypes();
+  const { accounts } = useBillAccounts();
   const [formData, setFormData] = useState({
     name: bill?.name || '',
     amount: bill?.amount || 0,
     bill_type_id: bill?.bill_type_id || null,
+    account_id: bill?.account_id || null,
     frequency: (bill?.frequency || 'monthly') as BillFrequency,
     payment_day: bill?.payment_day || null,
     payment_date: bill?.payment_date || null,
     weekly_days: bill?.weekly_days || [],
+    custom_count: bill?.custom_count ?? null,
+    expiry_date: bill?.expiry_date || null,
     active: bill?.active ?? true,
   });
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
