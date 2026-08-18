@@ -192,6 +192,23 @@ export const BillList = () => {
                         {bill.bill_type.name}
                       </Badge>
                     )}
+                    {bill.account && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] md:text-xs"
+                        style={{
+                          borderColor: bill.account.color || undefined,
+                          color: bill.account.color || undefined,
+                        }}
+                      >
+                        {bill.account.name}
+                      </Badge>
+                    )}
+                    {isBillExpiredNow(bill) && (
+                      <Badge variant="secondary" className="text-[10px] md:text-xs">
+                        Expired
+                      </Badge>
+                    )}
                   </div>
 
                   {/* Row 3: Amount */}
@@ -202,7 +219,9 @@ export const BillList = () => {
                   {/* Row 4: Description */}
                   <p className="text-xs md:text-sm text-muted-foreground">
                     {getFrequencyDisplay(bill)}
+                    {bill.expiry_date && ` · Ends ${formatDate(bill.expiry_date)}`}
                   </p>
+
 
                   {/* Row 5: Action buttons */}
                   <div className="flex gap-2 pt-2 border-t">
