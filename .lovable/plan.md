@@ -28,7 +28,14 @@ Top card for the selected pay period:
 
 Below it, one collapsible row per account showing the account total and share of outgoings. Expanding an account reveals its bills (grouped by bill type where present) with payment counts and amounts. Existing month navigation and 27th–26th pay period logic stay unchanged.
 
+## 5. Export the month's summary
+- A "Download" button on the summary, offering CSV or PDF for the pay period currently shown.
+- CSV: one flat, AI-friendly table — period start/end, row type (income / bill), name, account, bill type, frequency, payment count, unit amount, total — plus summary rows for income total, outgoings total and difference.
+- PDF: a clean printable version of the same summary (header with period, income vs outgoings vs difference, then each account with its bills).
+- Filenames like `bills-summary-2026-08.csv` / `.pdf`.
+
 ## Technical notes
+
 - Migration:
   - `bills`: add `custom_count integer`, `expiry_date date`, `account_id uuid references bill_accounts(id)`; allow `frequency = 'custom'`.
   - New `bill_accounts` (id, name, color, sort_order, created_at) and `incomes` (id, name, amount, active, expiry_date, timestamps), each with explicit `GRANT`s matching the open policy style used by the existing bills tables, RLS enabled, and policies mirroring `bills`.
