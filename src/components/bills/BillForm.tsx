@@ -46,6 +46,12 @@ export const BillForm = ({ bill, onSubmit, onCancel }: BillFormProps) => {
       alert('One-time bills require a payment date');
       return;
     }
+
+    if (formData.frequency === 'custom' && (!formData.custom_count || formData.custom_count < 1)) {
+      alert('Custom bills need the number of payments per pay period');
+      return;
+    }
+
     
     await onSubmit(formData as any);
   };
