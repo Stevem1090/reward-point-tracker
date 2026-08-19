@@ -76,18 +76,31 @@ export const exportSummaryToCsv = (summary: PayPeriodSummary, displayDate: Date)
   });
 
   summary.accountBreakdowns.forEach((account) => {
-    account.calculations.forEach((calc) => {
+    account.typeBreakdowns.forEach((type) => {
+      type.calculations.forEach((calc) => {
+          periodStart,
+          periodEnd,
+          'bill',
+          calc.bill.name,
+          account.accountName,
+          type.typeName,
+          frequencyLabel(calc.bill.frequency),
+          calc.paymentCount,
+          calc.individualAmount.toFixed(2),
+          calc.totalAmount.toFixed(2),
+        ]);
+      });
       rows.push([
         periodStart,
         periodEnd,
-        'bill',
-        calc.bill.name,
+        'type_total',
+        type.typeName,
         account.accountName,
-        calc.bill.bill_type?.name || '',
-        frequencyLabel(calc.bill.frequency),
-        calc.paymentCount,
-        calc.individualAmount.toFixed(2),
-        calc.totalAmount.toFixed(2),
+        type.typeName,
+        '',
+        '',
+        '',
+        type.total.toFixed(2),
       ]);
     });
   });
@@ -151,14 +164,18 @@ export const exportSummaryToPdf = (summary: PayPeriodSummary, displayDate: Date)
   summary.accountBreakdowns.forEach((account) => {
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 8,
-      head: [[`${account.accountName} — ${money(account.total)}`, 'Type', 'Frequency', 'Payments', 'Total']],
-      body: account.calculations.map((calc) => [
-        calc.bill.name,
-        calc.bill.bill_type?.name || '—',
-        frequencyLabel(calc.bill.frequency),
-        String(calc.paymentCount),
-        money(calc.totalAmount),
-      ]),
+      head: [[`${account.accountName} — ${money(account.total)}`, 'Frequency', 'Payments', 'Total']],
+      body: account.typeBreakdowns.flatMap((type) => [
+        [
+          { content: `${type.typeName} — ${money(type.total)}`, colSpan: 4, styles: { fontStyle: 'bold' as const, fillColor: [241, 245, 249] as [number, number, number] } },
+        ],
+        ...type.calculations.map((calc) => [
+          `   ${calc.bill.name}`,
+          frequencyLabel(calc.bill.frequency),
+          String(calc.paymentCount),
+          money(calc.totalAmount),
+        ]),
+      ]) as any,
       theme: 'striped',
       headStyles: { fillColor: [71, 85, 105] },
       styles: { fontSize: 9 },
