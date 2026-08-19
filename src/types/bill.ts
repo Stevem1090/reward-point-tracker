@@ -53,12 +53,21 @@ export interface MonthlyBillCalculation {
   effectiveDate?: Date;
 }
 
+export interface TypeBreakdown {
+  typeId: string | null;
+  typeName: string;
+  typeColor: string;
+  total: number;
+  calculations: MonthlyBillCalculation[];
+}
+
 export interface AccountBreakdown {
   accountId: string | null;
   accountName: string;
   accountColor: string;
   total: number;
   calculations: MonthlyBillCalculation[];
+  typeBreakdowns: TypeBreakdown[];
 }
 
 export interface PayPeriodSummary {
