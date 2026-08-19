@@ -155,25 +155,48 @@ export const MonthlySummary = () => {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <CardContent>
-                  <div className="space-y-3">
-                    {account.calculations.map((calc) => (
-                      <div
-                        key={calc.bill.id}
-                        className="flex items-start justify-between gap-3 pb-3 border-b last:border-0 last:pb-0"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium break-words">{calc.bill.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {calc.bill.bill_type?.name || 'Uncategorized'}
-                            {calc.paymentCount > 1 &&
-                              ` · ${calc.paymentCount} payments × £${calc.individualAmount.toFixed(2)}`}
+                  <div className="space-y-5">
+                    {account.typeBreakdowns.map((type) => (
+                      <div key={type.typeId || 'uncategorised'}>
+                        <div className="flex items-center justify-between gap-3 pb-2 mb-2 border-b">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: type.typeColor }}
+                            />
+                            <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground break-words">
+                              {type.typeName}
+                            </p>
+                          </div>
+                          <p className="text-sm font-semibold shrink-0">
+                            £{type.total.toFixed(2)}
                           </p>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-semibold">£{calc.totalAmount.toFixed(2)}</p>
-                          {calc.paymentCount === 0 && (
-                            <p className="text-xs text-muted-foreground">Not due this period</p>
-                          )}
+                        <div className="space-y-3 pl-4">
+                          {type.calculations.map((calc) => (
+                            <div
+                              key={calc.bill.id}
+                              className="flex items-start justify-between gap-3"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium break-words">{calc.bill.name}</p>
+                                {calc.paymentCount > 1 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {calc.paymentCount} payments × £
+                                    {calc.individualAmount.toFixed(2)}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="font-semibold">£{calc.totalAmount.toFixed(2)}</p>
+                                {calc.paymentCount === 0 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Not due this period
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ))}
