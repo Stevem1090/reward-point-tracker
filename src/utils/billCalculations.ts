@@ -4,6 +4,7 @@ import {
   Income,
   MonthlyBillCalculation,
   PayPeriodSummary,
+  TypeBreakdown,
 } from '@/types/bill';
 
 // Hardcoded pay day (27th of each month)
@@ -266,6 +267,39 @@ export const calculateIncomeForPayPeriod = (
 };
 
 const UNASSIGNED_COLOR = '#94a3b8';
+const UNCATEGORISED_COLOR = '#94a3b8';
+
+const buildTypeBreakdowns = (
+  calculations: MonthlyBillCalculation[]
+): TypeBreakdown[] => {
+  const groups = new Map<string, TypeBreakdown>();
+
+  calculations.forEach((calc) => {
+    const type = calc.bill.bill_type;
+    const key = type?.id || 'uncategorised';
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        typeId: type?.id || null,
+        typeName: type?.name || 'Uncategorised',
+        typeColor: type?.color || UNCATEGORISED_COLOR,
+        total: 0,
+        calculations: [],
+      });
+    }
+
+    const group = groups.get(key)!;
+    group.total += calc.totalAmount;
+    group.calculations.push(calc);
+  });
+
+  return Array.from(groups.values()).sort((a, b) => {
+    // Uncategorised always last
+    if (!a.typeId && b.typeId) return 1;
+    if (a.typeId && !b.typeId) return -1;
+    return b.total - a.total;
+  });
+};
 
 export const buildAccountBreakdowns = (
   calculations: MonthlyBillCalculation[]
@@ -283,6 +317,7 @@ export const buildAccountBreakdowns = (
         accountColor: account?.color || UNASSIGNED_COLOR,
         total: 0,
         calculations: [],
+        typeBreakdowns: [],
       });
     }
 
@@ -291,7 +326,12 @@ export const buildAccountBreakdowns = (
     group.calculations.push(calc);
   });
 
-  return Array.from(groups.values()).sort((a, b) => b.total - a.total);
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      typeBreakdowns: buildTypeBreakdowns(group.calculations),
+    }))
+    .sort((a, b) => b.total - a.total);
 };
 
 // Calculate all bills for a specific pay period
