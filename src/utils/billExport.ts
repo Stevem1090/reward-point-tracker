@@ -78,6 +78,7 @@ export const exportSummaryToCsv = (summary: PayPeriodSummary, displayDate: Date)
   summary.accountBreakdowns.forEach((account) => {
     account.typeBreakdowns.forEach((type) => {
       type.calculations.forEach((calc) => {
+        rows.push([
           periodStart,
           periodEnd,
           'bill',
