@@ -169,7 +169,10 @@ export const MonthlySummary = () => {
                             </p>
                           </div>
                           <p className="text-sm font-semibold shrink-0">
-                            £{type.total.toFixed(2)}
+                            £{type.total.toFixed(2)}{' '}
+                            <span className="text-muted-foreground font-normal">
+                              ({grandTotal > 0 ? Math.round((type.total / grandTotal) * 100) : 0}%)
+                            </span>
                           </p>
                         </div>
                         <div className="space-y-3 pl-4">
