@@ -224,8 +224,27 @@ export const BillAccountManager = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3">
-          {accounts.map((account) => (
+        <>
+          <Card>
+            <CardContent className="py-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm text-muted-foreground">Net position</p>
+                <p className="text-xs text-muted-foreground">Cash minus credit card balances</p>
+              </div>
+              <p
+                className={`text-xl font-bold ${
+                  netPosition >= 0 ? 'text-emerald-600' : 'text-destructive'
+                }`}
+              >
+                {netPosition < 0 ? '-' : ''}£{Math.abs(netPosition).toFixed(2)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-3">
+            {accounts.map((account) => {
+              const signed = getAccountBalanceSigned(account);
+              return (
             <Card key={account.id}>
               <CardContent className="py-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
@@ -233,9 +252,30 @@ export const BillAccountManager = () => {
                     className="w-3 h-3 rounded-full shrink-0"
                     style={{ backgroundColor: account.color || '#6366f1' }}
                   />
-                  <span className="font-medium break-words">{account.name}</span>
+                  <div className="min-w-0">
+                    <span className="font-medium break-words">{account.name}</span>
+                    <p className="text-xs text-muted-foreground">
+                      {KIND_LABELS[account.account_kind] || 'Current account'}
+                      {account.account_kind === 'credit_card' && account.apr
+                        ? ` · ${account.apr}% APR`
+                        : ''}
+                      {account.account_kind === 'credit_card' && account.promo_end_date
+                        ? ` · 0% until ${new Date(account.promo_end_date).toLocaleDateString('en-GB', {
+                            month: 'short',
+                            year: 'numeric',
+                          })}`
+                        : ''}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={`font-semibold ${
+                      signed < 0 ? 'text-destructive' : ''
+                    }`}
+                  >
+                    {signed < 0 ? '-' : ''}£{Math.abs(signed).toFixed(2)}
+                  </span>
                   <Button
                     size="icon"
                     variant="outline"
@@ -246,6 +286,11 @@ export const BillAccountManager = () => {
                         name: account.name,
                         color: account.color || '#6366f1',
                         sort_order: account.sort_order,
+                        account_kind: account.account_kind || 'current',
+                        current_balance: Number(account.current_balance || 0),
+                        credit_limit: account.credit_limit ?? '',
+                        apr: account.apr ?? '',
+                        promo_end_date: account.promo_end_date ?? '',
                       });
                     }}
                   >
