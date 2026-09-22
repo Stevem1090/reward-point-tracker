@@ -128,6 +128,8 @@ export const MonthlySummary = () => {
         </CardContent>
       </Card>
 
+      <FinancialAdviceCard summary={summary} periodLabel={monthName} />
+
       {accountBreakdowns.map((account) => {
         const percentage = grandTotal > 0 ? Math.round((account.total / grandTotal) * 100) : 0;
 
