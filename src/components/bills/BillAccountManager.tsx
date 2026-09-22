@@ -4,34 +4,70 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Trash2, Plus, Edit2, X } from 'lucide-react';
+import { AccountKind } from '@/types/bill';
+import { getAccountBalanceSigned, getNetPosition } from '@/utils/financialSnapshot';
+
+const KIND_LABELS: Record<AccountKind, string> = {
+  current: 'Current account',
+  savings: 'Savings',
+  credit_card: 'Credit card',
+};
+
+const emptyForm = {
+  name: '',
+  color: '#6366f1',
+  sort_order: 0,
+  account_kind: 'current' as AccountKind,
+  current_balance: 0,
+  credit_limit: '' as string | number,
+  apr: '' as string | number,
+  promo_end_date: '',
+};
 
 export const BillAccountManager = () => {
   const { accounts, loading, createAccount, updateAccount, deleteAccount } =
     useBillAccounts();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    color: '#6366f1',
-    sort_order: 0,
-  });
+  const [formData, setFormData] = useState(emptyForm);
 
   const reset = () => {
-    setFormData({ name: '', color: '#6366f1', sort_order: 0 });
+    setFormData(emptyForm);
     setIsAdding(false);
     setEditingId(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isCard = formData.account_kind === 'credit_card';
+    const payload = {
+      name: formData.name,
+      color: formData.color,
+      sort_order: formData.sort_order,
+      account_kind: formData.account_kind,
+      current_balance: Number(formData.current_balance) || 0,
+      credit_limit: isCard && formData.credit_limit !== '' ? Number(formData.credit_limit) : null,
+      apr: isCard && formData.apr !== '' ? Number(formData.apr) : null,
+      promo_end_date: isCard && formData.promo_end_date ? formData.promo_end_date : null,
+    };
+
     if (editingId) {
-      await updateAccount(editingId, formData);
+      await updateAccount(editingId, payload);
     } else {
-      await createAccount(formData);
+      await createAccount(payload);
     }
     reset();
   };
+
+  const netPosition = getNetPosition(accounts);
 
   if (loading) return <div>Loading...</div>;
 
@@ -81,6 +117,82 @@ export const BillAccountManager = () => {
                 />
               </div>
               <div>
+                <Label htmlFor="account_kind">Account type</Label>
+                <Select
+                  value={formData.account_kind}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, account_kind: value as AccountKind })
+                  }
+                >
+                  <SelectTrigger id="account_kind">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">Current account</SelectItem>
+                    <SelectItem value="savings">Savings</SelectItem>
+                    <SelectItem value="credit_card">Credit card</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="account_balance">
+                  {formData.account_kind === 'credit_card'
+                    ? 'Balance owed (£)'
+                    : 'Current balance (£)'}
+                </Label>
+                <Input
+                  id="account_balance"
+                  type="number"
+                  step="0.01"
+                  value={formData.current_balance}
+                  onChange={(e) =>
+                    setFormData({ ...formData, current_balance: e.target.value as unknown as number })
+                  }
+                />
+                {formData.account_kind === 'credit_card' && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Entered as a positive number, counted as money owed.
+                  </p>
+                )}
+              </div>
+              {formData.account_kind === 'credit_card' && (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <Label htmlFor="account_limit">Credit limit (£)</Label>
+                    <Input
+                      id="account_limit"
+                      type="number"
+                      step="0.01"
+                      value={formData.credit_limit}
+                      onChange={(e) =>
+                        setFormData({ ...formData, credit_limit: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="account_apr">Interest rate (% APR)</Label>
+                    <Input
+                      id="account_apr"
+                      type="number"
+                      step="0.01"
+                      value={formData.apr}
+                      onChange={(e) => setFormData({ ...formData, apr: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="account_promo">0% promo ends</Label>
+                    <Input
+                      id="account_promo"
+                      type="date"
+                      value={formData.promo_end_date}
+                      onChange={(e) =>
+                        setFormData({ ...formData, promo_end_date: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+              <div>
                 <Label htmlFor="account_order">Sort order</Label>
                 <Input
                   id="account_order"
@@ -112,8 +224,27 @@ export const BillAccountManager = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3">
-          {accounts.map((account) => (
+        <>
+          <Card>
+            <CardContent className="py-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm text-muted-foreground">Net position</p>
+                <p className="text-xs text-muted-foreground">Cash minus credit card balances</p>
+              </div>
+              <p
+                className={`text-xl font-bold ${
+                  netPosition >= 0 ? 'text-emerald-600' : 'text-destructive'
+                }`}
+              >
+                {netPosition < 0 ? '-' : ''}£{Math.abs(netPosition).toFixed(2)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-3">
+            {accounts.map((account) => {
+              const signed = getAccountBalanceSigned(account);
+              return (
             <Card key={account.id}>
               <CardContent className="py-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
@@ -121,9 +252,30 @@ export const BillAccountManager = () => {
                     className="w-3 h-3 rounded-full shrink-0"
                     style={{ backgroundColor: account.color || '#6366f1' }}
                   />
-                  <span className="font-medium break-words">{account.name}</span>
+                  <div className="min-w-0">
+                    <span className="font-medium break-words">{account.name}</span>
+                    <p className="text-xs text-muted-foreground">
+                      {KIND_LABELS[account.account_kind] || 'Current account'}
+                      {account.account_kind === 'credit_card' && account.apr
+                        ? ` · ${account.apr}% APR`
+                        : ''}
+                      {account.account_kind === 'credit_card' && account.promo_end_date
+                        ? ` · 0% until ${new Date(account.promo_end_date).toLocaleDateString('en-GB', {
+                            month: 'short',
+                            year: 'numeric',
+                          })}`
+                        : ''}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={`font-semibold ${
+                      signed < 0 ? 'text-destructive' : ''
+                    }`}
+                  >
+                    {signed < 0 ? '-' : ''}£{Math.abs(signed).toFixed(2)}
+                  </span>
                   <Button
                     size="icon"
                     variant="outline"
@@ -134,6 +286,11 @@ export const BillAccountManager = () => {
                         name: account.name,
                         color: account.color || '#6366f1',
                         sort_order: account.sort_order,
+                        account_kind: account.account_kind || 'current',
+                        current_balance: Number(account.current_balance || 0),
+                        credit_limit: account.credit_limit ?? '',
+                        apr: account.apr ?? '',
+                        promo_end_date: account.promo_end_date ?? '',
                       });
                     }}
                   >
@@ -149,8 +306,10 @@ export const BillAccountManager = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

@@ -40,24 +40,39 @@ export type Database = {
       }
       bill_accounts: {
         Row: {
+          account_kind: string
+          apr: number | null
           color: string | null
           created_at: string
+          credit_limit: number | null
+          current_balance: number
           id: string
           name: string
+          promo_end_date: string | null
           sort_order: number
         }
         Insert: {
+          account_kind?: string
+          apr?: number | null
           color?: string | null
           created_at?: string
+          credit_limit?: number | null
+          current_balance?: number
           id?: string
           name: string
+          promo_end_date?: string | null
           sort_order?: number
         }
         Update: {
+          account_kind?: string
+          apr?: number | null
           color?: string | null
           created_at?: string
+          credit_limit?: number | null
+          current_balance?: number
           id?: string
           name?: string
+          promo_end_date?: string | null
           sort_order?: number
         }
         Relationships: []
@@ -336,6 +351,36 @@ export type Database = {
           preference_type?: string
           user_id?: string
           value?: string
+        }
+        Relationships: []
+      }
+      financial_advice_runs: {
+        Row: {
+          advice_markdown: string | null
+          context_note: string | null
+          created_at: string
+          id: string
+          period_label: string
+          summary_snapshot: Json | null
+          updated_at: string
+        }
+        Insert: {
+          advice_markdown?: string | null
+          context_note?: string | null
+          created_at?: string
+          id?: string
+          period_label: string
+          summary_snapshot?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          advice_markdown?: string | null
+          context_note?: string | null
+          created_at?: string
+          id?: string
+          period_label?: string
+          summary_snapshot?: Json | null
+          updated_at?: string
         }
         Relationships: []
       }

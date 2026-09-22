@@ -185,3 +185,50 @@ export const exportSummaryToPdf = (summary: PayPeriodSummary, displayDate: Date)
 
   doc.save(`${getExportFileBase(displayDate)}.pdf`);
 };
+
+export const exportAdviceToPdf = (markdown: string, periodLabel: string) => {
+  const doc = new jsPDF();
+  const marginX = 14;
+  const maxWidth = 182;
+  let y = 20;
+
+  doc.setFontSize(16);
+  doc.text('Financial advice', marginX, y);
+  y += 7;
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(periodLabel, marginX, y);
+  doc.setTextColor(0);
+  y += 8;
+
+  const lines = markdown.split('\n');
+  lines.forEach((rawLine) => {
+    const headingMatch = rawLine.match(/^(#{1,4})\s+(.*)$/);
+    const isHeading = Boolean(headingMatch);
+    const text = (headingMatch ? headingMatch[2] : rawLine)
+      .replace(/\*\*/g, '')
+      .replace(/^\s*[-*]\s+/, '• ')
+      .replace(/`/g, '');
+
+    if (!text.trim()) {
+      y += 4;
+      return;
+    }
+
+    doc.setFontSize(isHeading ? 12 : 10);
+    doc.setFont('helvetica', isHeading ? 'bold' : 'normal');
+
+    const wrapped = doc.splitTextToSize(text, maxWidth) as string[];
+    wrapped.forEach((line) => {
+      if (y > 280) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(line, marginX, y);
+      y += isHeading ? 7 : 5.5;
+    });
+    if (isHeading) y += 1;
+  });
+
+  doc.save(`financial-advice-${periodLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`);
+};
