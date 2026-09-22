@@ -4,34 +4,70 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Trash2, Plus, Edit2, X } from 'lucide-react';
+import { AccountKind } from '@/types/bill';
+import { getAccountBalanceSigned, getNetPosition } from '@/utils/financialSnapshot';
+
+const KIND_LABELS: Record<AccountKind, string> = {
+  current: 'Current account',
+  savings: 'Savings',
+  credit_card: 'Credit card',
+};
+
+const emptyForm = {
+  name: '',
+  color: '#6366f1',
+  sort_order: 0,
+  account_kind: 'current' as AccountKind,
+  current_balance: 0,
+  credit_limit: '' as string | number,
+  apr: '' as string | number,
+  promo_end_date: '',
+};
 
 export const BillAccountManager = () => {
   const { accounts, loading, createAccount, updateAccount, deleteAccount } =
     useBillAccounts();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    color: '#6366f1',
-    sort_order: 0,
-  });
+  const [formData, setFormData] = useState(emptyForm);
 
   const reset = () => {
-    setFormData({ name: '', color: '#6366f1', sort_order: 0 });
+    setFormData(emptyForm);
     setIsAdding(false);
     setEditingId(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isCard = formData.account_kind === 'credit_card';
+    const payload = {
+      name: formData.name,
+      color: formData.color,
+      sort_order: formData.sort_order,
+      account_kind: formData.account_kind,
+      current_balance: Number(formData.current_balance) || 0,
+      credit_limit: isCard && formData.credit_limit !== '' ? Number(formData.credit_limit) : null,
+      apr: isCard && formData.apr !== '' ? Number(formData.apr) : null,
+      promo_end_date: isCard && formData.promo_end_date ? formData.promo_end_date : null,
+    };
+
     if (editingId) {
-      await updateAccount(editingId, formData);
+      await updateAccount(editingId, payload);
     } else {
-      await createAccount(formData);
+      await createAccount(payload);
     }
     reset();
   };
+
+  const netPosition = getNetPosition(accounts);
 
   if (loading) return <div>Loading...</div>;
 
