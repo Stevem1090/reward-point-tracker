@@ -306,8 +306,10 @@ export const BillAccountManager = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
