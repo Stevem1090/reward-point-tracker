@@ -8,11 +8,18 @@ export interface BillType {
   created_at: string;
 }
 
+export type AccountKind = 'current' | 'savings' | 'credit_card';
+
 export interface BillAccount {
   id: string;
   name: string;
   color?: string | null;
   sort_order: number;
+  account_kind: AccountKind;
+  current_balance: number;
+  credit_limit?: number | null;
+  apr?: number | null;
+  promo_end_date?: string | null;
   created_at: string;
 }
 
