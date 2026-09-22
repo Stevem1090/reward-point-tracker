@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ChevronLeft, ChevronRight, ChevronDown, Download } from 'lucide-react';
+import { FinancialAdviceCard } from './FinancialAdviceCard';
 
 export const MonthlySummary = () => {
   const { bills } = useBills();
