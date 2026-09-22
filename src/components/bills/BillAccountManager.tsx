@@ -117,6 +117,82 @@ export const BillAccountManager = () => {
                 />
               </div>
               <div>
+                <Label htmlFor="account_kind">Account type</Label>
+                <Select
+                  value={formData.account_kind}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, account_kind: value as AccountKind })
+                  }
+                >
+                  <SelectTrigger id="account_kind">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">Current account</SelectItem>
+                    <SelectItem value="savings">Savings</SelectItem>
+                    <SelectItem value="credit_card">Credit card</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="account_balance">
+                  {formData.account_kind === 'credit_card'
+                    ? 'Balance owed (£)'
+                    : 'Current balance (£)'}
+                </Label>
+                <Input
+                  id="account_balance"
+                  type="number"
+                  step="0.01"
+                  value={formData.current_balance}
+                  onChange={(e) =>
+                    setFormData({ ...formData, current_balance: e.target.value as unknown as number })
+                  }
+                />
+                {formData.account_kind === 'credit_card' && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Entered as a positive number, counted as money owed.
+                  </p>
+                )}
+              </div>
+              {formData.account_kind === 'credit_card' && (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <Label htmlFor="account_limit">Credit limit (£)</Label>
+                    <Input
+                      id="account_limit"
+                      type="number"
+                      step="0.01"
+                      value={formData.credit_limit}
+                      onChange={(e) =>
+                        setFormData({ ...formData, credit_limit: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="account_apr">Interest rate (% APR)</Label>
+                    <Input
+                      id="account_apr"
+                      type="number"
+                      step="0.01"
+                      value={formData.apr}
+                      onChange={(e) => setFormData({ ...formData, apr: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="account_promo">0% promo ends</Label>
+                    <Input
+                      id="account_promo"
+                      type="date"
+                      value={formData.promo_end_date}
+                      onChange={(e) =>
+                        setFormData({ ...formData, promo_end_date: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+              <div>
                 <Label htmlFor="account_order">Sort order</Label>
                 <Input
                   id="account_order"
