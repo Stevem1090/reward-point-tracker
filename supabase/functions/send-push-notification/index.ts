@@ -1,189 +1,114 @@
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import webpush from "npm:web-push@3.6.6";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// Sends push notifications through Firebase Cloud Messaging (via the Lovable connector gateway).
+// Modes:
+//  - { userIds, title, body, url? }  -> send to those users' devices (used by reminders / freezer alerts / test button)
+//  - { kind: "tasks" }               -> send due task reminders (called every minute by cron)
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-source, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || "https://ehhycpszdjhdqsorriun.supabase.co";
-const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const GATEWAY_URL = "https://connector-gateway.lovable.dev/firebase_messaging";
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-  console.info("[START] send-push-notification function triggered");
+type Admin = ReturnType<typeof createClient>;
 
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+async function sendToUsers(admin: Admin, userIds: string[], title: string, body: string, url = "/") {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const FCM_KEY = Deno.env.get("FIREBASE_MESSAGING_API_KEY");
+  if (!LOVABLE_API_KEY || !FCM_KEY) throw new Error("Push is not configured");
 
-    const requestBody = await req.json();
-    console.debug("[INPUT] Raw request body:", JSON.stringify(requestBody));
+  const { data: tokens, error } = await admin.from("push_tokens").select("id, token").in("user_id", userIds);
+  if (error) throw error;
 
-    // Extract userIds from request - check all possible properties
-    const userIds = requestBody.userIds || 
-                   requestBody.familyMemberIds || 
-                   (requestBody.userId ? [requestBody.userId] : undefined);
-                   
-    const { title, body } = requestBody;
-
-    console.debug("[VALIDATION] UserIds extracted:", userIds);
-
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      console.warn("[VALIDATION] Invalid or missing userIds:", userIds);
-      return new Response(
-        JSON.stringify({ 
-          status: 400,
-          message: 'Invalid or missing userIds. Please provide userIds, familyMemberIds, or userId' 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.info(`[VALIDATION] Processing push for ${userIds.length} user(s) with title: ${title}`);
-
-    const { data: vapidKeys, error: vapidError } = await supabase
-      .from('vapid_keys')
-      .select('public_key, private_key')
-      .single();
-
-    if (vapidError || !vapidKeys) {
-      console.error("[ERROR] Failed to fetch VAPID keys:", vapidError);
-      return new Response(
-        JSON.stringify({ 
-          status: 500,
-          message: 'Failed to retrieve VAPID keys' 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.info("[SETUP] VAPID keys retrieved. Setting up web-push");
-    webpush.setVapidDetails(
-      'mailto:admin@familyapp.com',
-      vapidKeys.public_key,
-      vapidKeys.private_key
-    );
-
-    const { data: subscriptions, error: subError } = await supabase
-      .from('user_push_subscriptions')
-      .select('*')
-      .in('user_id', userIds);
-
-    if (subError) {
-      console.error("[ERROR] Failed to fetch subscriptions:", subError);
-      return new Response(
-        JSON.stringify({ 
-          status: 500,
-          message: 'Failed to fetch user subscriptions' 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!subscriptions || subscriptions.length === 0) {
-      console.warn("[INFO] No subscriptions found for provided user IDs");
-      return new Response(
-        JSON.stringify({ 
-          status: 200,
-          message: 'No subscriptions found for the given users' 
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.info(`[SEND] Sending notifications to ${subscriptions.length} subscription(s)`);
-
-    const sendResults = await Promise.all(subscriptions.map(async (sub) => {
-      try {
-        const pushSubscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth
-          }
-        };
-
-        const payload = JSON.stringify({
-          title,
-          body,
-          userId: sub.user_id
-        });
-
-        await webpush.sendNotification(pushSubscription, payload);
-
-        console.info(`[SUCCESS] Notification sent to user ${sub.user_id}`);
-        return { success: true, userId: sub.user_id };
-
-      } catch (error) {
-        console.error(`[FAILURE] Error sending to ${sub.endpoint}:`, error);
-        
-        // Log more information about the error
-        console.error(`[ERROR_DETAILS] Status code: ${error.statusCode}, Error type: ${error.name}, Message: ${error.message}`);
-        
-        // Check for expired subscription (status code 410 - Gone)
-        if (error.statusCode === 410 || error.statusCode === 404) {
-          console.warn(`[CLEANUP] Removing expired subscription for ${sub.user_id} with endpoint ${sub.endpoint}`);
-          
-          try {
-            // Delete the expired subscription
-            const { error: deleteError } = await supabase
-              .from('user_push_subscriptions')
-              .delete()
-              .eq('endpoint', sub.endpoint);
-              
-            if (deleteError) {
-              console.error(`[CLEANUP_ERROR] Failed to delete subscription:`, deleteError);
-            } else {
-              console.info(`[CLEANUP_SUCCESS] Successfully removed expired subscription for ${sub.user_id}`);
-            }
-          } catch (cleanupError) {
-            console.error(`[CLEANUP_ERROR] Exception during subscription cleanup:`, cleanupError);
-          }
-        }
-
-        return { 
-          success: false, 
-          userId: sub.user_id, 
-          error: error.message,
-          statusCode: error.statusCode || 'unknown'
-        };
+  let sent = 0;
+  const stale: string[] = [];
+  for (const t of tokens ?? []) {
+    const res = await fetch(`${GATEWAY_URL}/v1/projects/_/messages:send`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "X-Connection-Api-Key": FCM_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          token: t.token,
+          notification: { title, body },
+          data: { url },
+          webpush: { fcm_options: { link: url }, notification: { icon: "/icons/icon-192.png", badge: "/icons/badge-96.png" } },
+        },
+      }),
+    });
+    if (res.ok) {
+      sent++;
+    } else {
+      const text = await res.text();
+      console.error(`FCM send failed [${res.status}]: ${text}`);
+      if (res.status === 404 || (res.status === 400 && text.includes("INVALID_ARGUMENT")) || text.includes("UNREGISTERED")) {
+        stale.push(t.id);
       }
-    }));
-
-    const successCount = sendResults.filter(r => r.success).length;
-    const expiredCount = sendResults.filter(r => !r.success && (r.statusCode === 410 || r.statusCode === 404)).length;
-
-    console.info(`[COMPLETE] ${successCount}/${sendResults.length} notifications sent successfully.`);
-    if (expiredCount > 0) {
-      console.info(`[CLEANUP] Removed ${expiredCount} expired subscription(s)`);
     }
+  }
+  if (stale.length) await admin.from("push_tokens").delete().in("id", stale);
+  return { sent, devices: tokens?.length ?? 0, removed: stale.length };
+}
 
-    return new Response(
-      JSON.stringify({ 
-        status: 200,
-        message: 'Push notifications processed', 
-        total: sendResults.length,
-        successful: successCount,
-        expired: expiredCount,
-        results: sendResults 
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+async function sendTaskReminders(admin: Admin) {
+  const { data: tasks, error } = await admin
+    .from("tasks")
+    .select("id, title, notes, is_private, owner_id")
+    .eq("done", false)
+    .is("notified_at", null)
+    .not("due_at", "is", null)
+    .lte("due_at", new Date().toISOString())
+    .limit(50);
+  if (error) throw error;
+  if (!tasks?.length) return { tasks: 0 };
 
-  } catch (error) {
-    console.error("[UNHANDLED] Error in push function:", error);
-    return new Response(
-      JSON.stringify({ 
-        status: 500,
-        message: 'Unexpected error processing push notifications',
-        error: error.message 
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  let allUsers: string[] | null = null;
+  for (const task of tasks) {
+    // Mark first so a slow send never double-notifies
+    await admin.from("tasks").update({ notified_at: new Date().toISOString() }).eq("id", task.id).is("notified_at", null);
+    let recipients: string[];
+    if (task.is_private) {
+      recipients = [task.owner_id];
+    } else {
+      if (!allUsers) {
+        const { data } = await admin.from("push_tokens").select("user_id");
+        allUsers = [...new Set((data ?? []).map((r: { user_id: string }) => r.user_id))];
+      }
+      recipients = allUsers;
+    }
+    if (recipients.length) {
+      await sendToUsers(admin, recipients, `⏰ ${task.title}`, task.notes || "Task reminder", "/tasks");
+    }
+  }
+  return { tasks: tasks.length };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  try {
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const payload = await req.json().catch(() => ({}));
+
+    if (payload?.kind === "tasks") return json(await sendTaskReminders(admin));
+
+    const userIds = payload.userIds || payload.familyMemberIds || (payload.userId ? [payload.userId] : undefined);
+    const title = typeof payload.title === "string" ? payload.title.slice(0, 200) : "";
+    const body = typeof payload.body === "string" ? payload.body.slice(0, 1000) : "";
+    const url = typeof payload.url === "string" && payload.url.startsWith("/") ? payload.url : "/";
+    if (!Array.isArray(userIds) || userIds.length === 0 || !title) {
+      return json({ error: "Provide userIds and title" }, 400);
+    }
+    return json(await sendToUsers(admin, userIds.slice(0, 50), title, body, url));
+  } catch (e) {
+    console.error(e);
+    return json({ error: (e as Error).message }, 500);
   }
 });

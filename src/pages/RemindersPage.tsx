@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Bell, CalendarClock, Clock, Loader2, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-import PushNotificationToggle from '@/components/PushNotificationToggle';
 import { useToast } from '@/hooks/use-toast';
 import { sendPushNotification } from '@/utils/vapidUtils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -285,10 +284,6 @@ const RemindersPage = () => {
         Family Reminders
       </h1>
       <div className="flex justify-center mb-6 gap-2">
-        <PushNotificationToggle 
-          userIds={selectedUsers} 
-          onSubscriptionChange={handleSubscriptionChange}
-        />
         <Button 
           variant="default" 
           className="bg-kid-purple hover:bg-kid-purple/90 gap-2"

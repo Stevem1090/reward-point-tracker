@@ -1,207 +1,127 @@
+import React, { useEffect, useState } from 'react';
+import { Bell, Loader2, Send, Smartphone, Share, PlusSquare, MoreVertical } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
+import {
+  enablePush, disablePush, isThisDeviceEnabled, sendTestPush,
+  getPushPermission, isInIframe, isIOS, isStandalone,
+} from '@/lib/push/registerPush';
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Bell, Loader2, Info } from 'lucide-react';
-import { useUserNotifications } from '@/hooks/useUserNotifications';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from "@/hooks/use-toast";
-
-interface NotificationSettingsProps {
-  user: User | null;
-}
-
-// Define NotificationPermission type if it's not available
-type NotificationPermissionType = "default" | "denied" | "granted";
-
-const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => {
-  const [browserSupport, setBrowserSupport] = useState(true);
-  const [permissionStatus, setPermissionStatus] = useState<NotificationPermissionType | null>(null);
-  const { toast } = useToast();
-  
-  const { 
-    isSubscribed, 
-    isLoading: notificationLoading, 
-    subscribe, 
-    unsubscribe 
-  } = useUserNotifications();
-  
-  useEffect(() => {
-    // Check browser support for push notifications
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      setBrowserSupport(false);
-      return;
-    }
-
-    // Check current notification permission status
-    if ('Notification' in window) {
-      setPermissionStatus(Notification.permission as NotificationPermissionType);
-    }
-  }, []);
-  
-  const handleRequestPermission = async () => {
-    try {
-      // Request notification permission explicitly
-      const permission = await Notification.requestPermission();
-      setPermissionStatus(permission as NotificationPermissionType);
-      
-      if (permission === 'granted') {
-        // Only try to subscribe if permission is granted
-        await handleToggleNotifications();
-      } else {
-        toast({
-          title: "Permission Denied",
-          description: "You need to allow notifications in your browser settings to receive reminders.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Error requesting notification permission:', error);
-    }
-  };
-  
-  const handleToggleNotifications = async () => {
-    try {
-      if (isSubscribed) {
-        await unsubscribe();
-      } else {
-        const result = await subscribe();
-        if (!result.success) {
-          console.error("Subscription failed:", result.message);
-          
-          // Handle duplicate subscription error
-          if (result.message && result.message.includes("duplicate key")) {
-            toast({
-              title: "Already Subscribed",
-              description: "You are already subscribed to notifications on this device.",
-              variant: "default"
-            });
-            // Force refresh subscription status
-            useUserNotifications().checkSubscriptionStatus();
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling notifications:', error);
-    }
-  };
-  
-  const handleTestNotification = async () => {
-    if (!user?.id) return;
-    
-    try {
-      const { error } = await supabase.functions.invoke('send-push-notification', {
-        body: {
-          userId: user.id,
-          title: "Test Notification",
-          body: "This is a test notification from your profile page"
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Test notification sent",
-        description: "You should receive it shortly"
-      });
-    } catch (error) {
-      console.error('Error sending test notification:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send test notification",
-        variant: "destructive"
-      });
-    }
-  };
-  
-  const renderPermissionGuidance = () => {
-    if (permissionStatus === 'denied') {
-      return (
-        <Alert variant="destructive" className="mb-4">
-          <Info className="h-4 w-4" />
-          <AlertTitle>Notification Permission Blocked</AlertTitle>
-          <AlertDescription>
-            You've blocked notifications for this site. To enable notifications, you need to:
-            <ol className="ml-4 mt-2 list-decimal">
-              <li>Click the lock/info icon in your browser's address bar</li>
-              <li>Find the notifications setting and change it to "Allow"</li>
-              <li>Refresh this page</li>
-            </ol>
-          </AlertDescription>
-        </Alert>
-      );
-    }
-    return null;
-  };
-  
+export const InstallAppCard: React.FC = () => {
+  if (isStandalone()) return null;
+  const ios = isIOS();
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Notification Settings</CardTitle>
-        <CardDescription>Manage how you receive notifications</CardDescription>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg"><Smartphone className="h-5 w-5" /> Install the app</CardTitle>
+        <CardDescription>Add Family Hub to your home screen for a full-screen app and notifications.</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {!browserSupport ? (
-            <Alert className="mb-4">
-              <AlertDescription>
-                Your browser doesn't support push notifications.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              {renderPermissionGuidance()}
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <div className="font-medium">Push Notifications</div>
-                  <div className="text-sm text-muted-foreground">
-                    Receive notifications on this device
-                  </div>
-                </div>
-                
-                {permissionStatus === 'default' ? (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleRequestPermission}
-                    disabled={notificationLoading}
-                  >
-                    {notificationLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Bell className="h-4 w-4 mr-2" />
-                    )}
-                    Enable Notifications
-                  </Button>
-                ) : (
-                  <Switch 
-                    checked={isSubscribed} 
-                    onCheckedChange={handleToggleNotifications}
-                    disabled={notificationLoading || !browserSupport || permissionStatus === 'denied'}
-                  />
-                )}
-              </div>
-              
-              {isSubscribed && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleTestNotification}
-                  className="mt-2"
-                >
-                  <Bell className="mr-2 h-4 w-4" />
-                  Send Test Notification
-                </Button>
-              )}
-            </>
-          )}
-        </div>
+      <CardContent className="text-sm space-y-2">
+        {ios ? (
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>Open this page in <strong>Safari</strong>.</li>
+            <li>Tap <Share className="inline h-4 w-4" /> <strong>Share</strong>.</li>
+            <li>Tap <PlusSquare className="inline h-4 w-4" /> <strong>Add to Home Screen</strong>.</li>
+            <li>Open Family Hub from your home screen, then turn on notifications here.</li>
+          </ol>
+        ) : (
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>Open this page in <strong>Chrome</strong>.</li>
+            <li>Tap <MoreVertical className="inline h-4 w-4" /> the menu.</li>
+            <li>Tap <strong>Install app</strong> (or <strong>Add to Home screen</strong>).</li>
+          </ol>
+        )}
       </CardContent>
     </Card>
+  );
+};
+
+const NotificationSettings: React.FC<{ user?: unknown }> = () => {
+  const { toast } = useToast();
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const perm = getPushPermission();
+  const iosNeedsInstall = isIOS() && !isStandalone();
+
+  useEffect(() => { isThisDeviceEnabled().then(setEnabled); }, []);
+
+  const toggle = async (on: boolean) => {
+    setBusy(true);
+    try {
+      if (!on) {
+        await disablePush();
+        setEnabled(false);
+        toast({ title: 'Notifications turned off on this device' });
+        return;
+      }
+      const r = await enablePush();
+      const messages: Record<string, string> = {
+        'open-in-new-tab': 'Notifications can\'t be turned on inside the editor preview. Open the app in its own tab or from your home screen.',
+        denied: 'Notifications are blocked. Allow them for this site in your browser or phone settings, then try again.',
+        unsupported: iosNeedsInstall ? 'On iPhone, add the app to your Home Screen first, then open it from there.' : 'This browser doesn\'t support notifications.',
+        'not-configured': 'Notifications aren\'t set up yet.',
+      };
+      if (r.status === 'registered') {
+        setEnabled(true);
+        toast({ title: 'Notifications on', description: 'This device will now get reminders.' });
+      } else {
+        toast({ title: 'Couldn\'t turn on notifications', description: messages[r.status] ?? r.message, variant: 'destructive' });
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const test = async () => {
+    setTesting(true);
+    try {
+      const r = await sendTestPush();
+      toast({ title: 'Test sent', description: `Sent to ${r.sent} of your device${r.devices === 1 ? '' : 's'}.` });
+    } catch (e) {
+      toast({ title: 'Test failed', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <InstallAppCard />
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg"><Bell className="h-5 w-5" /> Notifications</CardTitle>
+          <CardDescription>Get task reminders, weekly reminders and defrost alerts on this device.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isInIframe() && (
+            <Alert><AlertDescription>Open the app in its own tab (or from your home screen) to turn on notifications.</AlertDescription></Alert>
+          )}
+          {iosNeedsInstall && !isInIframe() && (
+            <Alert><AlertDescription>On iPhone, notifications only work after adding the app to your Home Screen.</AlertDescription></Alert>
+          )}
+          {perm === 'denied' && (
+            <Alert variant="destructive"><AlertDescription>Notifications are blocked for this site. Re-allow them in your browser or phone settings.</AlertDescription></Alert>
+          )}
+          <div className="flex items-center justify-between min-h-[44px]">
+            <span className="font-medium">Notifications on this device</span>
+            <div className="flex items-center gap-2">
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              <Switch checked={enabled} disabled={busy} onCheckedChange={toggle} aria-label="Notifications on this device" />
+            </div>
+          </div>
+          {enabled && (
+            <Button variant="outline" onClick={test} disabled={testing} className="min-h-[44px]">
+              {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+              Send test notification
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

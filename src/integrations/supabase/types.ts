@@ -660,6 +660,36 @@ export type Database = {
         }
         Relationships: []
       }
+      push_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          last_seen_at: string
+          platform: string
+          token: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_seen_at?: string
+          platform?: string
+          token: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_seen_at?: string
+          platform?: string
+          token?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       recipe_cards: {
         Row: {
           base_servings: number
@@ -1138,6 +1168,86 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      task_sections: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          created_at: string
+          done: boolean
+          done_at: string | null
+          due_at: string | null
+          id: string
+          is_private: boolean
+          notes: string | null
+          notified_at: string | null
+          owner_id: string
+          section_id: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          done?: boolean
+          done_at?: string | null
+          due_at?: string | null
+          id?: string
+          is_private?: boolean
+          notes?: string | null
+          notified_at?: string | null
+          owner_id?: string
+          section_id: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          done?: boolean
+          done_at?: string | null
+          due_at?: string | null
+          id?: string
+          is_private?: boolean
+          notes?: string | null
+          notified_at?: string | null
+          owner_id?: string
+          section_id?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "task_sections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_profiles: {
         Row: {

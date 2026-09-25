@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Menu, Award, Receipt, UtensilsCrossed, ListChecks, Scale } from 'lucide-react';
+import { Menu, Award, Receipt, UtensilsCrossed, ListChecks, Scale, CheckSquare, UserCircle } from 'lucide-react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,11 +20,13 @@ type MenuLink = {
 };
 
 const menuLinks: MenuLink[] = [
+  { name: 'Tasks', path: '/tasks', icon: <CheckSquare className="h-5 w-5" /> },
   { name: 'Rewards', path: '/rewards', icon: <Award className="h-5 w-5" /> },
   { name: 'Bills', path: '/bills', icon: <Receipt className="h-5 w-5" /> },
   { name: 'Meals', path: '/meals', icon: <UtensilsCrossed className="h-5 w-5" /> },
   { name: 'Chores', path: '/chores', icon: <ListChecks className="h-5 w-5" /> },
   { name: 'Slimming World', path: '/slimming-world', icon: <Scale className="h-5 w-5" /> },
+  { name: 'Profile & notifications', path: '/profile', icon: <UserCircle className="h-5 w-5" /> },
 ];
 
 const AppLayout = () => {
