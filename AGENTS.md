@@ -2,3 +2,5 @@
 - PWA is manifest-only (no app-shell service worker); `public/sw.js` is a kill-switch for the retired worker. Why: avoid stale cached app versions.
 - Background task completion from push notifications uses short-lived, task-specific HMAC tokens handled by `task-notification-action`. Why: complete only the notified task without exposing a reusable user session.
 - Task reminder input and display use `Europe/London` explicitly. Why: keep selected times stable across device timezone differences and GMT/BST changes.
+
+- Multi-family: shared tables carry `family_id` (default `current_family_id()`) with RLS "same family"; membership in `family_members`, invites via RPCs + `send-family-invite`; `FamilyGate` runs `ensure_family` on load. Why: separate households in one app, master controls members.

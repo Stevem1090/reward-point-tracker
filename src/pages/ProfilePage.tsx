@@ -11,6 +11,7 @@ import { UserCircle, Loader2 } from "lucide-react";
 import { UserProfile } from '@/types/user';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import NotificationSettings from '@/components/NotificationSettings';
+import FamilySettings from '@/components/FamilySettings';
 
 const ProfilePage = () => {
   const { user } = useAuth();
@@ -207,6 +208,7 @@ const ProfilePage = () => {
           </CardFooter>
         </Card>
         
+        {user && <FamilySettings />}
         {user && <NotificationSettings user={user} />}
       </div>
     </div>
