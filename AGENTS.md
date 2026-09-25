@@ -1,0 +1,2 @@
+- Push notifications use Firebase Cloud Messaging via the connector gateway: `send-push-notification` edge function + `push_tokens` table + `public/firebase-messaging-sw.js` (scope /firebase-cloud-messaging-push-scope). Why: old VAPID/sw.js system was unreliable on installed phone apps.
+- PWA is manifest-only (no app-shell service worker); `public/sw.js` is a kill-switch for the retired worker. Why: avoid stale cached app versions.
