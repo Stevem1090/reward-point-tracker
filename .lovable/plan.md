@@ -16,8 +16,9 @@ The old notification system here is replaced with the Firebase Cloud Messaging s
 
 ## 3. New Tasks section (Google Keep style)
 New "Tasks" page in the menu.
-- **Sections**: starts with Today, Soon, Later. Add, rename, reorder and delete sections.
-- **Tasks**: quick-add line at the top of each section, tick box to mark done, done items drop into a collapsible "Completed" list (untick to restore), tap a task to edit, swipe/menu to delete or move to another section.
+- **Sections**: starts with Today, Soon, Later. Add, rename and delete sections; drag a section by its handle to reorder.
+- **Tasks**: quick-add line at the top of each section, tick box to mark done, done items drop into a collapsible "Completed" list (untick to restore), tap a task to edit, menu to delete.
+- **Drag and drop**: press-and-hold (phone) or grab the handle to drag a task up/down within a section or into another section (e.g. Soon to Today). Order is saved for everyone.
 - **Shared vs private**: tasks are shared with the household by default; a "Only me" toggle hides a task from everyone else. Private tasks show a small lock icon.
 - **Dates**: optional due date and time. Overdue tasks are highlighted; dated tasks show the date on the row.
 - **Reminders**: a task with a date/time sends a notification at that time - to everyone for shared tasks, only to the owner for private ones. Each task notifies once (not repeated after being ticked off).
@@ -29,11 +30,13 @@ New "Tasks" page in the menu.
 
 ## Technical details
 - `public/manifest.webmanifest`, generated 192/512 + maskable + apple-touch icons, head tags in `index.html`. No vite-plugin-pwa.
-- `public/sw.js`: strip install/fetch caching, keep `push` + `notificationclick` (open `data.url`).
+- Port from spot-stash-scan: `public/firebase-messaging-sw.js` (click handler registered before messaging init), push client lib, `NotificationsSection`/install card, `send-push` edge function using the Firebase connector gateway.
+- New `push_tokens` table (user_id, token, platform, last_seen). Replace `public/sw.js` with the kill-switch worker for one release; remove old VAPID subscribe code.
+- Point `check_and_send_reminders` / `check_freezer_reminders` at `send-push`.
 - New tables with GRANTs + RLS:
   - `task_sections` (name, sort_order, created_by) - readable/editable by authenticated users.
   - `tasks` (section_id, title, notes, done, done_at, due_at, is_private, owner_id, sort_order, notified_at, timestamps). RLS: select/update/delete where `is_private = false OR owner_id = auth.uid()`; insert with `owner_id = auth.uid()`.
   - Seed Today / Soon / Later.
-- Edge function `send-task-reminders` (service role): finds `done = false AND due_at <= now() AND notified_at IS NULL`, sends web push via existing VAPID/`user_push_subscriptions`, removes stale subscriptions (404/410), sets `notified_at`. Run every minute by pg_cron + pg_net. Editing `due_at` resets `notified_at`.
+- Edge function `send-task-reminders`: finds `done = false AND due_at <= now() AND notified_at IS NULL`, calls `send-push` (FCM), deletes UNREGISTERED tokens, sets `notified_at`. pg_cron every minute. Editing `due_at` resets `notified_at`.
+- Drag and drop with existing dnd-kit (touch sensor with press delay, multi-container sortable); optimistic reorder then batch-update `sort_order`/`section_id`.
 - New `src/pages/TasksPage.tsx`, `src/hooks/useTasks.ts`, `useTaskSections.ts`, components under `src/components/tasks/`, route `/tasks` + nav entry.
-- Notification toggle consolidated into existing `useUserNotifications` with iframe/unsupported/denied states.
