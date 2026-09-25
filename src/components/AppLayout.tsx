@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Menu, Award, Receipt, UtensilsCrossed, ListChecks, Scale, CheckSquare, UserCircle } from 'lucide-react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Menu, Award, Receipt, UtensilsCrossed, ListChecks, Scale, CheckSquare, UserCircle, LogOut } from 'lucide-react';
+import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -30,9 +30,16 @@ const menuLinks: MenuLink[] = [
 ];
 
 const AppLayout = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    setIsOpen(false);
+    await signOut();
+    navigate('/');
+  };
 
   if (!user) return <Outlet />;
 
@@ -68,6 +75,14 @@ const AppLayout = () => {
                     <span>{link.name}</span>
                   </Link>
                 ))}
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all hover:bg-white/50 text-left"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span>Sign out</span>
+                </button>
               </nav>
             </SheetContent>
           </Sheet>
