@@ -1,7 +1,8 @@
 # Installable app, notifications and a new Tasks section
 
-## 1. Install on your phone
-- Add an app name, icon and theme colour so "Add to Home Screen" works on iPhone and Android and opens full screen like a normal app.
+## 1. Install on your phone (same approach as Squirrel It)
+- Same setup as Squirrel It: app name, icons and theme colour so "Add to Home Screen" works on iPhone and Android and opens full screen like a normal app.
+- Includes Squirrel It's "Install the app" card with simple step-by-step instructions for iPhone and Android.
 - Set a proper app title and description (replacing the "Lovable Generated Project" placeholder).
 - No offline mode (not requested) - keeps updates instant.
 - iPhone note: notifications only work once the app has been added to the Home Screen and opened from there (Apple rule).
