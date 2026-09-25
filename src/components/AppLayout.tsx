@@ -75,6 +75,14 @@ const AppLayout = () => {
                     <span>{link.name}</span>
                   </Link>
                 ))}
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all hover:bg-white/50 text-left"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span>Sign out</span>
+                </button>
               </nav>
             </SheetContent>
           </Sheet>
