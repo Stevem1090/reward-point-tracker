@@ -259,7 +259,6 @@ export const useChores = (selectedYear: number) => {
       const { data: serverRows } = await supabase
         .from('chore_completions')
         .select('id, completed_at')
-        .eq('user_id', user.id)
         .eq('chore_id', chore_id)
         .gte('completed_at', periodStart.toISOString())
         .lte('completed_at', periodEnd.toISOString())
