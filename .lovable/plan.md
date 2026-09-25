@@ -6,12 +6,13 @@
 - No offline mode (not requested) - keeps updates instant.
 - iPhone note: notifications only work once the app has been added to the Home Screen and opened from there (Apple rule).
 
-## 2. Notifications
-The app already has a notification system (used by Reminders). It will be tidied and reused:
-- One clear "Enable notifications" switch on the Profile page, with a "Send test notification" button.
-- Friendly messages when it can't work (e.g. inside the editor preview - open the installed/published app instead; permission blocked - how to re-allow in settings).
-- Tapping a notification opens the relevant page in the app (e.g. the task).
-- The existing background worker keeps handling notifications, but its old page-caching is removed so it can never show a stale version of the app.
+## 2. Notifications (copied from Squirrel It / spot-stash-scan)
+The old notification system here is replaced with the Firebase Cloud Messaging setup that works well in Squirrel It:
+- Same "Notifications" settings card on the Profile page, including the "install the app first" prompt on iPhone, an enable switch and a "Send test notification" button.
+- Each phone/browser you enable is remembered, so both your and your wife's devices get alerts; dead devices are cleaned up automatically.
+- Tapping a notification opens the right page (e.g. the task).
+- Existing weekly Reminders and freezer defrost alerts are switched over to the new system, and the old notification worker is retired safely.
+- **You'll need a Firebase project for this app** (free). I'll show a connect card for Firebase Cloud Messaging - the same kind of setup you did for Squirrel It, with "Include web push" ticked. You could reuse the Squirrel It Firebase project, but a separate one keeps the apps apart.
 
 ## 3. New Tasks section (Google Keep style)
 New "Tasks" page in the menu.
