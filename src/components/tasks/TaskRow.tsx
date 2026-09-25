@@ -3,16 +3,13 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Checkbox } from '@/components/ui/checkbox';
 import { GripVertical, Lock, Bell } from 'lucide-react';
-import { format, isPast, isToday, isTomorrow } from 'date-fns';
+import { isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Task } from '@/hooks/useTasks';
+import { formatTaskDue } from '@/lib/tasks/dateTime';
 
 export function formatDue(due: string) {
-  const d = new Date(due);
-  const time = format(d, 'HH:mm');
-  if (isToday(d)) return `Today ${time}`;
-  if (isTomorrow(d)) return `Tomorrow ${time}`;
-  return format(d, 'EEE d MMM, HH:mm');
+  return formatTaskDue(due);
 }
 
 interface Props {
