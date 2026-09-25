@@ -83,7 +83,7 @@ async function sendTaskReminders(admin: Admin) {
   if (!actionSecret) throw new Error("Task actions are not configured");
   const { data: tasks, error } = await admin
     .from("tasks")
-    .select("id, title, notes, is_private, owner_id")
+    .select("id, title, notes, is_private, owner_id, family_id")
     .eq("done", false)
     .is("notified_at", null)
     .not("due_at", "is", null)
@@ -92,7 +92,7 @@ async function sendTaskReminders(admin: Admin) {
   if (error) throw error;
   if (!tasks?.length) return { tasks: 0 };
 
-  let allUsers: string[] | null = null;
+  const familyCache = new Map<string, string[]>();
   for (const task of tasks) {
     // Mark first so a slow send never double-notifies
     await admin.from("tasks").update({ notified_at: new Date().toISOString() }).eq("id", task.id).is("notified_at", null);
@@ -100,11 +100,11 @@ async function sendTaskReminders(admin: Admin) {
     if (task.is_private) {
       recipients = [task.owner_id];
     } else {
-      if (!allUsers) {
-        const { data } = await admin.from("push_tokens").select("user_id");
-        allUsers = [...new Set((data ?? []).map((r: { user_id: string }) => r.user_id))];
+      if (!familyCache.has(task.family_id)) {
+        const { data } = await admin.from("family_members").select("user_id").eq("family_id", task.family_id);
+        familyCache.set(task.family_id, (data ?? []).map((r: { user_id: string }) => r.user_id));
       }
-      recipients = allUsers;
+      recipients = familyCache.get(task.family_id)!;
     }
     if (recipients.length) {
       const actionToken = await createTaskActionToken(task.id, actionSecret);

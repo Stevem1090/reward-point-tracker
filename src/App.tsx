@@ -19,6 +19,8 @@ import TasksPage from "./pages/TasksPage";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
+import JoinPage from "./pages/JoinPage";
+import FamilyGate from "./components/FamilyGate";
 import { useEffect } from "react";
 import { refreshPushToken, retireOldServiceWorker } from "./lib/push/registerPush";
 
@@ -51,8 +53,9 @@ const App = () => {
                 <Routes>
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
+                  <Route path="/join" element={<JoinPage />} />
 
-                  <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
+                  <Route element={<AuthGuard><FamilyGate><AppLayout /></FamilyGate></AuthGuard>}>
                     <Route path="/" element={<Navigate to="/rewards" replace />} />
                     <Route path="/rewards" element={<RewardsPage />} />
                     <Route path="/calendar" element={<CalendarPage />} />
