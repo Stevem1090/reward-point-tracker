@@ -4,6 +4,9 @@ project_id = "ehhycpszdjhdqsorriun"
 [functions.send-push-notification]
 verify_jwt = true
 
+[functions.task-notification-action]
+verify_jwt = false
+
 [functions.send-email]
 verify_jwt = true
 

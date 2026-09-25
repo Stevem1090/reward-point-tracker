@@ -8,9 +8,22 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
   const fcm = data.FCM_MSG || {};
+  const messageData = fcm.data || data;
+  if (event.action === 'mark-done' && messageData.actionUrl && messageData.taskId && messageData.actionToken) {
+    event.waitUntil(
+      fetch(messageData.actionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: messageData.taskId, token: messageData.actionToken }),
+      }).then((response) => {
+        if (!response.ok) throw new Error('Task completion failed');
+      }).catch((error) => console.error('[push] mark done failed', error))
+    );
+    return;
+  }
   const url =
     data.url ||
-    (fcm.data && fcm.data.url) ||
+    messageData.url ||
     (fcm.fcmOptions && fcm.fcmOptions.link) ||
     '/';
   const target = new URL(url, self.location.origin).href;

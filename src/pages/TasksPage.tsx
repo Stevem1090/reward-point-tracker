@@ -5,6 +5,7 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus, Loader2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -22,12 +23,21 @@ type Order = Record<string, string[]>; // sectionId -> active task ids
 const TasksPage = () => {
   const { user } = useAuth();
   const t = useTasks();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [editing, setEditing] = useState<Task | null>(null);
   const [sectionDialog, setSectionDialog] = useState<{ mode: 'add' | 'rename'; section?: TaskSection } | null>(null);
   const [sectionName, setSectionName] = useState('');
   const [toDelete, setToDelete] = useState<TaskSection | null>(null);
   const [dragType, setDragType] = useState<'task' | 'section' | null>(null);
   const [order, setOrder] = useState<Order>({});
+
+  useEffect(() => {
+    const taskId = searchParams.get('task');
+    if (!taskId || t.isLoading) return;
+    const task = t.tasks.find((candidate) => candidate.id === taskId);
+    if (task) setEditing(task);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams, t.isLoading, t.tasks]);
 
   const byId = useMemo(() => new Map(t.tasks.map((x) => [x.id, x])), [t.tasks]);
 

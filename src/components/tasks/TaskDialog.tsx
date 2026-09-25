@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, X } from 'lucide-react';
 import type { Task, TaskSection } from '@/hooks/useTasks';
+import { taskLocalParts, taskLocalToIso } from '@/lib/tasks/dateTime';
 
 interface Props {
   task: Task | null;
@@ -31,8 +31,9 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
     if (!task) return;
     setTitle(task.title);
     setNotes(task.notes ?? '');
-    setDate(task.due_at ? format(new Date(task.due_at), 'yyyy-MM-dd') : '');
-    setTime(task.due_at ? format(new Date(task.due_at), 'HH:mm') : '');
+    const due = task.due_at ? taskLocalParts(task.due_at) : null;
+    setDate(due?.date ?? '');
+    setTime(due?.time ?? '');
     setIsPrivate(task.is_private);
     setSectionId(task.section_id);
   }, [task]);
@@ -42,7 +43,7 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
 
   const save = () => {
     if (!title.trim()) return;
-    const due_at = date ? new Date(`${date}T${time || '09:00'}`).toISOString() : null;
+    const due_at = date ? taskLocalToIso(date, time || '09:00') : null;
     onSave(task.id, {
       title: title.trim(),
       notes: notes.trim() || null,

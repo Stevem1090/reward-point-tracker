@@ -3,6 +3,7 @@
 //  - { userIds, title, body, url? }  -> send to those users' devices (used by reminders / freezer alerts / test button)
 //  - { kind: "tasks" }               -> send due task reminders (called every minute by cron)
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createTaskActionToken } from "../_shared/taskActionToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,7 +18,9 @@ const json = (data: unknown, status = 200) =>
 
 type Admin = ReturnType<typeof createClient>;
 
-async function sendToUsers(admin: Admin, userIds: string[], title: string, body: string, url = "/") {
+type TaskAction = { taskId: string; token: string };
+
+async function sendToUsers(admin: Admin, userIds: string[], title: string, body: string, url = "/", taskAction?: TaskAction) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   const FCM_KEY = Deno.env.get("FIREBASE_MESSAGING_API_KEY");
   if (!LOVABLE_API_KEY || !FCM_KEY) throw new Error("Push is not configured");
@@ -38,9 +41,26 @@ async function sendToUsers(admin: Admin, userIds: string[], title: string, body:
       body: JSON.stringify({
         message: {
           token: t.token,
-          notification: { title, body },
-          data: { url },
-          webpush: { fcm_options: { link: url }, notification: { icon: "/icons/icon-192.png", badge: "/icons/badge-96.png" } },
+          notification: body ? { title, body } : { title },
+          data: {
+            url,
+            ...(taskAction ? {
+              taskId: taskAction.taskId,
+              actionToken: taskAction.token,
+              actionUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1/task-notification-action`,
+            } : {}),
+          },
+          webpush: {
+            fcm_options: { link: url },
+            notification: {
+              icon: "/icons/icon-192.png",
+              badge: "/icons/notification-96.png",
+              ...(taskAction ? { actions: [
+                { action: "mark-done", title: "Mark done" },
+                { action: "view-task", title: "View task" },
+              ] } : {}),
+            },
+          },
         },
       }),
     });
@@ -59,6 +79,8 @@ async function sendToUsers(admin: Admin, userIds: string[], title: string, body:
 }
 
 async function sendTaskReminders(admin: Admin) {
+  const actionSecret = Deno.env.get("TASK_ACTION_SIGNING_SECRET");
+  if (!actionSecret) throw new Error("Task actions are not configured");
   const { data: tasks, error } = await admin
     .from("tasks")
     .select("id, title, notes, is_private, owner_id")
@@ -85,7 +107,15 @@ async function sendTaskReminders(admin: Admin) {
       recipients = allUsers;
     }
     if (recipients.length) {
-      await sendToUsers(admin, recipients, `⏰ ${task.title}`, task.notes || "Task reminder", "/tasks");
+      const actionToken = await createTaskActionToken(task.id, actionSecret);
+      await sendToUsers(
+        admin,
+        recipients,
+        task.title,
+        task.notes || "",
+        `/tasks?task=${task.id}`,
+        { taskId: task.id, token: actionToken },
+      );
     }
   }
   return { tasks: tasks.length };
