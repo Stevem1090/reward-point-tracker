@@ -32,18 +32,16 @@ export const useChores = (selectedYear: number) => {
     const yearEnd = new Date(selectedYear + 1, 0, 1).toISOString();
 
     const [catsRes, choresRes, compsRes, allCompYearsRes] = await Promise.all([
-      supabase.from('chore_categories').select('*').eq('user_id', user.id).order('sort_order'),
-      supabase.from('chores').select('*').eq('user_id', user.id).eq('archived', false).order('created_at'),
+      supabase.from('chore_categories').select('*').order('sort_order'),
+      supabase.from('chores').select('*').eq('archived', false).order('created_at'),
       supabase
         .from('chore_completions')
         .select('*')
-        .eq('user_id', user.id)
         .gte('completed_at', yearStart)
         .lt('completed_at', yearEnd),
       supabase
         .from('chore_completions')
         .select('completed_at')
-        .eq('user_id', user.id)
         .order('completed_at', { ascending: true })
         .limit(1),
     ]);
