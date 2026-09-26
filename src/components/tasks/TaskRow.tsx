@@ -88,6 +88,16 @@ export const TaskRow: React.FC<Props> = ({ task, onToggle, onOpen, onDelete, dra
           </span>
         )}
       </button>
+      {assignee && (
+        <span
+          className="self-center h-6 w-6 shrink-0 rounded-full flex items-center justify-center text-[11px] font-semibold text-white"
+          style={{ backgroundColor: assignee.color }}
+          title={`Assigned to ${assignee.name}`}
+          aria-label={`Assigned to ${assignee.name}`}
+        >
+          {initialOf(assignee.name)}
+        </span>
+      )}
       <button
         onClick={() => onDelete(task.id)}
         className="h-11 w-11 flex items-center justify-center shrink-0 text-muted-foreground/60 hover:text-destructive"
