@@ -12,12 +12,21 @@ import { UserProfile } from '@/types/user';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import NotificationSettings from '@/components/NotificationSettings';
 import FamilySettings from '@/components/FamilySettings';
+import { useQueryClient } from '@tanstack/react-query';
+import { memberColor, initialOf } from '@/hooks/useFamilyMembers';
+
+const PRESET_COLORS = [
+  '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
+  '#f59e0b', '#10b981', '#14b8a6', '#0ea5e9',
+];
 
 const ProfilePage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState('');
+  const [color, setColor] = useState('#6366f1');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
