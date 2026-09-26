@@ -29,6 +29,8 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
   const [repeat, setRepeat] = useState<TaskRepeat>('none');
   const [weekday, setWeekday] = useState(1);
   const [monthDay, setMonthDay] = useState(1);
+  const [initialDate, setInitialDate] = useState('');
+
 
   useEffect(() => {
     if (!task) return;
@@ -36,6 +38,8 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
     setNotes(task.notes ?? '');
     const due = task.due_at ? taskLocalParts(task.due_at) : null;
     setDate(due?.date ?? '');
+    setInitialDate(due?.date ?? '');
+
     setTime(due?.time ?? '');
     setIsPrivate(task.is_private);
     setSectionId(task.section_id);
@@ -53,9 +57,11 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
     let useDate = date;
     if (repeat !== 'none') {
       const changedRule = repeat !== task.repeat || weekday !== task.repeat_weekday || monthDay !== task.repeat_day;
-      if (!useDate || changedRule) useDate = firstOccurrenceDate(repeat, weekday, monthDay);
+      const userPickedDate = date !== initialDate && !!date;
+      if (!useDate || (changedRule && !userPickedDate)) useDate = firstOccurrenceDate(repeat, weekday, monthDay);
     }
     const due_at = useDate ? taskLocalToIso(useDate, time || '09:00') : null;
+
     onSave(task.id, {
       title: title.trim(),
       notes: notes.trim() || null,
@@ -79,9 +85,10 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
           <div className="space-y-2">
             <Label>Reminder</Label>
             <div className="flex gap-2 items-center">
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="flex-1" disabled={repeat !== 'none'} />
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="flex-1" />
               <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={!date && repeat === 'none'} className="w-28" />
               {date && repeat === 'none' && (
+
                 <Button variant="ghost" size="icon" onClick={() => { setDate(''); setTime(''); }} aria-label="Clear reminder">
                   <X className="h-4 w-4" />
                 </Button>
