@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Menu, LayoutGrid, LogOut } from 'lucide-react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -51,24 +51,19 @@ const AppLayout = () => {
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-2">
-                {menuLinks.map((link) => (
-                  (() => {
-                    const Icon = link.icon;
-                    return (
+                {menuLinks.map(({ name, path, icon: Icon }) => (
                   <Link 
-                    key={link.path} 
-                    to={link.path}
+                    key={path} 
+                    to={path}
                     onClick={() => setIsOpen(false)}
                     className={cn(
                       "flex items-center gap-3 px-4 py-3 rounded-lg transition-all hover:bg-white/50",
-                      location.pathname === link.path && "bg-white text-kid-purple font-medium"
+                      location.pathname === path && "bg-white text-kid-purple font-medium"
                     )}
                   >
                     <Icon className="h-5 w-5" />
-                    <span>{link.name}</span>
+                    <span>{name}</span>
                   </Link>
-                    );
-                  })()
                 ))}
                 <Button
                   onClick={handleSignOut}
@@ -89,23 +84,18 @@ const AppLayout = () => {
         {/* Sidebar for larger screens */}
         <aside className="hidden md:block w-64 bg-soft-purple p-4 min-h-[calc(100vh-64px)]">
           <nav className="flex flex-col gap-2 mt-6">
-            {menuLinks.map((link) => (
-              (() => {
-                const Icon = link.icon;
-                return (
+            {menuLinks.map(({ name, path, icon: Icon }) => (
               <Link 
-                key={link.path} 
-                to={link.path}
+                key={path} 
+                to={path}
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-lg transition-all hover:bg-white/50",
-                  location.pathname === link.path && "bg-white text-kid-purple font-medium"
+                  location.pathname === path && "bg-white text-kid-purple font-medium"
                 )}
               >
                 <Icon className="h-5 w-5" />
-                <span>{link.name}</span>
+                <span>{name}</span>
               </Link>
-                );
-              })()
             ))}
           </nav>
         </aside>
