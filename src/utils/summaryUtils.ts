@@ -17,26 +17,17 @@ export const sendSummaryEmail = async (
     throw new Error("No entries to send");
   }
   
-  let summaryHTML = `<h1>Daily Point Summary for ${summary.date}</h1>`;
-  summaryHTML += `<h2>Total Points: ${summary.totalPoints}</h2>`;
-  
-  summary.entriesByCategory.forEach(category => {
-    summaryHTML += `<h3>${category.categoryName}: ${category.totalPoints} points</h3>`;
-    summaryHTML += `<ul>`;
-    category.entries.forEach(entry => {
-      summaryHTML += `<li><strong>${entry.description || category.categoryName}:</strong> ${entry.points} points</li>`;
-    });
-    summaryHTML += `</ul>`;
-  });
-  
-  console.log(`Preparing to send email to ${email} (domain: ${email.split('@')[1]})`);
-  
   try {
+    // The email goes to the signed-in user's own address; the server builds and escapes the HTML.
     const { data, error } = await supabase.functions.invoke('send-email', {
       body: {
-        email: email,
-        subject: `Daily Points Summary for ${summary.date}`,
-        content: summaryHTML
+        date: String(summary.date),
+        totalPoints: Math.round(summary.totalPoints),
+        categories: summary.entriesByCategory.map((c) => ({
+          name: c.categoryName,
+          points: Math.round(c.totalPoints),
+          entries: c.entries.map((e) => ({ description: e.description || '', points: Math.round(e.points) })),
+        })),
       },
     });
     
