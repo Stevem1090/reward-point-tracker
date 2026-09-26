@@ -10,7 +10,7 @@ import { useRecipes } from '@/hooks/useRecipes';
 import { useDirectRecipeExtraction } from '@/hooks/useDirectRecipeExtraction';
 import { Recipe, DayOfWeek } from '@/types/meal';
 import { Clock, Users, BookOpen, Pencil, Loader2, Search, Camera, X, Image as ImageIcon } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 
 interface SwapMealDialogProps {

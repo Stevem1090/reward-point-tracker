@@ -14,7 +14,7 @@ import { Loader2, Sparkles, Check, RefreshCw, Trash2, PenLine, X, AlertTriangle,
 import { IngredientSearchDrawer } from './IngredientSearchDrawer';
 import { DAYS_OF_WEEK, MealWithRecipeCard, DayOfWeek, Ingredient, MealType } from '@/types/meal';
 import { scaleIngredients } from '@/utils/scaleIngredients';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,

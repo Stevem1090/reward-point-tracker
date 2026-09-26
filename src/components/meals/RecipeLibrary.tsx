@@ -27,7 +27,7 @@ import { RecipeCardDialog } from './RecipeCardDialog';
 import { EditRecipeDialog } from './EditRecipeDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { formatDistanceToNow } from 'date-fns';
 import type { RecipeStats } from '@/hooks/useRecipeStats';
 import { cn } from '@/lib/utils';
