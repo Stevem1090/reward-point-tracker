@@ -20,11 +20,12 @@ interface Props {
   onAdd: (sectionId: string, title: string, isPrivate: boolean) => void;
   onToggle: (t: Task) => void;
   onOpen: (t: Task) => void;
+  onDeleteTask: (id: string) => void;
   onRename: (s: TaskSection) => void;
   onDelete: (s: TaskSection) => void;
 }
 
-export const TaskSectionCard: React.FC<Props> = ({ section, active, completed, onAdd, onToggle, onOpen, onRename, onDelete }) => {
+export const TaskSectionCard: React.FC<Props> = ({ section, active, completed, onAdd, onToggle, onOpen, onDeleteTask, onRename, onDelete }) => {
   const [text, setText] = useState('');
   const [privateNext, setPrivateNext] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -99,7 +100,7 @@ export const TaskSectionCard: React.FC<Props> = ({ section, active, completed, o
 
       <div ref={setDropRef} className={cn('px-1 pb-2 min-h-[12px] rounded-b-xl', isOver && 'bg-accent/40')}>
         <SortableContext items={active.map((t) => `task:${t.id}`)} strategy={verticalListSortingStrategy}>
-          {active.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onOpen={onOpen} />)}
+          {active.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onOpen={onOpen} onDelete={onDeleteTask} />)}
         </SortableContext>
 
         {completed.length > 0 && (
