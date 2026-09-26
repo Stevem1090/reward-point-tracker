@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { getCaller } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -492,6 +493,10 @@ serve(async (req) => {
   }
 
   try {
+    const caller = await getCaller(req);
+    if (!caller) {
+      return new Response(JSON.stringify({ error: "Not signed in" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const { preferences, excludeMeals, rejectedMeals, daysToRegenerate } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -507,8 +512,9 @@ serve(async (req) => {
     let familyPreferencesSection = '';
     let savedRecipes: SavedRecipe[] = [];
     
-    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    {
+      // Caller-scoped client: RLS limits history, ratings and recipes to the caller's family.
+      const supabase = caller.client as unknown as ReturnType<typeof createClient>;
       
       const [recentMealsResult, ratingsResult, preferencesResult, savedRecipesResult] = await Promise.all([
         fetchRecentMeals(supabase),

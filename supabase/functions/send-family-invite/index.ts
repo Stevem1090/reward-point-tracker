@@ -1,6 +1,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3";
+import { escapeHtml } from "../_shared/auth.ts";
+
+const APP_ORIGIN = (Deno.env.get("APP_ORIGIN") ?? "https://reward-point-tracker.lovable.app").replace(/\/$/, "");
+const ALLOWED_ORIGINS = new Set([APP_ORIGIN, "https://id-preview--6d6906c6-162c-45ae-b910-47ebf987bb28.lovable.app"]);
 
 const Body = z.object({ email: z.string().trim().email().max(255), origin: z.string().url().max(300) });
 
@@ -26,8 +30,10 @@ Deno.serve(async (req) => {
     if (error) return json({ error: error.message }, 400);
 
     const { data: fam } = await supabase.from("families").select("name").maybeSingle();
-    const link = `${origin}/join?token=${token}`;
-    const familyName = fam?.name ?? "a family";
+    const base = ALLOWED_ORIGINS.has(origin.replace(/\/$/, "")) ? origin.replace(/\/$/, "") : APP_ORIGIN;
+    const link = `${base}/join?token=${encodeURIComponent(String(token))}`;
+    const familyName = (fam?.name ?? "a family").replace(/[\r\n]/g, " ").slice(0, 100);
+    const safeName = escapeHtml(familyName);
 
     let emailSent = false;
     let emailError: string | null = null;
@@ -40,8 +46,8 @@ Deno.serve(async (req) => {
           from: "Family Hub <onboarding@resend.dev>",
           to: [email],
           subject: `You're invited to join ${familyName} on Family Hub`,
-          html: `<p>You've been invited to join <strong>${familyName}</strong> on Family Hub.</p>
-<p><a href="${link}">Accept the invite</a></p><p>This link expires in 7 days.</p>`,
+          html: `<p>You've been invited to join <strong>${safeName}</strong> on Family Hub.</p>
+<p><a href="${escapeHtml(link)}">Accept the invite</a></p><p>This link expires in 7 days.</p>`,
         }),
       });
       emailSent = res.ok;
@@ -53,6 +59,6 @@ Deno.serve(async (req) => {
     return json({ link, emailSent, emailError });
   } catch (e) {
     console.error(e);
-    return json({ error: (e as Error).message }, 500);
+    return json({ error: "Unable to send invite" }, 500);
   }
 });

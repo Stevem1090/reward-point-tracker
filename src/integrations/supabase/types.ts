@@ -657,6 +657,24 @@ export type Database = {
           },
         ]
       }
+      internal_settings: {
+        Row: {
+          created_at: string
+          key: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
       meal_plans: {
         Row: {
           approved_at: string | null

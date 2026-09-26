@@ -1,4 +1,5 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { getCaller } from '../_shared/auth.ts';
 
 const SYSTEM_PROMPT = `[ROLE & EXPERTISE]
 
@@ -64,6 +65,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    if (!(await getCaller(req))) {
+      return new Response(JSON.stringify({ error: 'Not signed in' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const apiKey = Deno.env.get('LOVABLE_API_KEY');
     if (!apiKey) {
       return new Response(JSON.stringify({ error: 'AI is not configured' }), {

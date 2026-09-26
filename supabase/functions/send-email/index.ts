@@ -1,95 +1,53 @@
-
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { Resend } from "npm:resend@1.0.0";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { z } from "npm:zod@3";
+import { getCaller, escapeHtml } from "../_shared/auth.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Structured summary only: the server builds the HTML, escaping every value.
+const Body = z.object({
+  date: z.string().max(40),
+  totalPoints: z.number().int(),
+  categories: z.array(z.object({
+    name: z.string().max(200),
+    points: z.number().int(),
+    entries: z.array(z.object({ description: z.string().max(500), points: z.number().int() })).max(200),
+  })).max(100),
+});
 
-interface EmailRequest {
-  email: string;
-  subject: string;
-  content: string;
-}
+const json = (b: unknown, status = 200) =>
+  new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { email, subject, content }: EmailRequest = await req.json();
+    const caller = await getCaller(req);
+    if (!caller?.user.email) return json({ error: "Not signed in" }, 401);
 
-    if (!email || !subject || !content) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
+    const parsed = Body.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) return json({ error: "Invalid summary" }, 400);
+    const s = parsed.data;
 
-    // Extract domain for logging purposes
-    const domain = email.split('@')[1]?.toLowerCase();
-    
-    console.log(`Attempting to send email to ${email} (domain: ${domain})`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Content length: ${content.length} characters`);
-
-    // Add this log to help debug the source of the request (client or server)
-    const isServerRequest = req.headers.get("X-Source") === "server";
-    console.log(`Request source: ${isServerRequest ? "Server-side schedule" : "Client-side action"}`);
-
-    // Add domain-specific debugging for problematic providers
-    if (domain === 'hotmail.com' || domain === 'outlook.com' || domain === 'live.com') {
-      console.log(`Sending to Microsoft email provider (${domain}). Ensuring proper headers and formatting.`);
-    }
-
-    // Send email with improved error handling
-    try {
-      const emailResponse = await resend.emails.send({
-        from: "Reward Points <onboarding@resend.dev>",
-        to: [email],
-        subject: subject,
-        html: content,
-      });
-
-      console.log("Email send response:", JSON.stringify(emailResponse));
-
-      return new Response(JSON.stringify(emailResponse), {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
-    } catch (emailError) {
-      console.error(`Error from Resend service for ${domain}:`, emailError);
-      return new Response(
-        JSON.stringify({ 
-          error: emailError.message,
-          provider: domain,
-          details: emailError 
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
-  } catch (error) {
-    console.error("Error in send-email edge function:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+    let html = `<h1>Daily Point Summary for ${escapeHtml(s.date)}</h1><h2>Total Points: ${s.totalPoints}</h2>`;
+    for (const c of s.categories) {
+      html += `<h3>${escapeHtml(c.name)}: ${c.points} points</h3><ul>`;
+      for (const e of c.entries) {
+        html += `<li><strong>${escapeHtml(e.description || c.name)}:</strong> ${e.points} points</li>`;
       }
-    );
-  }
-};
+      html += `</ul>`;
+    }
 
-serve(handler);
+    // Always sent to the signed-in user's own address.
+    const result = await resend.emails.send({
+      from: "Family Hub <onboarding@resend.dev>",
+      to: [caller.user.email],
+      subject: `Daily Points Summary for ${s.date.replace(/[\r\n]/g, " ")}`,
+      html,
+    });
+    return json({ ok: true, id: (result as { data?: { id?: string } })?.data?.id ?? null });
+  } catch (e) {
+    console.error("send-email failed", e);
+    return json({ error: "Unable to send email" }, 500);
+  }
+});
