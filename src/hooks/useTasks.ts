@@ -14,9 +14,12 @@ export type Task = {
   is_private: boolean;
   owner_id: string;
   sort_order: number;
-  repeat: 'none' | 'daily' | 'weekly' | 'monthly';
+  repeat: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   repeat_weekday: number | null;
   repeat_day: number | null;
+  repeat_interval: number;
+  repeat_days: number[] | null;
+  repeat_month_days: number[] | null;
 };
 
 const SECTIONS_KEY = ['task_sections'];
