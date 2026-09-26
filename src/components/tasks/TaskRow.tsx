@@ -72,6 +72,11 @@ export const TaskRow: React.FC<Props> = ({ task, onToggle, onOpen, onDelete, dra
                 {formatDue(task.due_at)}
               </span>
             )}
+            {task.repeat && task.repeat !== 'none' && (
+              <span className="inline-flex items-center gap-1">
+                <Repeat className="h-3 w-3" /> {repeatLabel(task.repeat, task.repeat_weekday, task.repeat_day)}
+              </span>
+            )}
             {task.is_private && (
               <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" /> Only me</span>
             )}

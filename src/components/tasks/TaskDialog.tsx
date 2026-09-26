@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, X } from 'lucide-react';
 import type { Task, TaskSection } from '@/hooks/useTasks';
-import { taskLocalParts, taskLocalToIso } from '@/lib/tasks/dateTime';
+import { taskLocalParts, taskLocalToIso, firstOccurrenceDate, WEEKDAYS, type TaskRepeat } from '@/lib/tasks/dateTime';
 
 interface Props {
   task: Task | null;
@@ -26,6 +26,9 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
   const [time, setTime] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [sectionId, setSectionId] = useState('');
+  const [repeat, setRepeat] = useState<TaskRepeat>('none');
+  const [weekday, setWeekday] = useState(1);
+  const [monthDay, setMonthDay] = useState(1);
 
   useEffect(() => {
     if (!task) return;
@@ -36,6 +39,10 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
     setTime(due?.time ?? '');
     setIsPrivate(task.is_private);
     setSectionId(task.section_id);
+    setRepeat(task.repeat ?? 'none');
+    const d = due ? new Date(`${due.date}T12:00:00`) : new Date();
+    setWeekday(task.repeat_weekday ?? d.getDay());
+    setMonthDay(task.repeat_day ?? d.getDate());
   }, [task]);
 
   if (!task) return null;
@@ -43,13 +50,21 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
 
   const save = () => {
     if (!title.trim()) return;
-    const due_at = date ? taskLocalToIso(date, time || '09:00') : null;
+    let useDate = date;
+    if (repeat !== 'none') {
+      const changedRule = repeat !== task.repeat || weekday !== task.repeat_weekday || monthDay !== task.repeat_day;
+      if (!useDate || changedRule) useDate = firstOccurrenceDate(repeat, weekday, monthDay);
+    }
+    const due_at = useDate ? taskLocalToIso(useDate, time || '09:00') : null;
     onSave(task.id, {
       title: title.trim(),
       notes: notes.trim() || null,
       due_at,
       is_private: isOwner ? isPrivate : task.is_private,
       section_id: sectionId,
+      repeat,
+      repeat_weekday: repeat === 'weekly' ? weekday : null,
+      repeat_day: repeat === 'monthly' ? monthDay : null,
     });
     onClose();
   };
@@ -64,15 +79,46 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
           <div className="space-y-2">
             <Label>Reminder</Label>
             <div className="flex gap-2 items-center">
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="flex-1" />
-              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={!date} className="w-28" />
-              {date && (
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="flex-1" disabled={repeat !== 'none'} />
+              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={!date && repeat === 'none'} className="w-28" />
+              {date && repeat === 'none' && (
                 <Button variant="ghost" size="icon" onClick={() => { setDate(''); setTime(''); }} aria-label="Clear reminder">
                   <X className="h-4 w-4" />
                 </Button>
               )}
             </div>
-            {date && !time && <p className="text-xs text-muted-foreground">No time set — you'll be reminded at 9:00am.</p>}
+            {(date || repeat !== 'none') && !time && <p className="text-xs text-muted-foreground">No time set — you'll be reminded at 9:00am.</p>}
+          </div>
+          <div className="space-y-2">
+            <Label>Repeat</Label>
+            <div className="flex gap-2">
+              <Select value={repeat} onValueChange={(v) => setRepeat(v as TaskRepeat)}>
+                <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Never</SelectItem>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+              {repeat === 'weekly' && (
+                <Select value={String(weekday)} onValueChange={(v) => setWeekday(Number(v))}>
+                  <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6, 0].map((d) => <SelectItem key={d} value={String(d)}>{WEEKDAYS[d]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {repeat === 'monthly' && (
+                <Select value={String(monthDay)} onValueChange={(v) => setMonthDay(Number(v))}>
+                  <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <SelectItem key={d} value={String(d)}>Day {d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            {repeat === 'monthly' && monthDay > 28 && <p className="text-xs text-muted-foreground">Shorter months use their last day.</p>}
           </div>
           <div className="space-y-2">
             <Label>Section</Label>
