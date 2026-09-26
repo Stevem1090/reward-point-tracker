@@ -110,7 +110,7 @@ export const TaskSectionCard: React.FC<Props> = ({ section, active, completed, o
               {completed.length} completed
             </CollapsibleTrigger>
             <CollapsibleContent>
-              {completed.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onOpen={onOpen} draggable={false} />)}
+              {completed.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onOpen={onOpen} onDelete={onDeleteTask} draggable={false} />)}
             </CollapsibleContent>
           </Collapsible>
         )}
