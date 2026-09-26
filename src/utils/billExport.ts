@@ -37,7 +37,9 @@ const downloadBlob = (blob: Blob, filename: string) => {
 };
 
 const csvEscape = (value: string | number) => {
-  const text = String(value ?? '');
+  let text = String(value ?? '');
+  // Neutralise spreadsheet formulas in text cells (numbers are left as-is).
+  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
