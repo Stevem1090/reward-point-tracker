@@ -53,8 +53,8 @@ async function sendToUsers(admin: Admin, userIds: string[], title: string, body:
           webpush: {
             fcm_options: { link: url },
             notification: {
-              icon: "/icons/icon-192.png",
-              badge: "/icons/notification-96.png",
+              icon: `${APP_ORIGIN}/icons/icon-192.png`,
+              badge: `${APP_ORIGIN}/icons/notification-96.png`,
               ...(taskAction ? { actions: [
                 { action: "mark-done", title: "Mark done" },
                 { action: "view-task", title: "View task" },
