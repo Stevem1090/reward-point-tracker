@@ -81,6 +81,8 @@ async function sendToUsers(admin: Admin, userIds: string[], title: string, body:
 async function sendTaskReminders(admin: Admin) {
   const actionSecret = Deno.env.get("TASK_ACTION_SIGNING_SECRET");
   if (!actionSecret) throw new Error("Task actions are not configured");
+  const { error: rollError } = await admin.rpc("roll_recurring_tasks");
+  if (rollError) console.error("roll_recurring_tasks failed", rollError);
   const { data: tasks, error } = await admin
     .from("tasks")
     .select("id, title, notes, is_private, owner_id, family_id")
