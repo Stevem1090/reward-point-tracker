@@ -2,11 +2,11 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Checkbox } from '@/components/ui/checkbox';
-import { GripVertical, Lock, Bell, X } from 'lucide-react';
+import { GripVertical, Lock, Bell, X, Repeat } from 'lucide-react';
 import { isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Task } from '@/hooks/useTasks';
-import { formatTaskDue } from '@/lib/tasks/dateTime';
+import { formatTaskDue, repeatLabel } from '@/lib/tasks/dateTime';
 
 export function formatDue(due: string) {
   return formatTaskDue(due);
