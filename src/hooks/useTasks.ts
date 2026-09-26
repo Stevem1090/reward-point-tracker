@@ -20,6 +20,7 @@ export type Task = {
   repeat_interval: number;
   repeat_days: number[] | null;
   repeat_month_days: number[] | null;
+  assigned_to: string | null;
 };
 
 const SECTIONS_KEY = ['task_sections'];
@@ -71,11 +72,22 @@ export function useTasks() {
   };
 
   const updateTask = async (id: string, patch: Partial<Task>) => {
+    const before = (tasksQ.data ?? []).find((x) => x.id === id);
     setTasks((t) => t.map((x) => (x.id === id ? { ...x, ...patch } : x)));
     const { data, error } = await supabase.from('tasks').update(patch).eq('id', id).select().maybeSingle();
     if (error) return fail(error);
     // Server may move the reminder date (recurring tasks)
     if (data) setTasks((t) => t.map((x) => (x.id === id ? (data as Task) : x)));
+
+    // Let someone know when a task has just been handed to them
+    if ('assigned_to' in patch && patch.assigned_to && patch.assigned_to !== before?.assigned_to) {
+      const { data: auth } = await supabase.auth.getUser();
+      if (auth.user && patch.assigned_to !== auth.user.id) {
+        supabase.functions
+          .invoke('send-push-notification', { body: { kind: 'task-assigned', taskId: id } })
+          .catch((e) => console.error('assignment notice failed', e));
+      }
+    }
   };
 
   const deleteTask = async (id: string) => {

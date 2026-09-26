@@ -88,7 +88,7 @@ async function sendTaskReminders(admin: Admin) {
   if (rollError) console.error("roll_recurring_tasks failed", rollError);
   const { data: tasks, error } = await admin
     .from("tasks")
-    .select("id, title, notes, is_private, owner_id, family_id")
+    .select("id, title, notes, is_private, owner_id, family_id, assigned_to")
     .eq("done", false)
     .is("notified_at", null)
     .not("due_at", "is", null)
@@ -104,6 +104,8 @@ async function sendTaskReminders(admin: Admin) {
     let recipients: string[];
     if (task.is_private) {
       recipients = [task.owner_id];
+    } else if (task.assigned_to) {
+      recipients = [task.assigned_to as string];
     } else {
       if (!familyCache.has(task.family_id)) {
         const { data } = await admin.from("family_members").select("user_id").eq("family_id", task.family_id);
