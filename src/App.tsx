@@ -1,8 +1,7 @@
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import AuthGuard from "./components/AuthGuard";
 import AppLayout from "./components/AppLayout";
@@ -16,6 +15,7 @@ import MealPlanningPage from "./pages/MealPlanningPage";
 import ChoresPage from "./pages/ChoresPage";
 import SlimmingWorldPage from "./pages/SlimmingWorldPage";
 import TasksPage from "./pages/TasksPage";
+import DashboardPage from "./pages/DashboardPage";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
@@ -44,7 +44,6 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Sonner />
         <BrowserRouter>
           <AuthProvider>
             <PushRefresher />
@@ -56,7 +55,7 @@ const App = () => {
                   <Route path="/join" element={<JoinPage />} />
 
                   <Route element={<AuthGuard><FamilyGate><AppLayout /></FamilyGate></AuthGuard>}>
-                    <Route path="/" element={<Navigate to="/rewards" replace />} />
+                    <Route path="/" element={<DashboardPage />} />
                     <Route path="/rewards" element={<RewardsPage />} />
                     <Route path="/calendar" element={<CalendarPage />} />
                     <Route path="/lists" element={<ListsPage />} />

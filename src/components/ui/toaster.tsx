@@ -1,7 +1,6 @@
 import { useToast } from "@/hooks/use-toast"
 import {
   Toast,
-  ToastClose,
   ToastDescription,
   ToastProvider,
   ToastTitle,
@@ -12,18 +11,16 @@ export function Toaster() {
   const { toasts } = useToast()
 
   return (
-    <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
+    <ToastProvider swipeDirection="down">
+      {toasts.map(function ({ id, title, description, action, duration, variant, ...props }) {
+        const computedDuration = duration ?? (variant === "destructive" ? 4000 : 1800)
         return (
-          <Toast key={id} {...props}>
-            <div className="grid gap-1">
+          <Toast key={id} duration={computedDuration} variant={variant} {...props}>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               {title && <ToastTitle>{title}</ToastTitle>}
-              {description && (
-                <ToastDescription>{description}</ToastDescription>
-              )}
+              {description && <ToastDescription>{description}</ToastDescription>}
             </div>
             {action}
-            <ToastClose />
           </Toast>
         )
       })}

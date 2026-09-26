@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MealRating } from '@/types/meal';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 async function getCurrentUserId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();

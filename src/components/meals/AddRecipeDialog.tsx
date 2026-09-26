@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Globe, BookOpen, Clock, Users, ChevronLeft, Camera, X } from 'lucide-react';
 import { useDirectRecipeExtraction, ExtractedRecipe } from '@/hooks/useDirectRecipeExtraction';
 import { useRecipes } from '@/hooks/useRecipes';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface AddRecipeDialogProps {

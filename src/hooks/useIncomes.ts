@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Income } from '@/types/bill';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 export const useIncomes = () => {
   const [incomes, setIncomes] = useState<Income[]>([]);

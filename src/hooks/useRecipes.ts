@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Recipe, Ingredient, RecipeSourceType } from '@/types/meal';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Json } from '@/integrations/supabase/types';
 
 async function getCurrentUserId(): Promise<string> {
