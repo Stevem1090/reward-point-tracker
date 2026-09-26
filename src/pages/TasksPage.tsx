@@ -4,7 +4,7 @@ import {
   closestCorners, useSensor, useSensors, CollisionDetection,
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Bell, BellOff } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,8 @@ const TasksPage = () => {
   const [toDelete, setToDelete] = useState<TaskSection | null>(null);
   const [dragType, setDragType] = useState<'task' | 'section' | null>(null);
   const [order, setOrder] = useState<Order>({});
+  const [hideReminders, setHideReminders] = useState(false);
+
 
   useEffect(() => {
     const taskId = searchParams.get('task');
@@ -148,12 +150,24 @@ const TasksPage = () => {
 
   return (
     <div className="container mx-auto max-w-2xl px-3 pb-24">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-2xl font-bold">Tasks</h1>
-        <Button variant="outline" onClick={() => openSectionDialog('add')} className="min-h-[44px]">
-          <Plus className="h-4 w-4 mr-1" /> Section
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={hideReminders ? 'default' : 'outline'}
+            onClick={() => setHideReminders((v) => !v)}
+            className="min-h-[44px]"
+            aria-pressed={hideReminders}
+          >
+            {hideReminders ? <BellOff className="h-4 w-4 mr-1" /> : <Bell className="h-4 w-4 mr-1" />}
+            {hideReminders ? 'Reminders hidden' : 'Hide reminders'}
+          </Button>
+          <Button variant="outline" onClick={() => openSectionDialog('add')} className="min-h-[44px]">
+            <Plus className="h-4 w-4 mr-1" /> Section
+          </Button>
+        </div>
       </div>
+
 
       <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={() => setDragType(null)}>
         <SortableContext items={t.sections.map((s) => `section:${s.id}`)} strategy={verticalListSortingStrategy}>
@@ -162,8 +176,9 @@ const TasksPage = () => {
               <TaskSectionCard
                 key={s.id}
                 section={s}
-                active={(order[s.id] ?? []).map((id) => byId.get(id)).filter(Boolean) as Task[]}
-                completed={t.tasks.filter((x) => x.section_id === s.id && x.done).sort((a, b) => (b.done_at ?? '').localeCompare(a.done_at ?? ''))}
+                active={(order[s.id] ?? []).map((id) => byId.get(id)).filter((x): x is Task => !!x && (!hideReminders || !x.due_at))}
+                completed={t.tasks.filter((x) => x.section_id === s.id && x.done && (!hideReminders || !x.due_at)).sort((a, b) => (b.done_at ?? '').localeCompare(a.done_at ?? ''))}
+
                 onAdd={(sectionId, title, isPrivate) => t.addTask({ section_id: sectionId, title, is_private: isPrivate })}
                 onToggle={toggle}
                 onOpen={setEditing}
