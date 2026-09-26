@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
-import { Menu, Award, Receipt, UtensilsCrossed, ListChecks, Scale, CheckSquare, UserCircle, LogOut } from 'lucide-react';
+import { Menu, LayoutGrid, LogOut } from 'lucide-react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { appSections } from '@/config/appSections';
 import {
   Sheet,
   SheetContent,
@@ -13,20 +14,9 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-type MenuLink = {
-  name: string;
-  path: string;
-  icon: React.ReactNode;
-};
-
-const menuLinks: MenuLink[] = [
-  { name: 'Tasks', path: '/tasks', icon: <CheckSquare className="h-5 w-5" /> },
-  { name: 'Rewards', path: '/rewards', icon: <Award className="h-5 w-5" /> },
-  { name: 'Bills', path: '/bills', icon: <Receipt className="h-5 w-5" /> },
-  { name: 'Meals', path: '/meals', icon: <UtensilsCrossed className="h-5 w-5" /> },
-  { name: 'Chores', path: '/chores', icon: <ListChecks className="h-5 w-5" /> },
-  { name: 'Slimming World', path: '/slimming-world', icon: <Scale className="h-5 w-5" /> },
-  { name: 'Profile & notifications', path: '/profile', icon: <UserCircle className="h-5 w-5" /> },
+const menuLinks = [
+  { name: 'Dashboard', path: '/', icon: LayoutGrid },
+  ...appSections.map(({ name, path, icon }) => ({ name, path, icon })),
 ];
 
 const AppLayout = () => {
@@ -62,6 +52,9 @@ const AppLayout = () => {
               </SheetHeader>
               <nav className="flex flex-col gap-2">
                 {menuLinks.map((link) => (
+                  (() => {
+                    const Icon = link.icon;
+                    return (
                   <Link 
                     key={link.path} 
                     to={link.path}
@@ -71,18 +64,20 @@ const AppLayout = () => {
                       location.pathname === link.path && "bg-white text-kid-purple font-medium"
                     )}
                   >
-                    {link.icon}
+                    <Icon className="h-5 w-5" />
                     <span>{link.name}</span>
                   </Link>
+                    );
+                  })()
                 ))}
-                <button
-                  type="button"
+                <Button
                   onClick={handleSignOut}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all hover:bg-white/50 text-left"
+                  variant="ghost"
+                  className="h-auto justify-start gap-3 px-4 py-3 hover:bg-white/50"
                 >
                   <LogOut className="h-5 w-5" />
                   <span>Sign out</span>
-                </button>
+                </Button>
               </nav>
             </SheetContent>
           </Sheet>
@@ -95,6 +90,9 @@ const AppLayout = () => {
         <aside className="hidden md:block w-64 bg-soft-purple p-4 min-h-[calc(100vh-64px)]">
           <nav className="flex flex-col gap-2 mt-6">
             {menuLinks.map((link) => (
+              (() => {
+                const Icon = link.icon;
+                return (
               <Link 
                 key={link.path} 
                 to={link.path}
@@ -103,9 +101,11 @@ const AppLayout = () => {
                   location.pathname === link.path && "bg-white text-kid-purple font-medium"
                 )}
               >
-                {link.icon}
+                <Icon className="h-5 w-5" />
                 <span>{link.name}</span>
               </Link>
+                );
+              })()
             ))}
           </nav>
         </aside>

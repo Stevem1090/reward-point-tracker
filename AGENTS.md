@@ -4,3 +4,5 @@
 - Task reminder input and display use `Europe/London` explicitly. Why: keep selected times stable across device timezone differences and GMT/BST changes.
 
 - Multi-family: shared tables carry `family_id` (default `current_family_id()`) with RLS "same family"; membership in `family_members`, invites via RPCs + `send-family-invite`; `FamilyGate` runs `ensure_family` on load. Why: separate households in one app, master controls members.
+- App sections are defined once in `src/config/appSections.ts` and reused by the dashboard and navigation. Why: labels, paths, and icons stay synchronized.
+- In-app feedback uses the Radix toast system through `use-toast`/`lib/toast`; Sonner is not mounted. Why: match the single bottom-centre Squirrel It snackbar experience.
