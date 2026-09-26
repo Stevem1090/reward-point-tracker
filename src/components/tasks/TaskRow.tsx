@@ -28,6 +28,8 @@ export const TaskRow: React.FC<Props> = ({ task, onToggle, onOpen, onDelete, dra
     disabled: !draggable,
   });
   const overdue = task.due_at && !task.done && isPast(new Date(task.due_at));
+  const { members } = useFamilyMembers();
+  const assignee = task.assigned_to ? members.find((m) => m.id === task.assigned_to) : undefined;
 
   return (
     <div
