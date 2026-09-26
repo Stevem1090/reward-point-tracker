@@ -12,6 +12,9 @@ const corsHeaders = {
 };
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/firebase_messaging";
+// Absolute origin for notification images/links: Android resolves these while the app is closed.
+const APP_ORIGIN = (Deno.env.get("APP_ORIGIN") ?? "https://reward-point-tracker.lovable.app").replace(/\/$/, "");
+const absoluteUrl = (u: string) => (/^https?:\/\//.test(u) ? u : `${APP_ORIGIN}${u.startsWith("/") ? u : `/${u}`}`);
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
