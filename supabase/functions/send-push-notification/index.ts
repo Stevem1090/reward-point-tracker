@@ -88,7 +88,7 @@ async function sendTaskReminders(admin: Admin) {
   if (rollError) console.error("roll_recurring_tasks failed", rollError);
   const { data: tasks, error } = await admin
     .from("tasks")
-    .select("id, title, notes, is_private, owner_id, family_id")
+    .select("id, title, notes, is_private, owner_id, family_id, assigned_to")
     .eq("done", false)
     .is("notified_at", null)
     .not("due_at", "is", null)
@@ -104,6 +104,8 @@ async function sendTaskReminders(admin: Admin) {
     let recipients: string[];
     if (task.is_private) {
       recipients = [task.owner_id];
+    } else if (task.assigned_to) {
+      recipients = [task.assigned_to as string];
     } else {
       if (!familyCache.has(task.family_id)) {
         const { data } = await admin.from("family_members").select("user_id").eq("family_id", task.family_id);
@@ -126,6 +128,43 @@ async function sendTaskReminders(admin: Admin) {
   return { tasks: tasks.length };
 }
 
+// Tells the assignee "<Name> assigned you a task", with the same Mark done / View actions.
+async function sendAssignmentNotice(admin: Admin, req: Request, taskId: string) {
+  const actionSecret = Deno.env.get("TASK_ACTION_SIGNING_SECRET");
+  if (!actionSecret) throw new Error("Task actions are not configured");
+
+  const jwt = req.headers.get("Authorization")?.replace("Bearer ", "") ?? "";
+  const { data: caller } = await admin.auth.getUser(jwt);
+  const assignerId = caller?.user?.id;
+  if (!assignerId) return { sent: 0, reason: "not signed in" };
+
+  const { data: task } = await admin
+    .from("tasks")
+    .select("id, title, notes, due_at, assigned_to, family_id")
+    .eq("id", taskId)
+    .maybeSingle();
+  if (!task?.assigned_to || task.assigned_to === assignerId) return { sent: 0, reason: "nobody to notify" };
+
+  const { data: membership } = await admin
+    .from("family_members")
+    .select("user_id")
+    .eq("family_id", task.family_id)
+    .in("user_id", [assignerId, task.assigned_to]);
+  if ((membership ?? []).length < 2) return { sent: 0, reason: "not in the same family" };
+
+  const { data: profile } = await admin.from("user_profiles").select("name").eq("id", assignerId).maybeSingle();
+  const who = (profile?.name as string | null)?.trim() || "Someone";
+  const actionToken = await createTaskActionToken(task.id, actionSecret);
+  return await sendToUsers(
+    admin,
+    [task.assigned_to as string],
+    `${who} assigned you a task`,
+    task.title as string,
+    `/tasks?task=${task.id}`,
+    { taskId: task.id as string, token: actionToken },
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -133,6 +172,12 @@ Deno.serve(async (req) => {
     const payload = await req.json().catch(() => ({}));
 
     if (payload?.kind === "tasks") return json(await sendTaskReminders(admin));
+
+    if (payload?.kind === "task-assigned") {
+      const taskId = typeof payload.taskId === "string" ? payload.taskId : "";
+      if (!/^[0-9a-f-]{36}$/i.test(taskId)) return json({ error: "Provide taskId" }, 400);
+      return json(await sendAssignmentNotice(admin, req, taskId));
+    }
 
     const userIds = payload.userIds || payload.familyMemberIds || (payload.userId ? [payload.userId] : undefined);
     const title = typeof payload.title === "string" ? payload.title.slice(0, 200) : "";
