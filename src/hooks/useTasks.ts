@@ -14,6 +14,9 @@ export type Task = {
   is_private: boolean;
   owner_id: string;
   sort_order: number;
+  repeat: 'none' | 'daily' | 'weekly' | 'monthly';
+  repeat_weekday: number | null;
+  repeat_day: number | null;
 };
 
 const SECTIONS_KEY = ['task_sections'];
@@ -66,8 +69,10 @@ export function useTasks() {
 
   const updateTask = async (id: string, patch: Partial<Task>) => {
     setTasks((t) => t.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-    const { error } = await supabase.from('tasks').update(patch).eq('id', id);
-    if (error) fail(error);
+    const { data, error } = await supabase.from('tasks').update(patch).eq('id', id).select().maybeSingle();
+    if (error) return fail(error);
+    // Server may move the reminder date (recurring tasks)
+    if (data) setTasks((t) => t.map((x) => (x.id === id ? (data as Task) : x)));
   };
 
   const deleteTask = async (id: string) => {

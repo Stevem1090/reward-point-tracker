@@ -1563,6 +1563,9 @@ export type Database = {
           notes: string | null
           notified_at: string | null
           owner_id: string
+          repeat: string
+          repeat_day: number | null
+          repeat_weekday: number | null
           section_id: string
           sort_order: number
           title: string
@@ -1579,6 +1582,9 @@ export type Database = {
           notes?: string | null
           notified_at?: string | null
           owner_id?: string
+          repeat?: string
+          repeat_day?: number | null
+          repeat_weekday?: number | null
           section_id: string
           sort_order?: number
           title: string
@@ -1595,6 +1601,9 @@ export type Database = {
           notes?: string | null
           notified_at?: string | null
           owner_id?: string
+          repeat?: string
+          repeat_day?: number | null
+          repeat_weekday?: number | null
           section_id?: string
           sort_order?: number
           title?: string
@@ -1719,7 +1728,18 @@ export type Database = {
       is_family_master: { Args: { _family: string }; Returns: boolean }
       leave_family: { Args: never; Returns: undefined }
       remove_family_member: { Args: { _user: string }; Returns: undefined }
+      roll_recurring_tasks: { Args: never; Returns: undefined }
       send_scheduled_emails: { Args: never; Returns: undefined }
+      task_next_occurrence: {
+        Args: {
+          _after: string
+          _day: number
+          _due: string
+          _repeat: string
+          _weekday: number
+        }
+        Returns: string
+      }
     }
     Enums: {
       sw_healthy_extra_type: "calcium" | "fibre" | "healthy_fats"

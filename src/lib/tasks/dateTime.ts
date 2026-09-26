@@ -27,3 +27,34 @@ export function formatTaskDue(instant: string, now = new Date()) {
   if (dueDay === tomorrow) return `Tomorrow ${time}`;
   return format(due, 'EEE d MMM, HH:mm');
 }
+export type TaskRepeat = 'none' | 'daily' | 'weekly' | 'monthly';
+export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function ordinal(n: number) {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+export function repeatLabel(repeat: TaskRepeat, weekday: number | null, day: number | null) {
+  if (repeat === 'daily') return 'Daily';
+  if (repeat === 'weekly') return `Every ${WEEKDAYS[weekday ?? 1].slice(0, 3)}`;
+  if (repeat === 'monthly') return `Monthly on ${ordinal(day ?? 1)}`;
+  return '';
+}
+
+/** First matching London date from today (inclusive) for a repeat rule. */
+export function firstOccurrenceDate(repeat: TaskRepeat, weekday: number | null, day: number | null, now = new Date()) {
+  const today = toZonedTime(now, TASK_TIME_ZONE);
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (repeat === 'weekly') {
+    d.setDate(d.getDate() + (((weekday ?? 1) - d.getDay() + 7) % 7));
+  } else if (repeat === 'monthly') {
+    const target = day ?? 1;
+    const clamp = (y: number, m: number) => new Date(y, m, Math.min(target, new Date(y, m + 1, 0).getDate()));
+    let c = clamp(d.getFullYear(), d.getMonth());
+    if (c < d) c = clamp(d.getFullYear(), d.getMonth() + 1);
+    return format(c, 'yyyy-MM-dd');
+  }
+  return format(d, 'yyyy-MM-dd');
+}

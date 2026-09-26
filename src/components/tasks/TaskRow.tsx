@@ -2,11 +2,11 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Checkbox } from '@/components/ui/checkbox';
-import { GripVertical, Lock, Bell, X } from 'lucide-react';
+import { GripVertical, Lock, Bell, X, Repeat } from 'lucide-react';
 import { isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Task } from '@/hooks/useTasks';
-import { formatTaskDue } from '@/lib/tasks/dateTime';
+import { formatTaskDue, repeatLabel } from '@/lib/tasks/dateTime';
 
 export function formatDue(due: string) {
   return formatTaskDue(due);
@@ -70,6 +70,11 @@ export const TaskRow: React.FC<Props> = ({ task, onToggle, onOpen, onDelete, dra
               >
                 <Bell className="h-3 w-3" />
                 {formatDue(task.due_at)}
+              </span>
+            )}
+            {task.repeat && task.repeat !== 'none' && (
+              <span className="inline-flex items-center gap-1">
+                <Repeat className="h-3 w-3" /> {repeatLabel(task.repeat, task.repeat_weekday, task.repeat_day)}
               </span>
             )}
             {task.is_private && (
