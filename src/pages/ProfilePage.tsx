@@ -57,6 +57,7 @@ const ProfilePage = () => {
           console.log('Profile retrieved successfully:', data);
           setProfile(data as UserProfile);
           setDisplayName(data.name || '');
+          setColor(memberColor({ id: user.id, color: data.color }));
           return;
         }
         
@@ -83,6 +84,7 @@ const ProfilePage = () => {
           console.log('Profile created successfully:', newProfile);
           setProfile(newProfile as UserProfile);
           setDisplayName(newProfile.name || defaultName);
+          setColor(memberColor({ id: user.id, color: newProfile.color }));
         }
       } catch (err: any) {
         console.error('Unexpected error in profile management:', err);
@@ -114,7 +116,7 @@ const ProfilePage = () => {
       console.log('Updating profile for user:', user.id);
       const { error } = await supabase
         .from('user_profiles')
-        .update({ name: displayName })
+        .update({ name: displayName, color })
         .eq('id', user.id);
       
       if (error) {
@@ -124,8 +126,12 @@ const ProfilePage = () => {
       
       setProfile({
         ...profile,
-        name: displayName
+        name: displayName,
+        color
       });
+
+      queryClient.invalidateQueries({ queryKey: ['family_members_profiles'] });
+      
       
       toast({
         title: "Profile saved",
