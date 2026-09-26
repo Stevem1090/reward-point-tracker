@@ -49,10 +49,15 @@ const Login = () => {
     <div className="container mx-auto flex items-center justify-center min-h-screen bg-gradient-to-b from-soft-blue via-white to-soft-purple">
       <div className="w-full max-w-md px-4">
         <div className="text-center mb-6">
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            className="h-16 w-16 rounded-xl mx-auto mb-3 shadow-sm"
+          />
           <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-kid-purple via-kid-pink to-kid-blue bg-clip-text text-transparent mb-2">
-            Reward Point Tracker
+            Family Hub
           </h1>
-          <p className="text-muted-foreground">Track good behavior and earn rewards!</p>
+          <p className="text-muted-foreground">Tasks, meals, bills, chores and rewards — all in one place.</p>
         </div>
         
         <Card className="kid-card border-kid-purple/30 bg-white/90 backdrop-blur-sm">
