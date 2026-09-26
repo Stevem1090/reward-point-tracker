@@ -2,7 +2,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Checkbox } from '@/components/ui/checkbox';
-import { GripVertical, Lock, Bell } from 'lucide-react';
+import { GripVertical, Lock, Bell, X } from 'lucide-react';
 import { isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Task } from '@/hooks/useTasks';
@@ -16,10 +16,11 @@ interface Props {
   task: Task;
   onToggle: (t: Task) => void;
   onOpen: (t: Task) => void;
+  onDelete: (id: string) => void;
   draggable?: boolean;
 }
 
-export const TaskRow: React.FC<Props> = ({ task, onToggle, onOpen, draggable = true }) => {
+export const TaskRow: React.FC<Props> = ({ task, onToggle, onOpen, onDelete, draggable = true }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `task:${task.id}`,
     data: { type: 'task', task },
@@ -77,6 +78,13 @@ export const TaskRow: React.FC<Props> = ({ task, onToggle, onOpen, draggable = t
             {task.notes && <span className="truncate max-w-[12rem]">{task.notes}</span>}
           </span>
         )}
+      </button>
+      <button
+        onClick={() => onDelete(task.id)}
+        className="h-11 w-11 flex items-center justify-center shrink-0 text-muted-foreground/60 hover:text-destructive"
+        aria-label="Delete task"
+      >
+        <X className="h-4 w-4" />
       </button>
     </div>
   );
