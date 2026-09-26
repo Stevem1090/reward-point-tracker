@@ -4,11 +4,12 @@
 //  - { kind: "tasks" }               -> send due task reminders (called every minute by cron)
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createTaskActionToken } from "../_shared/taskActionToken.ts";
+import { getCaller } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-source, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-source, x-internal-key, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/firebase_messaging";
@@ -186,7 +187,27 @@ Deno.serve(async (req) => {
     if (!Array.isArray(userIds) || userIds.length === 0 || !title) {
       return json({ error: "Provide userIds and title" }, 400);
     }
-    return json(await sendToUsers(admin, userIds.slice(0, 50), title, body, url));
+    let targets = userIds.filter((u: unknown): u is string => typeof u === "string" && /^[0-9a-f-]{36}$/i.test(u)).slice(0, 50);
+
+    // Scheduled database jobs authenticate with the private internal key.
+    const suppliedKey = req.headers.get("X-Internal-Key") ?? "";
+    let internal = false;
+    if (suppliedKey) {
+      const { data: row } = await admin.from("internal_settings").select("value").eq("key", "push_internal_key").maybeSingle();
+      internal = Boolean(row?.value) && row!.value === suppliedKey;
+    }
+    if (!internal) {
+      // Signed-in users can only notify people in their own family.
+      const caller = await getCaller(req);
+      if (!caller) return json({ error: "Not signed in" }, 401);
+      const { data: me } = await admin.from("family_members").select("family_id").eq("user_id", caller.user.id).maybeSingle();
+      if (!me?.family_id) return json({ error: "Not allowed" }, 403);
+      const { data: members } = await admin.from("family_members").select("user_id").eq("family_id", me.family_id);
+      const allowed = new Set((members ?? []).map((m: { user_id: string }) => m.user_id));
+      targets = targets.filter((u: string) => allowed.has(u));
+      if (targets.length === 0) return json({ error: "Not allowed" }, 403);
+    }
+    return json(await sendToUsers(admin, targets, title, body, url));
   } catch (e) {
     console.error(e);
     return json({ error: (e as Error).message }, 500);
