@@ -167,6 +167,7 @@ const TasksPage = () => {
                 onAdd={(sectionId, title, isPrivate) => t.addTask({ section_id: sectionId, title, is_private: isPrivate })}
                 onToggle={toggle}
                 onOpen={setEditing}
+                onDeleteTask={t.deleteTask}
                 onRename={(sec) => openSectionDialog('rename', sec)}
                 onDelete={setToDelete}
               />
