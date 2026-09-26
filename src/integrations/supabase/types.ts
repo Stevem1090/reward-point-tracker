@@ -1565,6 +1565,9 @@ export type Database = {
           owner_id: string
           repeat: string
           repeat_day: number | null
+          repeat_days: number[] | null
+          repeat_interval: number
+          repeat_month_days: number[] | null
           repeat_weekday: number | null
           section_id: string
           sort_order: number
@@ -1584,6 +1587,9 @@ export type Database = {
           owner_id?: string
           repeat?: string
           repeat_day?: number | null
+          repeat_days?: number[] | null
+          repeat_interval?: number
+          repeat_month_days?: number[] | null
           repeat_weekday?: number | null
           section_id: string
           sort_order?: number
@@ -1603,6 +1609,9 @@ export type Database = {
           owner_id?: string
           repeat?: string
           repeat_day?: number | null
+          repeat_days?: number[] | null
+          repeat_interval?: number
+          repeat_month_days?: number[] | null
           repeat_weekday?: number | null
           section_id?: string
           sort_order?: number
@@ -1737,6 +1746,17 @@ export type Database = {
           _due: string
           _repeat: string
           _weekday: number
+        }
+        Returns: string
+      }
+      task_next_occurrence_v2: {
+        Args: {
+          _after: string
+          _days: number[]
+          _due: string
+          _interval: number
+          _month_days: number[]
+          _repeat: string
         }
         Returns: string
       }
