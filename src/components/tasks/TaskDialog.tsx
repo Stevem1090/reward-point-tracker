@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Task, TaskSection } from '@/hooks/useTasks';
+import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import {
   taskLocalParts,
   taskLocalToIso,
@@ -43,6 +44,8 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
   const [days, setDays] = useState<number[]>([]);
   const [monthDays, setMonthDays] = useState<number[]>([]);
   const [initialDate, setInitialDate] = useState('');
+  const [assignedTo, setAssignedTo] = useState('none');
+  const { members } = useFamilyMembers();
 
   useEffect(() => {
     if (!task) return;
@@ -59,6 +62,7 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
     const d = due ? new Date(`${due.date}T12:00:00`) : new Date();
     setDays(task.repeat_days?.length ? task.repeat_days : [task.repeat_weekday ?? d.getDay()]);
     setMonthDays(task.repeat_month_days?.length ? task.repeat_month_days : [task.repeat_day ?? d.getDate()]);
+    setAssignedTo(task.assigned_to ?? 'none');
   }, [task]);
 
   if (!task) return null;
@@ -98,6 +102,7 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
       repeat_month_days: repeat === 'monthly' ? monthDays : null,
       repeat_weekday: repeat === 'weekly' ? days[0] ?? null : null,
       repeat_day: repeat === 'monthly' ? monthDays[0] ?? null : null,
+      assigned_to: assignedTo === 'none' ? null : assignedTo,
     });
     onClose();
   };
@@ -201,6 +206,24 @@ export const TaskDialog: React.FC<Props> = ({ task, sections, currentUserId, onC
                 <p className="text-xs text-muted-foreground">{repeatLabel(repeat, interval, days, monthDays)}</p>
               </div>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Assigned to</Label>
+            <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nobody</SelectItem>
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    <span className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: m.color }} />
+                      {m.id === currentUserId ? `${m.name} (you)` : m.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

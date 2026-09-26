@@ -7,6 +7,7 @@ import { isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Task } from '@/hooks/useTasks';
 import { formatTaskDue, repeatLabel } from '@/lib/tasks/dateTime';
+import { useFamilyMembers, initialOf } from '@/hooks/useFamilyMembers';
 
 export function formatDue(due: string) {
   return formatTaskDue(due);
