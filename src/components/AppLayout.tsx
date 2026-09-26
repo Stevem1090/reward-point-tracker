@@ -76,7 +76,10 @@ const AppLayout = () => {
               </nav>
             </SheetContent>
           </Sheet>
-          <h1 className="text-xl font-bold text-kid-purple">Family Hub</h1>
+          <Link to="/" className="flex items-center gap-2 min-h-[44px]" aria-label="Family Hub — go to dashboard">
+            <img src="/icons/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
+            <h1 className="text-xl font-bold text-kid-purple">Family Hub</h1>
+          </Link>
         </div>
       </div>
 
