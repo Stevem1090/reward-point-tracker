@@ -74,7 +74,8 @@ export const TaskRow: React.FC<Props> = ({ task, onToggle, onOpen, onDelete, dra
             )}
             {task.repeat && task.repeat !== 'none' && (
               <span className="inline-flex items-center gap-1">
-                <Repeat className="h-3 w-3" /> {repeatLabel(task.repeat, task.repeat_weekday, task.repeat_day)}
+                <Repeat className="h-3 w-3" />{' '}
+                {repeatLabel(task.repeat, task.repeat_interval, task.repeat_days, task.repeat_month_days)}
               </span>
             )}
             {task.is_private && (
