@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { UserCircle, Loader2 } from "lucide-react";
+import { UserCircle, Loader2, Palette } from "lucide-react";
 import { UserProfile } from '@/types/user';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import NotificationSettings from '@/components/NotificationSettings';
@@ -206,12 +206,56 @@ const ProfilePage = () => {
                   placeholder="Enter your name"
                 />
               </div>
+
+              <div className="space-y-3">
+                <Label>Profile colour</Label>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="h-11 w-11 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-sm"
+                    style={{ backgroundColor: color }}
+                    aria-hidden
+                  >
+                    {initialOf(displayName || 'U')}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    This is how you appear on tasks assigned to you.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_COLORS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setColor(preset)}
+                      aria-label={`Choose colour ${preset}`}
+                      aria-pressed={color.toLowerCase() === preset}
+                      className={`h-11 w-11 rounded-full border-2 transition ${
+                        color.toLowerCase() === preset ? 'border-foreground scale-105' : 'border-transparent'
+                      }`}
+                      style={{ backgroundColor: preset }}
+                    />
+                  ))}
+                  <label
+                    className="h-11 w-11 rounded-full border-2 border-dashed border-muted-foreground/50 flex items-center justify-center cursor-pointer overflow-hidden"
+                    title="Pick a custom colour"
+                  >
+                    <Palette className="h-5 w-5 text-muted-foreground" />
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      className="sr-only"
+                      aria-label="Custom profile colour"
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
           </CardContent>
           <CardFooter>
             <Button 
               onClick={handleSaveProfile} 
-              disabled={isSaving || displayName === profile?.name}
+              disabled={isSaving || (displayName === profile?.name && color === (profile?.color ?? ''))}
             >
               {isSaving ? (
                 <>
