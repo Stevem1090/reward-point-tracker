@@ -246,7 +246,9 @@ Deno.serve(async (req) => {
       targets = targets.filter((u: string) => allowed.has(u));
       if (targets.length === 0) return json({ error: "Not allowed" }, 403);
     }
-    return json(await sendToUsers(admin, targets, title, body, url));
+    const kind: NotifKind = payload?.kind === "freezer" ? "freezer" : "test";
+    const itemId = typeof payload?.itemId === "string" ? payload.itemId : undefined;
+    return json(await sendToUsers(admin, targets, title, body, url, undefined, kind, itemId));
   } catch (e) {
     console.error(e);
     return json({ error: (e as Error).message }, 500);
