@@ -1,62 +1,48 @@
-# Reliable push notifications: high-urgency delivery + display receipts with retry
+# Reliable push notifications — Part 1: high-urgency delivery, de-duplication, logging
 
 ## Goal
-Stop reminders being silently dropped when a phone is asleep (Doze mode). Two layers:
-1. Tell Google/Android the message is time-sensitive so it wakes the device immediately.
-2. Know when a notification actually displayed on the phone, and automatically re-send it if it didn't.
+Stop reminders being silently dropped when a phone is asleep (Doze mode), and make every send observable. Part 2 (display receipts and automatic retries) is deliberately out of scope for now — we revisit it once we've seen whether Part 1 fixes the problem.
 
-## Part 1 — High-urgency delivery headers
+## Changes to `send-push-notification`
 
-In `send-push-notification`, add to every FCM web push message:
-- `Urgency: high` — tells Android to wake the device and display immediately, even in Doze.
-- `TTL: 86400` — if the phone is offline, Google holds the message for up to 24 hours instead of discarding it quickly.
-- A stable `Tag` per task — if a reminder is re-sent before the first displays, the phone replaces the old one rather than stacking duplicates.
+### 1. Urgency
+- Set `Urgency: high` in `webpush.headers` on every message.
+- Do not use `android.priority` — it only applies to native Android apps, not our PWA.
 
-Applies to task reminders, assignment notices, freezer alerts, and test pushes.
+### 2. TTL per notification type (in `webpush.headers`)
+Single config object at the top of the function so values are easy to change:
 
-## Part 2 — Display receipt (ACK) and automatic retry
-
-### How it works
 ```text
-Cron (every minute)
-  → send-push-notification finds due task
-  → sends FCM push with Urgency: high + tag
-  → phone receives it, service worker wakes
-  → worker shows the banner AND posts an "I displayed it" receipt
-  → server records displayed_at on the task
-
-10 minutes later, cron checks again:
-  → task still has no displayed_at? → re-send (max 2 retries)
-  → displayed? → nothing more to do
+TTL_SECONDS = {
+  taskReminder: 14400,   // 4 hours
+  assignment:   86400,   // 24 hours
+  freezer:      86400,   // 24 hours
+  test:           300,   // 5 minutes
+}
 ```
 
-### Changes
+Each send path picks its TTL from this object.
 
-**Database (one migration):**
-- Add `displayed_at timestamptz` and `notify_attempts int default 0` to `tasks`.
-- Update the reminder SQL (`check_and_send_reminders`) so the cron also picks up tasks that were notified 10+ minutes ago, have no `displayed_at`, and have fewer than 3 attempts — these get re-sent.
+### 3. De-duplication (two separate mechanisms)
+- **Topic header:** set `webpush.headers.Topic` to a stable per-task value so Google replaces any undelivered queued message for the same task instead of delivering several when the phone reconnects. Topic must be ≤32 chars, URL-safe base64 (A–Z, a–z, 0–9, `-`, `_`) — derive it from the task ID (e.g. `task-` + task UUID with dashes stripped, truncated to 32 chars).
+- **Tag:** set a stable per-task `tag` as a notification option (in `showNotification` in `public/firebase-messaging-sw.js`, or `webpush.notification.tag`) — not as a header.
+- Set `renotify: true` so a replacement notification still sounds and vibrates rather than appearing silently.
 
-**Notification worker (`public/firebase-messaging-sw.js`):**
-- After showing a notification, POST a receipt to `task-notification-action` with the task ID and the same short-lived, task-specific token already used for "Mark done" (action: `ack`). No login needed, no reusable credential.
-- If the phone is offline when the push arrives, the receipt simply never sends — which is exactly what triggers the retry.
+### 4. Confirm how notifications are displayed (before changing anything)
+- Determine whether the Firebase SDK is auto-displaying notifications (because the payload includes a `notification` block) or whether our service worker calls `showNotification` itself. Report which it is before editing — it decides where `tag` and `renotify` must live and avoids duplicate banners.
+- Whatever displays the notification in the service worker must be inside `event.waitUntil`.
 
-**`task-notification-action` edge function:**
-- Accept a new `ack` action alongside the existing mark-done action: validate the token, set `displayed_at` on that one task only.
+### 5. Log FCM responses and clean up dead subscriptions
+- Log the outcome of every FCM send (success, or error code and message) with the task ID and subscription ID. Never log tokens.
+- If FCM returns UNREGISTERED / 404 / 410, delete that push subscription so we stop sending to it. (The existing stale-token pruning covers 404/UNREGISTERED; extend it to 410 and add the structured logging.)
 
-**`send-push-notification` edge function:**
-- When re-sending, increment `notify_attempts` and issue a fresh action token.
-- Keep the existing behaviour unchanged otherwise (recipients, icons, Mark done / View task actions).
-
-**App behaviour:**
-- When a task is opened/completed in the app, treat that as seen too (set `displayed_at`) so no pointless retry fires.
-- No visible UI changes — this is all behind the scenes.
-
-## Limits to be aware of
-- If the phone is fully off or has no signal for hours, the TTL holds the message but nothing can force it through until the phone reconnects.
-- Android battery settings ("Restricted" for Chrome/Family Hub) can still delay things; "Unrestricted" on Tasha's phone remains the best device-side complement.
+## Unchanged
+Recipients, icons, Mark done / View task actions and their existing HMAC tokens, cron schedule, and all other app behaviour.
 
 ## Verification
-- Create a test task due immediately, confirm the push sends and `displayed_at` gets recorded when the banner shows.
-- Simulate a dropped notification (no receipt) and confirm the cron re-sends it after ~10 minutes, and stops after the retry cap.
-- Confirm Mark done / View task actions still work.
-- Typecheck and build clean; deploy both updated edge functions.
+- Test push arrives with the new headers; show the final FCM payload for each notification type (task reminder, assignment, freezer, test).
+- Put the test phone into Doze (`adb shell dumpsys deviceidle force-idle`), send a test reminder, confirm it displays promptly. *(Requires your phone connected via adb — I'll prepare everything and give you the exact steps.)*
+- Send the same task reminder twice in quick succession: only one notification shows, and the second still makes a sound.
+- Confirm Mark done / View task still work.
+- Confirm a deliberately invalid subscription is logged and removed.
+- Typecheck and build clean, then deploy the updated function.
