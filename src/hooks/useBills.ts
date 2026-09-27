@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Bill } from '@/types/bill';
+import { Bill, BillInput } from '@/types/bill';
 import { toast } from '@/lib/toast';
 
 export const useBills = () => {
@@ -30,7 +30,7 @@ export const useBills = () => {
     }
   };
 
-  const createBill = async (bill: Omit<Bill, 'id' | 'created_at' | 'updated_at' | 'bill_type'>) => {
+  const createBill = async (bill: BillInput) => {
     try {
       // If monthly and no payment_day specified, explicitly set to 1
       const billData = {
@@ -58,7 +58,7 @@ export const useBills = () => {
 
   const updateBill = async (
     id: string,
-    updates: Partial<Omit<Bill, 'id' | 'created_at' | 'updated_at' | 'bill_type'>>
+    updates: Partial<BillInput>
   ) => {
     try {
       const { error } = await supabase.from('bills').update(updates).eq('id', id);

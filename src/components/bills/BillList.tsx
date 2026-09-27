@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bill } from '@/types/bill';
+import { Bill, BillInput } from '@/types/bill';
 import { isBillExpiredNow } from '@/utils/billCalculations';
 
 import { useBills } from '@/hooks/useBills';
@@ -30,7 +30,7 @@ export const BillList = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSubmit = async (
-    data: Omit<Bill, 'id' | 'created_at' | 'updated_at' | 'bill_type'>
+    data: BillInput
   ) => {
     if (editingBill) {
       await updateBill(editingBill.id, data);

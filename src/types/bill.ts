@@ -52,6 +52,8 @@ export interface Bill {
   account?: BillAccount | null;
 }
 
+export type BillInput = Omit<Bill, 'id' | 'created_at' | 'updated_at' | 'bill_type' | 'account'>;
+
 export interface MonthlyBillCalculation {
   bill: Bill;
   paymentCount: number;
