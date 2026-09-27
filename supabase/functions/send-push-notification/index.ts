@@ -54,6 +54,7 @@ async function sendToUsers(admin: Admin, userIds: string[], title: string, body:
   const { data: tokens, error } = await admin.from("push_tokens").select("id, token").in("user_id", userIds);
   if (error) throw error;
 
+  const topic = topicFor(kind, itemId);
   let sent = 0;
   const stale: string[] = [];
   for (const t of tokens ?? []) {
@@ -77,10 +78,16 @@ async function sendToUsers(admin: Admin, userIds: string[], title: string, body:
             } : {}),
           },
           webpush: {
+            headers: {
+              Urgency: "high",
+              TTL: String(TTL_SECONDS[kind]),
+              ...(topic ? { Topic: topic } : {}),
+            },
             fcm_options: { link: absoluteUrl(url) },
             notification: {
               icon: `${APP_ORIGIN}/icons/icon-192.png`,
               badge: `${APP_ORIGIN}/icons/notification-96.png`,
+              ...(topic ? { tag: topic, renotify: true } : {}),
               ...(taskAction ? { actions: [
                 { action: "mark-done", title: "Mark done" },
                 { action: "view-task", title: "View task" },
@@ -92,15 +99,21 @@ async function sendToUsers(admin: Admin, userIds: string[], title: string, body:
     });
     if (res.ok) {
       sent++;
+      console.log(`FCM send OK [kind=${kind}${itemId ? ` item=${itemId}` : ""} subscription=${t.id}]`);
     } else {
       const text = await res.text();
-      console.error(`FCM send failed [${res.status}]: ${text}`);
-      if (res.status === 404 || (res.status === 400 && text.includes("INVALID_ARGUMENT")) || text.includes("UNREGISTERED")) {
+      console.error(`FCM send failed [${res.status}] [kind=${kind}${itemId ? ` item=${itemId}` : ""} subscription=${t.id}]: ${text}`);
+      // Only delete subscriptions that are definitively dead. 400/INVALID_ARGUMENT can
+      // mean a malformed payload, so log it in full but keep the subscription.
+      if (res.status === 404 || res.status === 410 || text.includes("UNREGISTERED")) {
         stale.push(t.id);
       }
     }
   }
-  if (stale.length) await admin.from("push_tokens").delete().in("id", stale);
+  if (stale.length) {
+    await admin.from("push_tokens").delete().in("id", stale);
+    console.log(`Removed ${stale.length} dead push subscription(s): ${stale.join(", ")}`);
+  }
   return { sent, devices: tokens?.length ?? 0, removed: stale.length };
 }
 
