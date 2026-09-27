@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bill, BillFrequency } from '@/types/bill';
+import { Bill, BillFrequency, BillInput } from '@/types/bill';
 import { useBillTypes } from '@/hooks/useBillTypes';
 import { useBillAccounts } from '@/hooks/useBillAccounts';
 
@@ -14,7 +14,7 @@ import { X } from 'lucide-react';
 
 interface BillFormProps {
   bill?: Bill;
-  onSubmit: (data: Omit<Bill, 'id' | 'created_at' | 'updated_at' | 'bill_type'>) => Promise<void>;
+  onSubmit: (data: BillInput) => Promise<void>;
   onCancel: () => void;
 }
 
