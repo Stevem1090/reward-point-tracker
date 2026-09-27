@@ -3,6 +3,11 @@
 ## Goal
 Stop reminders being silently dropped when a phone is asleep (Doze mode), and make every send observable. Part 2 (display receipts and automatic retries) is deliberately out of scope for now — we revisit it once we've seen whether Part 1 fixes the problem.
 
+## Step 4 finding (checked first, before edits)
+The Firebase SDK auto-displays notifications: the FCM payload includes a `notification` block, and `public/firebase-messaging-sw.js` only registers a `notificationclick` handler — it never calls `showNotification`. Consequences:
+- `tag` and `renotify` must be set in `webpush.notification` in the FCM payload (FCM maps these to the displayed notification), not in the service worker.
+- No duplicate-banner risk from the worker; no `event.waitUntil` change needed for display (the existing click handler already uses `event.waitUntil`).
+
 ## Changes to `send-push-notification`
 
 ### 1. Urgency
@@ -23,25 +28,36 @@ TTL_SECONDS = {
 
 Each send path picks its TTL from this object.
 
-### 3. De-duplication (two separate mechanisms)
-- **Topic header:** set `webpush.headers.Topic` to a stable per-task value so Google replaces any undelivered queued message for the same task instead of delivering several when the phone reconnects. Topic must be ≤32 chars, URL-safe base64 (A–Z, a–z, 0–9, `-`, `_`) — derive it from the task ID (e.g. `task-` + task UUID with dashes stripped, truncated to 32 chars).
-- **Tag:** set a stable per-task `tag` as a notification option (in `showNotification` in `public/firebase-messaging-sw.js`, or `webpush.notification.tag`) — not as a header.
-- Set `renotify: true` so a replacement notification still sounds and vibrates rather than appearing silently.
+### 3. De-duplication (Topic header + notification tag)
+- **Unique per notification type AND per item**, so a reminder and an assignment notice for the same task never replace each other. Use a short type prefix plus the item ID:
+  - `rem_` + task ID (task reminders)
+  - `asg_` + task ID (assignment notices)
+  - `frz_` + freezer item ID (freezer alerts)
+  - Test pushes: unique value each time (or no topic/tag).
+- **Encoding (no truncation):** base64url-encode the UUID's 16 raw bytes (22 characters, no padding), add the 4-char type prefix → 26 characters, within the 32-char limit, using only URL-safe characters (A–Z, a–z, 0–9, `-`, `_`).
+- **Topic:** set `webpush.headers.Topic` to this value so Google replaces any undelivered queued message for the same item+type instead of delivering several when the phone reconnects.
+- **Tag:** set the same value in `webpush.notification.tag` (a notification option, not a header).
+- Set `renotify: true` in `webpush.notification` so a replacement notification still sounds and vibrates.
 
-### 4. Confirm how notifications are displayed (before changing anything)
-- Determine whether the Firebase SDK is auto-displaying notifications (because the payload includes a `notification` block) or whether our service worker calls `showNotification` itself. Report which it is before editing — it decides where `tag` and `renotify` must live and avoids duplicate banners.
-- Whatever displays the notification in the service worker must be inside `event.waitUntil`.
-
-### 5. Log FCM responses and clean up dead subscriptions
-- Log the outcome of every FCM send (success, or error code and message) with the task ID and subscription ID. Never log tokens.
-- If FCM returns UNREGISTERED / 404 / 410, delete that push subscription so we stop sending to it. (The existing stale-token pruning covers 404/UNREGISTERED; extend it to 410 and add the structured logging.)
+### 4. Log FCM responses and clean up dead subscriptions
+- Log the outcome of every FCM send (success, or error code and message) with the item ID and subscription ID. Never log tokens.
+- Delete the push subscription only on **404, 410, or UNREGISTERED**.
+- Do **not** delete on 400 / INVALID_ARGUMENT — that can be caused by a malformed payload and would wipe valid subscriptions. Log 400s with the full error body so we can see them.
 
 ## Unchanged
 Recipients, icons, Mark done / View task actions and their existing HMAC tokens, cron schedule, and all other app behaviour.
 
 ## Verification
 - Test push arrives with the new headers; show the final FCM payload for each notification type (task reminder, assignment, freezer, test).
-- Put the test phone into Doze (`adb shell dumpsys deviceidle force-idle`), send a test reminder, confirm it displays promptly. *(Requires your phone connected via adb — I'll prepare everything and give you the exact steps.)*
+- Doze test on the test phone, full sequence:
+  ```text
+  adb shell dumpsys battery unplug
+  adb shell dumpsys deviceidle force-idle
+  (send test reminder)
+  adb shell dumpsys deviceidle unforce
+  adb shell dumpsys battery reset
+  ```
+  Confirm the reminder displays promptly while forced idle. *(Requires your phone connected via adb — I'll prepare everything and give you the exact steps.)*
 - Send the same task reminder twice in quick succession: only one notification shows, and the second still makes a sound.
 - Confirm Mark done / View task still work.
 - Confirm a deliberately invalid subscription is logged and removed.
