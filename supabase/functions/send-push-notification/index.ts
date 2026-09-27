@@ -158,6 +158,8 @@ async function sendTaskReminders(admin: Admin) {
         task.notes || "",
         `/tasks?task=${task.id}`,
         { taskId: task.id, token: actionToken },
+        "taskReminder",
+        task.id,
       );
     }
   }
@@ -198,6 +200,8 @@ async function sendAssignmentNotice(admin: Admin, req: Request, taskId: string) 
     task.title as string,
     `/tasks?task=${task.id}`,
     { taskId: task.id as string, token: actionToken },
+    "assignment",
+    task.id as string,
   );
 }
 
