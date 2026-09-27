@@ -12,6 +12,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { cn } from '@/lib/utils';
 import { TaskRow } from './TaskRow';
 import type { Task, TaskSection } from '@/hooks/useTasks';
+import { taskLocalParts } from '@/lib/tasks/dateTime';
+
+const TierLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="flex items-center gap-2 px-3 pt-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+    <span>{children}</span>
+    <span className="flex-1 h-px bg-border/60" />
+  </div>
+);
 
 interface Props {
   section: TaskSection;
@@ -36,6 +44,12 @@ export const TaskSectionCard: React.FC<Props> = ({ section, active, completed, o
     id: `drop:${section.id}`,
     data: { type: 'drop', sectionId: section.id },
   });
+
+  const today = taskLocalParts(new Date().toISOString()).date;
+  const byDue = (a: Task, b: Task) => (a.due_at ?? '').localeCompare(b.due_at ?? '');
+  const now = active.filter((t) => t.due_at && taskLocalParts(t.due_at).date <= today).sort(byDue);
+  const anytime = active.filter((t) => !t.due_at);
+  const upcoming = active.filter((t) => t.due_at && taskLocalParts(t.due_at).date > today).sort(byDue);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,9 +113,22 @@ export const TaskSectionCard: React.FC<Props> = ({ section, active, completed, o
       </form>
 
       <div ref={setDropRef} className={cn('px-1 pb-2 min-h-[12px] rounded-b-xl', isOver && 'bg-accent/40')}>
-        <SortableContext items={active.map((t) => `task:${t.id}`)} strategy={verticalListSortingStrategy}>
-          {active.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onOpen={onOpen} onDelete={onDeleteTask} />)}
+        {now.length > 0 && (
+          <div className="mb-1">
+            <TierLabel>Today</TierLabel>
+            {now.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onOpen={onOpen} onDelete={onDeleteTask} draggable={false} />)}
+          </div>
+        )}
+        {(now.length > 0 || upcoming.length > 0) && anytime.length > 0 && <TierLabel>Anytime</TierLabel>}
+        <SortableContext items={anytime.map((t) => `task:${t.id}`)} strategy={verticalListSortingStrategy}>
+          {anytime.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onOpen={onOpen} onDelete={onDeleteTask} />)}
         </SortableContext>
+        {upcoming.length > 0 && (
+          <div className="mt-1">
+            <TierLabel>Upcoming</TierLabel>
+            {upcoming.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onOpen={onOpen} onDelete={onDeleteTask} draggable={false} />)}
+          </div>
+        )}
 
         {completed.length > 0 && (
           <Collapsible className="mt-1 border-t pt-1">
