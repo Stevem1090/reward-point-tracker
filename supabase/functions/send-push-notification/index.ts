@@ -20,11 +20,33 @@ const absoluteUrl = (u: string) => (/^https?:\/\//.test(u) ? u : `${APP_ORIGIN}$
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+// Time-to-live per notification type (seconds). How long Google holds an undelivered message.
+const TTL_SECONDS = {
+  taskReminder: 14400, // 4 hours
+  assignment: 86400,   // 24 hours
+  freezer: 86400,      // 24 hours
+  test: 300,           // 5 minutes
+} as const;
+type NotifKind = keyof typeof TTL_SECONDS;
+
+// Stable de-dup key per notification type + item: 4-char prefix + base64url of the
+// item UUID's 16 raw bytes (22 chars, no padding) = 26 chars, within the 32-char limit.
+function topicFor(kind: NotifKind, itemId?: string): string | undefined {
+  if (kind === "test" || !itemId) return undefined; // test pushes: unique each time, no topic/tag
+  const prefix = { taskReminder: "rem_", assignment: "asg_", freezer: "frz_" }[kind];
+  const hex = itemId.replace(/-/g, "");
+  if (!/^[0-9a-fA-F]{32}$/.test(hex)) return undefined;
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  const b64 = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${prefix}${b64}`;
+}
+
 type Admin = ReturnType<typeof createClient>;
 
 type TaskAction = { taskId: string; token: string };
 
-async function sendToUsers(admin: Admin, userIds: string[], title: string, body: string, url = "/", taskAction?: TaskAction) {
+async function sendToUsers(admin: Admin, userIds: string[], title: string, body: string, url = "/", taskAction?: TaskAction, kind: NotifKind = "test", itemId?: string) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   const FCM_KEY = Deno.env.get("FIREBASE_MESSAGING_API_KEY");
   if (!LOVABLE_API_KEY || !FCM_KEY) throw new Error("Push is not configured");
@@ -32,6 +54,7 @@ async function sendToUsers(admin: Admin, userIds: string[], title: string, body:
   const { data: tokens, error } = await admin.from("push_tokens").select("id, token").in("user_id", userIds);
   if (error) throw error;
 
+  const topic = topicFor(kind, itemId);
   let sent = 0;
   const stale: string[] = [];
   for (const t of tokens ?? []) {
@@ -55,10 +78,16 @@ async function sendToUsers(admin: Admin, userIds: string[], title: string, body:
             } : {}),
           },
           webpush: {
+            headers: {
+              Urgency: "high",
+              TTL: String(TTL_SECONDS[kind]),
+              ...(topic ? { Topic: topic } : {}),
+            },
             fcm_options: { link: absoluteUrl(url) },
             notification: {
               icon: `${APP_ORIGIN}/icons/icon-192.png`,
               badge: `${APP_ORIGIN}/icons/notification-96.png`,
+              ...(topic ? { tag: topic, renotify: true } : {}),
               ...(taskAction ? { actions: [
                 { action: "mark-done", title: "Mark done" },
                 { action: "view-task", title: "View task" },
@@ -70,15 +99,21 @@ async function sendToUsers(admin: Admin, userIds: string[], title: string, body:
     });
     if (res.ok) {
       sent++;
+      console.log(`FCM send OK [kind=${kind}${itemId ? ` item=${itemId}` : ""} subscription=${t.id}]`);
     } else {
       const text = await res.text();
-      console.error(`FCM send failed [${res.status}]: ${text}`);
-      if (res.status === 404 || (res.status === 400 && text.includes("INVALID_ARGUMENT")) || text.includes("UNREGISTERED")) {
+      console.error(`FCM send failed [${res.status}] [kind=${kind}${itemId ? ` item=${itemId}` : ""} subscription=${t.id}]: ${text}`);
+      // Only delete subscriptions that are definitively dead. 400/INVALID_ARGUMENT can
+      // mean a malformed payload, so log it in full but keep the subscription.
+      if (res.status === 404 || res.status === 410 || text.includes("UNREGISTERED")) {
         stale.push(t.id);
       }
     }
   }
-  if (stale.length) await admin.from("push_tokens").delete().in("id", stale);
+  if (stale.length) {
+    await admin.from("push_tokens").delete().in("id", stale);
+    console.log(`Removed ${stale.length} dead push subscription(s): ${stale.join(", ")}`);
+  }
   return { sent, devices: tokens?.length ?? 0, removed: stale.length };
 }
 
@@ -123,6 +158,8 @@ async function sendTaskReminders(admin: Admin) {
         task.notes || "",
         `/tasks?task=${task.id}`,
         { taskId: task.id, token: actionToken },
+        "taskReminder",
+        task.id,
       );
     }
   }
@@ -163,6 +200,8 @@ async function sendAssignmentNotice(admin: Admin, req: Request, taskId: string) 
     task.title as string,
     `/tasks?task=${task.id}`,
     { taskId: task.id as string, token: actionToken },
+    "assignment",
+    task.id as string,
   );
 }
 
@@ -207,7 +246,9 @@ Deno.serve(async (req) => {
       targets = targets.filter((u: string) => allowed.has(u));
       if (targets.length === 0) return json({ error: "Not allowed" }, 403);
     }
-    return json(await sendToUsers(admin, targets, title, body, url));
+    const kind: NotifKind = payload?.kind === "freezer" ? "freezer" : "test";
+    const itemId = typeof payload?.itemId === "string" ? payload.itemId : undefined;
+    return json(await sendToUsers(admin, targets, title, body, url, undefined, kind, itemId));
   } catch (e) {
     console.error(e);
     return json({ error: (e as Error).message }, 500);
