@@ -20,11 +20,33 @@ const absoluteUrl = (u: string) => (/^https?:\/\//.test(u) ? u : `${APP_ORIGIN}$
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+// Time-to-live per notification type (seconds). How long Google holds an undelivered message.
+const TTL_SECONDS = {
+  taskReminder: 14400, // 4 hours
+  assignment: 86400,   // 24 hours
+  freezer: 86400,      // 24 hours
+  test: 300,           // 5 minutes
+} as const;
+type NotifKind = keyof typeof TTL_SECONDS;
+
+// Stable de-dup key per notification type + item: 4-char prefix + base64url of the
+// item UUID's 16 raw bytes (22 chars, no padding) = 26 chars, within the 32-char limit.
+function topicFor(kind: NotifKind, itemId?: string): string | undefined {
+  if (kind === "test" || !itemId) return undefined; // test pushes: unique each time, no topic/tag
+  const prefix = { taskReminder: "rem_", assignment: "asg_", freezer: "frz_" }[kind];
+  const hex = itemId.replace(/-/g, "");
+  if (!/^[0-9a-fA-F]{32}$/.test(hex)) return undefined;
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  const b64 = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${prefix}${b64}`;
+}
+
 type Admin = ReturnType<typeof createClient>;
 
 type TaskAction = { taskId: string; token: string };
 
-async function sendToUsers(admin: Admin, userIds: string[], title: string, body: string, url = "/", taskAction?: TaskAction) {
+async function sendToUsers(admin: Admin, userIds: string[], title: string, body: string, url = "/", taskAction?: TaskAction, kind: NotifKind = "test", itemId?: string) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   const FCM_KEY = Deno.env.get("FIREBASE_MESSAGING_API_KEY");
   if (!LOVABLE_API_KEY || !FCM_KEY) throw new Error("Push is not configured");
