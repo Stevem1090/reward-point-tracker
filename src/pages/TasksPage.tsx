@@ -3,8 +3,11 @@ import {
   DndContext, DragEndEvent, DragOverEvent, DragStartEvent, KeyboardSensor, PointerSensor, TouchSensor,
   closestCorners, useSensor, useSensors, CollisionDetection,
 } from '@dnd-kit/core';
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Loader2, Bell, BellOff } from 'lucide-react';
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { Plus, Loader2, Rows3, Columns3 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { cn } from '@/lib/utils';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +34,9 @@ const TasksPage = () => {
   const [dragType, setDragType] = useState<'task' | 'section' | null>(null);
   const [order, setOrder] = useState<Order>({});
   const [hideReminders, setHideReminders] = useState(false);
+  const [assignedOnly, setAssignedOnly] = useState(false);
+  const [view, setView] = useState<'list' | 'board'>(() => (localStorage.getItem('tasks_view') === 'board' ? 'board' : 'list'));
+  useEffect(() => { localStorage.setItem('tasks_view', view); }, [view]);
 
 
   useEffect(() => {
@@ -148,37 +154,51 @@ const TasksPage = () => {
     return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
+  const visible = (x: Task) =>
+    (!hideReminders || !x.due_at) && (!assignedOnly || (!!user && x.assigned_to === user.id));
+  const sectionData = t.sections.map((s) => ({
+    s,
+    active: (order[s.id] ?? []).map((id) => byId.get(id)).filter((x): x is Task => !!x && visible(x)),
+    completed: t.tasks.filter((x) => x.section_id === s.id && x.done && visible(x)).sort((a, b) => (b.done_at ?? '').localeCompare(a.done_at ?? '')),
+  })).filter((d) => !assignedOnly || d.active.length + d.completed.length > 0);
+
   return (
-    <div className="container mx-auto max-w-2xl px-3 pb-24">
-      <div className="flex items-center justify-between mb-4 gap-2">
+    <div className={cn('mx-auto px-3 pb-24', view === 'board' ? 'max-w-none' : 'container max-w-2xl')}>
+      <div className="flex items-center justify-between mb-3 gap-2">
         <h1 className="text-2xl font-bold">Tasks</h1>
         <div className="flex items-center gap-2">
-          <Button
-            variant={hideReminders ? 'default' : 'outline'}
-            onClick={() => setHideReminders((v) => !v)}
-            className="min-h-[44px]"
-            aria-pressed={hideReminders}
-          >
-            {hideReminders ? <BellOff className="h-4 w-4 mr-1" /> : <Bell className="h-4 w-4 mr-1" />}
-            {hideReminders ? 'Reminders hidden' : 'Hide reminders'}
-          </Button>
+          <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as 'list' | 'board')} variant="outline">
+            <ToggleGroupItem value="list" aria-label="Stacked view" className="h-11 w-11"><Rows3 className="h-4 w-4" /></ToggleGroupItem>
+            <ToggleGroupItem value="board" aria-label="Board view" className="h-11 w-11"><Columns3 className="h-4 w-4" /></ToggleGroupItem>
+          </ToggleGroup>
           <Button variant="outline" onClick={() => openSectionDialog('add')} className="min-h-[44px]">
             <Plus className="h-4 w-4 mr-1" /> Section
           </Button>
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mb-4 rounded-xl border bg-card px-3 py-1">
+        <label className="flex items-center gap-2 min-h-[44px] text-sm cursor-pointer">
+          <Switch checked={assignedOnly} onCheckedChange={setAssignedOnly} />
+          Assigned to me
+        </label>
+        <label className="flex items-center gap-2 min-h-[44px] text-sm cursor-pointer">
+          <Switch checked={hideReminders} onCheckedChange={setHideReminders} />
+          Hide reminders
+        </label>
+      </div>
 
       <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={() => setDragType(null)}>
-        <SortableContext items={t.sections.map((s) => `section:${s.id}`)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-4">
-            {t.sections.map((s) => (
+        <SortableContext items={sectionData.map((d) => `section:${d.s.id}`)} strategy={view === 'board' ? horizontalListSortingStrategy : verticalListSortingStrategy}>
+          <div className={view === 'board'
+            ? 'flex gap-4 overflow-x-auto snap-x snap-mandatory pb-4 -mx-3 px-3 items-start'
+            : 'space-y-4'}>
+            {sectionData.map(({ s, active, completed }) => (
+              <div key={s.id} className={view === 'board' ? 'snap-start shrink-0 w-[85vw] max-w-sm' : undefined}>
               <TaskSectionCard
-                key={s.id}
                 section={s}
-                active={(order[s.id] ?? []).map((id) => byId.get(id)).filter((x): x is Task => !!x && (!hideReminders || !x.due_at))}
-                completed={t.tasks.filter((x) => x.section_id === s.id && x.done && (!hideReminders || !x.due_at)).sort((a, b) => (b.done_at ?? '').localeCompare(a.done_at ?? ''))}
-
+                active={active}
+                completed={completed}
                 onAdd={(sectionId, title, isPrivate) => t.addTask({ section_id: sectionId, title, is_private: isPrivate })}
                 onToggle={toggle}
                 onOpen={setEditing}
@@ -186,10 +206,15 @@ const TasksPage = () => {
                 onRename={(sec) => openSectionDialog('rename', sec)}
                 onDelete={setToDelete}
               />
+              </div>
             ))}
           </div>
         </SortableContext>
       </DndContext>
+
+      {assignedOnly && sectionData.length === 0 && t.sections.length > 0 && (
+        <p className="text-center text-muted-foreground py-10">Nothing assigned to you right now.</p>
+      )}
 
       {t.sections.length === 0 && (
         <p className="text-center text-muted-foreground py-10">No sections yet. Add one to get started.</p>
