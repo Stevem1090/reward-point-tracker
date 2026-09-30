@@ -22,7 +22,7 @@ import NotFound from "./pages/NotFound";
 import JoinPage from "./pages/JoinPage";
 import FamilyGate from "./components/FamilyGate";
 import { useEffect } from "react";
-import { refreshPushToken, retireOldServiceWorker } from "./lib/push/registerPush";
+import { refreshPushToken, retireOldServiceWorker, startPushSelfHealing } from "./lib/push/registerPush";
 
 const queryClient = new QueryClient();
 
@@ -30,10 +30,13 @@ const queryClient = new QueryClient();
 const PushRefresher = () => {
   const { user } = useAuth();
   useEffect(() => {
-    if (user?.id) refreshPushToken();
+    if (!user?.id) return;
+    refreshPushToken(true);
+    return startPushSelfHealing();
   }, [user?.id]);
   return null;
 };
+
 
 const App = () => {
   useEffect(() => {

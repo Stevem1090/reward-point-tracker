@@ -93,10 +93,43 @@ export async function enablePush(): Promise<PushResult> {
 }
 
 /** Silently re-saves this device's token (FCM rotates them). Never prompts. */
-export async function refreshPushToken() {
+let lastRefresh = 0;
+export async function refreshPushToken(force = false) {
   if (isInIframe() || getPushPermission() !== 'granted' || localStorage.getItem('push-disabled')) return;
+  const now = Date.now();
+  if (!force && now - lastRefresh < 60_000) return;
+  lastRefresh = now;
   try { await saveToken(); } catch (e) { console.error('[push] refresh failed', e); }
 }
+
+/**
+ * Keeps this device registered over time: re-checks whenever the app is brought
+ * back to the foreground, and when the browser tells us it rotated the subscription.
+ */
+export function startPushSelfHealing(): () => void {
+  if (typeof window === 'undefined') return () => undefined;
+
+  const onVisible = () => { if (document.visibilityState === 'visible') refreshPushToken(); };
+  const onFocus = () => refreshPushToken();
+  const onSwMessage = (event: MessageEvent) => {
+    if (event.data?.type === 'push-subscription-change') refreshPushToken(true);
+  };
+
+  document.addEventListener('visibilitychange', onVisible);
+  window.addEventListener('focus', onFocus);
+  navigator.serviceWorker?.addEventListener('message', onSwMessage);
+
+  // Periodic safety net for long-lived sessions (once an hour).
+  const timer = window.setInterval(() => refreshPushToken(true), 60 * 60 * 1000);
+
+  return () => {
+    document.removeEventListener('visibilitychange', onVisible);
+    window.removeEventListener('focus', onFocus);
+    navigator.serviceWorker?.removeEventListener('message', onSwMessage);
+    window.clearInterval(timer);
+  };
+}
+
 
 export async function disablePush() {
   localStorage.setItem('push-disabled', '1');
