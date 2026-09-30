@@ -30,10 +30,13 @@ const queryClient = new QueryClient();
 const PushRefresher = () => {
   const { user } = useAuth();
   useEffect(() => {
-    if (user?.id) refreshPushToken();
+    if (!user?.id) return;
+    refreshPushToken(true);
+    return startPushSelfHealing();
   }, [user?.id]);
   return null;
 };
+
 
 const App = () => {
   useEffect(() => {
