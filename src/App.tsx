@@ -22,7 +22,7 @@ import NotFound from "./pages/NotFound";
 import JoinPage from "./pages/JoinPage";
 import FamilyGate from "./components/FamilyGate";
 import { useEffect } from "react";
-import { refreshPushToken, retireOldServiceWorker } from "./lib/push/registerPush";
+import { refreshPushToken, retireOldServiceWorker, startPushSelfHealing } from "./lib/push/registerPush";
 
 const queryClient = new QueryClient();
 
