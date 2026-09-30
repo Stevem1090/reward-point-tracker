@@ -40,5 +40,16 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+// The browser rotates push subscriptions from time to time (cache pressure, key refresh).
+// Tell any open window so it can save a fresh token; otherwise flag it for the next visit.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      clients.forEach((client) => client.postMessage({ type: 'push-subscription-change' }));
+    }).catch((error) => console.error('[push] subscription change relay failed', error))
+  );
+});
+
 firebase.initializeApp(Object.fromEntries(new URL(self.location).searchParams));
 firebase.messaging();
+
