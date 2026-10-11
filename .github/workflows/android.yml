@@ -23,12 +23,20 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
+      - name: Ensure Android SDK components
+        run: |
+          SDKMGR=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)
+          if [ -n "$SDKMGR" ]; then
+            yes | "$SDKMGR" --licenses >/dev/null 2>&1 || true
+            "$SDKMGR" "platforms;android-36" "build-tools;36.0.0" "platform-tools" || true
+          fi
+
       - name: Create Android project
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
           bunx cap add android
-          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          if [ -n "$ANDROID_HOME" ]; then echo "sdk.dir=$ANDROID_HOME" > android/local.properties; fi
           echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
           node scripts/patch-android.mjs
           bunx cap sync android
