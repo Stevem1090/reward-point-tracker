@@ -58,6 +58,11 @@ CRITICAL RULES:
 
 7. Keep ingredient names simple and clear (e.g., "plain flour" not "all-purpose flour")
 
+8. QUANTITY AND UNIT MUST BE SEPARATE:
+   - The "quantity" field must contain ONLY the numeric amount (e.g. "500", "1.5", "3"). NEVER include the unit inside quantity.
+   - The "unit" field holds the unit only: "g", "kg", "ml", "l", or an empty string "" for countable items (e.g. 3 onions -> quantity "3", unit "").
+   - CORRECT: quantity "500", unit "g". WRONG: quantity "500g", unit "g".
+
 You MUST use the create_shopping_list function to return your response.`;
 
 interface Ingredient {
@@ -127,8 +132,14 @@ serve(async (req) => {
                       type: "object",
                       properties: {
                         name: { type: "string" },
-                        quantity: { type: "string" },
-                        unit: { type: "string" },
+                        quantity: {
+                          type: "string",
+                          description: "Numeric amount ONLY, no unit (e.g. \"500\", \"1.5\", \"3\")",
+                        },
+                        unit: {
+                          type: "string",
+                          description: "Unit only: g, kg, ml, l, or empty string for countable items",
+                        },
                         category: { 
                           type: "string",
                           enum: SHOPPING_CATEGORIES,
