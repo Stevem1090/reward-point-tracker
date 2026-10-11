@@ -11,5 +11,5 @@
 - [x] Server sends Android-specific high-priority messages + task sync/cancel messages
 - [x] Backup reminders stored on the phone (no duplicates, cancelled when done elsewhere)
 - [x] Setup/health card (permission, battery unrestricted, test)
-- [x] GitHub build workflow producing signed APK
-- [ ] User: GitHub export, Firebase Android app + google-services.json, GitHub secrets, install APK
+- [ ] GitHub build workflow producing signed APK (setup-android step removed after it failed; needs a clean run)
+- [ ] User: Firebase Android app + google-services.json, GitHub secrets, install APK
