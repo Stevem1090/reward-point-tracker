@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Capacitor Android project is generated in CI (see .github/workflows/android.yml)
+android/
+ios/
