@@ -185,9 +185,33 @@ serve(async (req) => {
 
     const { items } = JSON.parse(toolCall.function.arguments);
 
+    // Defensive cleanup: even with strict prompting, models occasionally emit
+    // the unit inside the quantity ("500g" or "500 g" + unit "g"), which would
+    // render duplicated in the app. Normalize to quantity-only + unit-only.
+    const normalizeItem = (item: any, index: number) => {
+      let quantity = String(item.quantity ?? '').trim();
+      let unit = String(item.unit ?? '').trim().toLowerCase();
+
+      // "500g" with empty unit -> split into "500" + "g"
+      if (!unit) {
+        const match = quantity.match(/^([\d.,\/\s]+)\s*([a-zA-Z]+)$/);
+        if (match) {
+          quantity = match[1].replace(/[\s,]+$/, '').trim();
+          unit = match[2].toLowerCase();
+        }
+      }
+
+      // "1 kg" with unit "kg" -> strip the duplicated unit from quantity
+      if (unit && quantity.toLowerCase().endsWith(unit)) {
+        quantity = quantity.slice(0, quantity.length - unit.length).trim();
+      }
+
+      return { ...item, quantity, unit };
+    };
+
     // Add unique IDs to each item
     const itemsWithIds = items.map((item: any, index: number) => ({
-      ...item,
+      ...normalizeItem(item, index),
       id: `item-${Date.now()}-${index}`,
       checked: false,
     }));
