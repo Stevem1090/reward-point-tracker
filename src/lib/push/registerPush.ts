@@ -1,6 +1,10 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, deleteToken, isSupported, type Messaging } from 'firebase/messaging';
 import { supabase } from '@/integrations/supabase/client';
+import { isNativeApp } from '@/lib/native/platform';
+import {
+  enableNativePush, refreshNativePush, disableNativePush, isNativeDeviceEnabled, startNativeSelfHealing,
+} from '@/lib/native/nativePush';
 
 const appId = import.meta.env.VITE_LOVABLE_CONNECTOR_FIREBASE_MESSAGING_APP_ID as string | undefined;
 const vapidKey = import.meta.env.VITE_LOVABLE_CONNECTOR_FIREBASE_MESSAGING_VAPID_KEY as string | undefined;
@@ -24,6 +28,7 @@ const isConfigured = () =>
   Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId && firebaseConfig.messagingSenderId && vapidKey);
 
 export const isInIframe = () => {
+  if (isNativeApp()) return false;
   try { return window.self !== window.top; } catch { return true; }
 };
 
@@ -32,6 +37,7 @@ export const isStandalone = () =>
   window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true;
 
 export function getPushPermission(): 'unsupported' | NotificationPermission {
+  if (isNativeApp()) return 'default';
   if (!('Notification' in window) || !('serviceWorker' in navigator)) return 'unsupported';
   return Notification.permission;
 }
@@ -78,6 +84,7 @@ async function saveToken(): Promise<boolean> {
 
 /** Call from a button tap: browsers ignore permission requests without a user action. */
 export async function enablePush(): Promise<PushResult> {
+  if (isNativeApp()) return enableNativePush();
   if (!isConfigured()) return { status: 'not-configured' };
   if (getPushPermission() === 'unsupported' || !(await isSupported().catch(() => false))) return { status: 'unsupported' };
   if (isInIframe()) return { status: 'open-in-new-tab' };
@@ -95,6 +102,7 @@ export async function enablePush(): Promise<PushResult> {
 /** Silently re-saves this device's token (FCM rotates them). Never prompts. */
 let lastRefresh = 0;
 export async function refreshPushToken(force = false) {
+  if (isNativeApp()) return refreshNativePush();
   if (isInIframe() || getPushPermission() !== 'granted' || localStorage.getItem('push-disabled')) return;
   const now = Date.now();
   if (!force && now - lastRefresh < 60_000) return;
@@ -107,6 +115,7 @@ export async function refreshPushToken(force = false) {
  * back to the foreground, and when the browser tells us it rotated the subscription.
  */
 export function startPushSelfHealing(): () => void {
+  if (isNativeApp()) return startNativeSelfHealing();
   if (typeof window === 'undefined') return () => undefined;
 
   const onVisible = () => { if (document.visibilityState === 'visible') refreshPushToken(); };
@@ -132,6 +141,7 @@ export function startPushSelfHealing(): () => void {
 
 
 export async function disablePush() {
+  if (isNativeApp()) return disableNativePush();
   localStorage.setItem('push-disabled', '1');
   const token = localStorage.getItem('push-token');
   try {
@@ -144,6 +154,7 @@ export async function disablePush() {
 
 /** Is this device currently receiving notifications? */
 export async function isThisDeviceEnabled(): Promise<boolean> {
+  if (isNativeApp()) return isNativeDeviceEnabled();
   const token = localStorage.getItem('push-token');
   if (!token || getPushPermission() !== 'granted') return false;
   const { data } = await supabase.from('push_tokens').select('id').eq('token', token).maybeSingle();
@@ -162,6 +173,7 @@ export async function sendTestPush() {
 
 /** Removes the old notification worker (/sw.js) left from the previous system. */
 export async function retireOldServiceWorker() {
+  if (isNativeApp()) return;
   if (!('serviceWorker' in navigator)) return;
   try {
     const regs = await navigator.serviceWorker.getRegistrations();

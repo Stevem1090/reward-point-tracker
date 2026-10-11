@@ -1,3 +1,4 @@
+import { isNativeApp, saveFile } from '@/lib/native/platform';
 import { useEffect, useState } from 'react';
 import {
   Dialog,
@@ -163,6 +164,10 @@ export function RecipeCardDialog({
       baseServings: recipeCard.base_servings,
     };
     const htmlContent = generateRecipeCardHtml(recipeData);
+    if (isNativeApp()) {
+      void saveFile(new Blob([htmlContent], { type: 'text/html' }), 'recipe-card.html');
+      return;
+    }
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(htmlContent);

@@ -1,3 +1,4 @@
+import { saveFile } from '@/lib/native/platform';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PayPeriodSummary } from '@/types/bill';
@@ -26,14 +27,7 @@ const frequencyLabel = (frequency: string) => {
 };
 
 const downloadBlob = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  void saveFile(blob, filename);
 };
 
 const csvEscape = (value: string | number) => {
@@ -185,7 +179,7 @@ export const exportSummaryToPdf = (summary: PayPeriodSummary, displayDate: Date)
     });
   });
 
-  doc.save(`${getExportFileBase(displayDate)}.pdf`);
+  downloadBlob(doc.output('blob'), `${getExportFileBase(displayDate)}.pdf`);
 };
 
 export const exportAdviceToPdf = (markdown: string, periodLabel: string) => {
@@ -232,5 +226,5 @@ export const exportAdviceToPdf = (markdown: string, periodLabel: string) => {
     if (isHeading) y += 1;
   });
 
-  doc.save(`financial-advice-${periodLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`);
+  downloadBlob(doc.output('blob'), `financial-advice-${periodLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`);
 };

@@ -21,6 +21,7 @@ import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
 import JoinPage from "./pages/JoinPage";
 import FamilyGate from "./components/FamilyGate";
+import NativeAppBridge from "./components/NativeAppBridge";
 import { useEffect } from "react";
 import { refreshPushToken, retireOldServiceWorker, startPushSelfHealing } from "./lib/push/registerPush";
 
@@ -50,6 +51,7 @@ const App = () => {
         <BrowserRouter>
           <AuthProvider>
             <PushRefresher />
+            <NativeAppBridge />
             <div className="min-h-screen flex flex-col">
               <div className="flex-1">
                 <Routes>

@@ -9,9 +9,11 @@ import {
   enablePush, disablePush, isThisDeviceEnabled, sendTestPush,
   getPushPermission, isInIframe, isIOS, isStandalone,
 } from '@/lib/push/registerPush';
+import { isNativeApp } from '@/lib/native/platform';
+import AndroidHealthCard from '@/components/AndroidHealthCard';
 
 export const InstallAppCard: React.FC = () => {
-  if (isStandalone()) return null;
+  if (isStandalone() || isNativeApp()) return null;
   const ios = isIOS();
   return (
     <Card>
@@ -121,6 +123,7 @@ const NotificationSettings: React.FC<{ user?: unknown }> = () => {
           )}
         </CardContent>
       </Card>
+      <AndroidHealthCard />
     </div>
   );
 };

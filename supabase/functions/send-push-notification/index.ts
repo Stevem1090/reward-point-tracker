@@ -46,75 +46,150 @@ type Admin = ReturnType<typeof createClient>;
 
 type TaskAction = { taskId: string; token: string };
 
-async function sendToUsers(admin: Admin, userIds: string[], title: string, body: string, url = "/", taskAction?: TaskAction, kind: NotifKind = "test", itemId?: string) {
+const ANDROID_CHANNEL: Record<NotifKind, string> = {
+  taskReminder: "task_reminders",
+  assignment: "assigned_tasks",
+  freezer: "freezer_alerts",
+  test: "test",
+};
+
+type GatewayResult = { ok: boolean; status: number; text: string };
+async function fcmSend(message: Record<string, unknown>): Promise<GatewayResult> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   const FCM_KEY = Deno.env.get("FIREBASE_MESSAGING_API_KEY");
   if (!LOVABLE_API_KEY || !FCM_KEY) throw new Error("Push is not configured");
+  const res = await fetch(`${GATEWAY_URL}/v1/projects/_/messages:send`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "X-Connection-Api-Key": FCM_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ message }),
+  });
+  return { ok: res.ok, status: res.status, text: res.ok ? "" : await res.text() };
+}
 
-  const { data: tokens, error } = await admin.from("push_tokens").select("id, token").in("user_id", userIds);
+const isDead = (r: GatewayResult) => r.status === 404 || r.status === 410 || r.text.includes("UNREGISTERED");
+
+async function pruneDead(admin: Admin, stale: string[]) {
+  if (!stale.length) return;
+  await admin.from("push_tokens").delete().in("id", stale);
+  console.log(`Removed ${stale.length} dead push subscription(s): ${stale.join(", ")}`);
+}
+
+async function sendToUsers(admin: Admin, userIds: string[], title: string, body: string, url = "/", taskAction?: TaskAction, kind: NotifKind = "test", itemId?: string, dueAt?: string | null) {
+  const { data: tokens, error } = await admin.from("push_tokens").select("id, token, platform").in("user_id", userIds);
   if (error) throw error;
 
   const topic = topicFor(kind, itemId);
+  const actionData = taskAction ? {
+    taskId: taskAction.taskId,
+    actionToken: taskAction.token,
+    actionUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1/task-notification-action`,
+  } : {};
   let sent = 0;
   const stale: string[] = [];
   for (const t of tokens ?? []) {
-    const res = await fetch(`${GATEWAY_URL}/v1/projects/_/messages:send`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": FCM_KEY,
-        "Content-Type": "application/json",
+    // Android app: data-only, high priority, so the app's own service always builds the alert.
+    const message = t.platform === "android" ? {
+      token: t.token,
+      data: {
+        type: "notify",
+        kind,
+        channel: ANDROID_CHANNEL[kind],
+        title,
+        body: body ?? "",
+        url,
+        tag: topic ?? `test_${crypto.randomUUID().slice(0, 8)}`,
+        dueAt: dueAt ? String(new Date(dueAt).getTime()) : "",
+        ...actionData,
       },
-      body: JSON.stringify({
-        message: {
-          token: t.token,
-          notification: body ? { title, body } : { title },
-          data: {
-            url,
-            ...(taskAction ? {
-              taskId: taskAction.taskId,
-              actionToken: taskAction.token,
-              actionUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1/task-notification-action`,
-            } : {}),
-          },
-          webpush: {
-            headers: {
-              Urgency: "high",
-              TTL: String(TTL_SECONDS[kind]),
-              ...(topic ? { Topic: topic } : {}),
-            },
-            fcm_options: { link: absoluteUrl(url) },
-            notification: {
-              icon: `${APP_ORIGIN}/icons/icon-192.png`,
-              badge: `${APP_ORIGIN}/icons/notification-96.png`,
-              ...(topic ? { tag: topic, renotify: true } : {}),
-              ...(taskAction ? { actions: [
-                { action: "mark-done", title: "Mark done" },
-                { action: "view-task", title: "View task" },
-              ] } : {}),
-            },
-          },
+      android: {
+        priority: "HIGH",
+        ttl: `${TTL_SECONDS[kind]}s`,
+        ...(topic ? { collapse_key: topic } : {}),
+      },
+    } : {
+      token: t.token,
+      notification: body ? { title, body } : { title },
+      data: { url, ...actionData },
+      webpush: {
+        headers: {
+          Urgency: "high",
+          TTL: String(TTL_SECONDS[kind]),
+          ...(topic ? { Topic: topic } : {}),
         },
-      }),
-    });
-    if (res.ok) {
+        fcm_options: { link: absoluteUrl(url) },
+        notification: {
+          icon: `${APP_ORIGIN}/icons/icon-192.png`,
+          badge: `${APP_ORIGIN}/icons/notification-96.png`,
+          ...(topic ? { tag: topic, renotify: true } : {}),
+          ...(taskAction ? { actions: [
+            { action: "mark-done", title: "Mark done" },
+            { action: "view-task", title: "View task" },
+          ] } : {}),
+        },
+      },
+    };
+    const r = await fcmSend(message);
+    const ctx = `kind=${kind}${itemId ? ` item=${itemId}` : ""} platform=${t.platform} subscription=${t.id}`;
+    if (r.ok) {
       sent++;
-      console.log(`FCM send OK [kind=${kind}${itemId ? ` item=${itemId}` : ""} subscription=${t.id}]`);
+      console.log(`FCM send OK [${ctx}]`);
     } else {
-      const text = await res.text();
-      console.error(`FCM send failed [${res.status}] [kind=${kind}${itemId ? ` item=${itemId}` : ""} subscription=${t.id}]: ${text}`);
+      console.error(`FCM send failed [${r.status}] [${ctx}]: ${r.text}`);
       // Only delete subscriptions that are definitively dead. 400/INVALID_ARGUMENT can
       // mean a malformed payload, so log it in full but keep the subscription.
-      if (res.status === 404 || res.status === 410 || text.includes("UNREGISTERED")) {
-        stale.push(t.id);
-      }
+      if (isDead(r)) stale.push(t.id);
     }
   }
-  if (stale.length) {
-    await admin.from("push_tokens").delete().in("id", stale);
-    console.log(`Removed ${stale.length} dead push subscription(s): ${stale.join(", ")}`);
-  }
+  await pruneDead(admin, stale);
   return { sent, devices: tokens?.length ?? 0, removed: stale.length };
+}
+
+// Silent message to the family's Android phones so their backup copy of a reminder
+// is created, moved, or cancelled to match the task. Never shows anything by itself.
+async function sendTaskSync(admin: Admin, taskId: string, familyId: string) {
+  const { data: task } = await admin
+    .from("tasks")
+    .select("id, title, notes, done, due_at, notified_at, is_private, owner_id, assigned_to")
+    .eq("id", taskId)
+    .maybeSingle();
+  const { data: members } = await admin.from("family_members").select("user_id").eq("family_id", familyId);
+  const familyIds = (members ?? []).map((m: { user_id: string }) => m.user_id);
+  const recipients = new Set<string>(
+    !task ? [] : task.is_private ? [task.owner_id] : task.assigned_to ? [task.assigned_to] : familyIds,
+  );
+  const { data: tokens } = await admin.from("push_tokens").select("id, token, user_id")
+    .eq("platform", "android").in("user_id", familyIds);
+  const dueMs = task?.due_at ? new Date(task.due_at).getTime() : 0;
+  const stale: string[] = [];
+  let sent = 0;
+  for (const t of tokens ?? []) {
+    const active = !!task && !task.done && !task.notified_at && dueMs > Date.now() && recipients.has(t.user_id);
+    const r = await fcmSend({
+      token: t.token,
+      data: active
+        ? { type: "sync", taskId, title: task!.title, body: task!.notes ?? "", dueAt: String(dueMs), url: `/tasks?task=${taskId}` }
+        : { type: "cancel", taskId, tag: topicFor("taskReminder", taskId) ?? "" },
+      android: { priority: "HIGH", ttl: "86400s", collapse_key: `sync_${taskId.slice(0, 20)}` },
+    });
+    if (r.ok) sent++;
+    else {
+      console.error(`FCM sync failed [${r.status}] [item=${taskId} subscription=${t.id}]: ${r.text}`);
+      if (isDead(r)) stale.push(t.id);
+    }
+  }
+  await pruneDead(admin, stale);
+  return { sent };
+}
+
+async function isInternal(admin: Admin, req: Request) {
+  const suppliedKey = req.headers.get("X-Internal-Key") ?? "";
+  if (!suppliedKey) return false;
+  const { data: row } = await admin.from("internal_settings").select("value").eq("key", "push_internal_key").maybeSingle();
+  return Boolean(row?.value) && row!.value === suppliedKey;
 }
 
 async function sendTaskReminders(admin: Admin) {
@@ -124,7 +199,7 @@ async function sendTaskReminders(admin: Admin) {
   if (rollError) console.error("roll_recurring_tasks failed", rollError);
   const { data: tasks, error } = await admin
     .from("tasks")
-    .select("id, title, notes, is_private, owner_id, family_id, assigned_to")
+    .select("id, title, notes, is_private, owner_id, family_id, assigned_to, due_at")
     .eq("done", false)
     .is("notified_at", null)
     .not("due_at", "is", null)
@@ -160,6 +235,7 @@ async function sendTaskReminders(admin: Admin) {
         { taskId: task.id, token: actionToken },
         "taskReminder",
         task.id,
+        task.due_at as string,
       );
     }
   }
@@ -213,6 +289,23 @@ Deno.serve(async (req) => {
 
     if (payload?.kind === "tasks") return json(await sendTaskReminders(admin));
 
+    if (payload?.kind === "task-sync") {
+      const taskId = typeof payload.taskId === "string" ? payload.taskId : "";
+      if (!/^[0-9a-f-]{36}$/i.test(taskId)) return json({ error: "Provide taskId" }, 400);
+      let familyId = typeof payload.familyId === "string" ? payload.familyId : "";
+      if (!(await isInternal(admin, req))) {
+        const caller = await getCaller(req);
+        if (!caller) return json({ error: "Not signed in" }, 401);
+        const { data: me } = await admin.from("family_members").select("family_id").eq("user_id", caller.user.id).maybeSingle();
+        if (!me?.family_id) return json({ error: "Not allowed" }, 403);
+        familyId = me.family_id;
+        const { data: t } = await admin.from("tasks").select("family_id").eq("id", taskId).maybeSingle();
+        if (t && t.family_id !== familyId) return json({ error: "Not allowed" }, 403);
+      }
+      if (!familyId) return json({ error: "Provide familyId" }, 400);
+      return json(await sendTaskSync(admin, taskId, familyId));
+    }
+
     if (payload?.kind === "task-assigned") {
       const taskId = typeof payload.taskId === "string" ? payload.taskId : "";
       if (!/^[0-9a-f-]{36}$/i.test(taskId)) return json({ error: "Provide taskId" }, 400);
@@ -229,12 +322,7 @@ Deno.serve(async (req) => {
     let targets = userIds.filter((u: unknown): u is string => typeof u === "string" && /^[0-9a-f-]{36}$/i.test(u)).slice(0, 50);
 
     // Scheduled database jobs authenticate with the private internal key.
-    const suppliedKey = req.headers.get("X-Internal-Key") ?? "";
-    let internal = false;
-    if (suppliedKey) {
-      const { data: row } = await admin.from("internal_settings").select("value").eq("key", "push_internal_key").maybeSingle();
-      internal = Boolean(row?.value) && row!.value === suppliedKey;
-    }
+    const internal = await isInternal(admin, req);
     if (!internal) {
       // Signed-in users can only notify people in their own family.
       const caller = await getCaller(req);
