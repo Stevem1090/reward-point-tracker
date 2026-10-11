@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { broadcastTaskChange } from '@/lib/native/backupReminders';
 
 export type TaskSection = { id: string; name: string; sort_order: number };
 export type Task = {
@@ -69,6 +70,7 @@ export function useTasks() {
       .single();
     if (error) return fail(error);
     setTasks((t) => [data as Task, ...t]);
+    if (input.due_at) broadcastTaskChange((data as Task).id);
   };
 
   const updateTask = async (id: string, patch: Partial<Task>) => {
@@ -78,6 +80,9 @@ export function useTasks() {
     if (error) return fail(error);
     // Server may move the reminder date (recurring tasks)
     if (data) setTasks((t) => t.map((x) => (x.id === id ? (data as Task) : x)));
+    // Keep the family's Android backup reminders in step with this change
+    const syncKeys = ['done', 'due_at', 'title', 'notes', 'assigned_to', 'is_private'];
+    if ((before?.due_at || patch.due_at) && syncKeys.some((k) => k in patch)) broadcastTaskChange(id);
 
     // Let someone know when a task has just been handed to them
     if ('assigned_to' in patch && patch.assigned_to && patch.assigned_to !== before?.assigned_to) {
@@ -92,8 +97,10 @@ export function useTasks() {
 
   const deleteTask = async (id: string) => {
     setTasks((t) => t.filter((x) => x.id !== id));
+    const hadDue = !!(tasksQ.data ?? []).find((x) => x.id === id)?.due_at;
     const { error } = await supabase.from('tasks').delete().eq('id', id);
-    if (error) fail(error);
+    if (error) return fail(error);
+    if (hadDue) broadcastTaskChange(id);
   };
 
   /** Save a new order for tasks (after drag and drop). */
