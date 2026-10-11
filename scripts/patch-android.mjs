@@ -62,8 +62,9 @@ const gradlePath = `${app}/build.gradle`;
 let g = fs.readFileSync(gradlePath, 'utf8');
 if (!g.includes('firebase-messaging')) {
   g = g.replace(/dependencies \{/, `dependencies {\n    implementation platform('com.google.firebase:firebase-bom:33.7.0')\n    implementation 'com.google.firebase:firebase-messaging'`);
-  g = g.replace(/versionCode \d+/, `versionCode (System.getenv("VERSION_CODE") ?: "1").toInteger()`);
-  g = g.replace(/versionName "[^"]*"/, `versionName (System.getenv("VERSION_NAME") ?: "1.0")`);
+  g = g.replace(/defaultConfig \{/, `defaultConfig {\n        def appVersionCode = (System.getenv("VERSION_CODE") ?: "1").toInteger()\n        def appVersionName = System.getenv("VERSION_NAME") ?: "1.0"`);
+  g = g.replace(/versionCode \d+/, `versionCode appVersionCode`);
+  g = g.replace(/versionName "[^"]*"/, `versionName appVersionName`);
   g = g.replace(/buildTypes \{/, `signingConfigs {
         release {
             if (System.getenv("KEYSTORE_PATH")) {
