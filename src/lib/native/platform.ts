@@ -10,7 +10,8 @@ export type NativeStatus = {
   manufacturer: string;
 };
 
-export type BackupReminder = { taskId: string; title: string; body: string; dueAt: number; url: string };
+import type { BackupReminder } from './backupRules';
+export type { BackupReminder };
 
 /** Custom native module shipped inside the APK (native/android/...). */
 export interface FamilyHubPlugin {
