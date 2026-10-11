@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Trash2 } from 'lucide-react';
 import { SHOPPING_CATEGORIES, ShoppingListItem } from '@/types/meal';
+import { stripTrailingUnit } from '@/utils/shoppingItemFormat';
 
 export interface ShoppingItemDraft {
   name: string;
@@ -53,7 +54,7 @@ export function ShoppingItemDialog({
       item
         ? {
             name: item.name,
-            quantity: item.quantity ?? '',
+            quantity: stripTrailingUnit(item.quantity, item.unit),
             unit: item.unit ?? '',
             category: item.category || 'Other',
           }

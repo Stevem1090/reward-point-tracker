@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, ShoppingCart, Plus, Trash2 } from 'lucide-react';
 import { SHOPPING_CATEGORIES, ShoppingListItem } from '@/types/meal';
 import { ShoppingItemDialog, ShoppingItemDraft } from './ShoppingItemDialog';
+import { formatItemQuantity } from '@/utils/shoppingItemFormat';
 
 import { cn } from '@/lib/utils';
 import {
@@ -261,7 +262,7 @@ function ShoppingItemRow({ item, onToggle, onEdit }: ShoppingItemRowProps) {
       >
         <span className="font-medium">{item.name}</span>
         <span className="text-sm text-muted-foreground">
-          {item.quantity} {item.unit}
+          {formatItemQuantity(item.quantity, item.unit)}
         </span>
       </button>
     </div>
