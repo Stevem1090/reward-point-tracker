@@ -44,7 +44,7 @@ Displaying (native code in the APK)
 
 Reliability extras
 - First-run setup screen in the app checks and guides through: notification permission, "Unrestricted" battery usage (opens the exact settings page), and on Samsung-type phones the "never sleeping apps" list. A health card in Profile shows green/red for each, plus "Send test".
-- Local backup alarms: when the app syncs, it schedules exact Android alarms for the person's upcoming due reminders (next 7 days). If the server push already arrived, the alarm is silently skipped (shared tag/ID); if the push was lost, the alarm fires on time anyway. Alarms are rescheduled after phone restart and whenever tasks change, and cancelled when a task is ticked or deleted.
+- Backup reminders stored on the phone: every time the app opens or a task changes, it gives the phone itself a copy of your upcoming reminders (next 7 days), like setting an alarm in the Clock app. At the due time the phone shows the reminder on its own, even with no internet. If the normal notification already arrived, the phone copy is skipped so you never get two. Ticking or deleting a task removes its copy, and copies are restored after the phone restarts. Limitation: a task added by someone else only gets its phone copy once your app has been opened since; until then the normal notification still covers it.
 - Delivery logging continues server-side so we can check any missed notification as before.
 
 ## Phase 3 – Building and installing
