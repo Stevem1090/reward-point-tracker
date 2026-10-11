@@ -36,9 +36,20 @@ Deno.serve(async (req) => {
       .update({ done: true, done_at: completedAt })
       .eq('id', taskId)
       .eq('done', false)
-      .select('id')
+      .select('id, family_id')
       .maybeSingle();
     if (error) throw error;
+    if (data) {
+      // Clear this reminder (and its backup copy) from the family's other Android phones.
+      const { data: key } = await admin.from('internal_settings').select('value').eq('key', 'push_internal_key').maybeSingle();
+      if (key?.value) {
+        await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Internal-Key': key.value as string, Authorization: `Bearer ${serviceRoleKey}` },
+          body: JSON.stringify({ kind: 'task-sync', taskId, familyId: data.family_id }),
+        }).catch((e) => console.error('task sync after mark done failed', e));
+      }
+    }
     return json({ completed: Boolean(data) });
   } catch (error) {
     console.error(error);
