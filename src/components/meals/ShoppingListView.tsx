@@ -261,7 +261,7 @@ function ShoppingItemRow({ item, onToggle, onEdit }: ShoppingItemRowProps) {
       >
         <span className="font-medium">{item.name}</span>
         <span className="text-sm text-muted-foreground">
-          {item.quantity} {item.unit}
+          {formatItemQuantity(item.quantity, item.unit)}
         </span>
       </button>
     </div>

@@ -53,7 +53,7 @@ export function ShoppingItemDialog({
       item
         ? {
             name: item.name,
-            quantity: item.quantity ?? '',
+            quantity: stripTrailingUnit(item.quantity, item.unit),
             unit: item.unit ?? '',
             category: item.category || 'Other',
           }
