@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, ShoppingCart, Plus, Trash2 } from 'lucide-react';
 import { SHOPPING_CATEGORIES, ShoppingListItem } from '@/types/meal';
 import { ShoppingItemDialog, ShoppingItemDraft } from './ShoppingItemDialog';
+import { formatItemQuantity } from '@/utils/shoppingItemFormat';
 
 import { cn } from '@/lib/utils';
 import {

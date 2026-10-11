@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Trash2 } from 'lucide-react';
 import { SHOPPING_CATEGORIES, ShoppingListItem } from '@/types/meal';
+import { stripTrailingUnit } from '@/utils/shoppingItemFormat';
 
 export interface ShoppingItemDraft {
   name: string;
