@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useAuth } from '@/contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -31,7 +31,11 @@ const formSchema = z.object({
 });
 
 const Login = () => {
-  const { signIn, loading } = useAuth();
+  const { signIn, loading, user } = useAuth();
+
+  // Already signed in (e.g. Android back gesture landing here) — go straight to the dashboard.
+  if (user) return <Navigate to="/" replace />;
+
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

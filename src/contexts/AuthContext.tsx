@@ -182,7 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
 
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (error: any) {
       toast({
         title: "Error signing in",

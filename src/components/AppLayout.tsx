@@ -35,7 +35,7 @@ const AppLayout = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="container mx-auto px-4 py-3 flex justify-between items-center border-b">
+      <div className="container mx-auto px-4 pb-3 flex justify-between items-center border-b" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 0.75rem)' }}>
         <div className="flex items-center gap-3">
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
@@ -44,7 +44,7 @@ const AppLayout = () => {
                 <span className="sr-only">Toggle menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[80%] sm:w-[300px] bg-soft-purple">
+            <SheetContent side="left" className="w-[80%] sm:w-[300px] bg-soft-purple" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 1.5rem)' }}>
               <SheetHeader className="mb-6">
                 <SheetTitle className="text-2xl font-bold text-kid-purple">
                   Family Hub
