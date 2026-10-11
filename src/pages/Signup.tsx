@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useAuth } from '@/contexts/AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -39,7 +39,7 @@ const formSchema = z.object({
 });
 
 const Signup = () => {
-  const { signUp, loading: authLoading } = useAuth();
+  const { signUp, loading: authLoading, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -101,6 +101,9 @@ const Signup = () => {
       setLoading(false);
     }
   };
+
+  // Already signed in — go straight to the dashboard.
+  if (user) return <Navigate to="/" replace />;
 
   return (
     <div className="container mx-auto flex items-center justify-center min-h-screen">
