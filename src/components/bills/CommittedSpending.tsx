@@ -7,7 +7,7 @@ import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Plus, Trash2, ArrowLeftRight, CheckCircle2, Circle } from 'lucide-react';
 import {
-  CommittedItem, currentPayPeriodKey, formatGBP, formatRange, groupTotals, lineEstimate,
+  CommittedItem, currentPayPeriodKey, formatGBP, formatRange, groupTotals,
   periodLabel, periodTotals, shiftPeriod,
 } from '@/utils/committedSpending';
 
@@ -155,7 +155,7 @@ export function CommittedSpending() {
                 <>
                   <div className="pl-3 border-l mt-2 space-y-0.5">
                     {kids.map((k) => (
-                      <LineRow key={k.id} item={k} update={(p) => update(k.id, p)} remove={() => remove(k.id)} showEstimate={!!(k.estimate_min ?? k.estimate_max) || lineEstimate(k).min > 0 || true} />
+                      <LineRow key={k.id} item={k} update={(p) => update(k.id, p)} remove={() => remove(k.id)} />
                     ))}
                   </div>
                   <div className="flex justify-end">
