@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "12.2.3"
   }
   public: {
     Tables: {
@@ -323,6 +323,79 @@ export type Database = {
             columns: ["family_id"]
             isOneToOne: false
             referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      committed_spending_items: {
+        Row: {
+          account_id: string | null
+          actual_amount: number | null
+          created_at: string
+          estimate_max: number | null
+          estimate_min: number | null
+          family_id: string
+          id: string
+          is_complete: boolean
+          is_range: boolean
+          name: string
+          parent_id: string | null
+          pay_period: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          actual_amount?: number | null
+          created_at?: string
+          estimate_max?: number | null
+          estimate_min?: number | null
+          family_id?: string
+          id?: string
+          is_complete?: boolean
+          is_range?: boolean
+          name: string
+          parent_id?: string | null
+          pay_period: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          actual_amount?: number | null
+          created_at?: string
+          estimate_max?: number | null
+          estimate_min?: number | null
+          family_id?: string
+          id?: string
+          is_complete?: boolean
+          is_range?: boolean
+          name?: string
+          parent_id?: string | null
+          pay_period?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "committed_spending_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "bill_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "committed_spending_items_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "committed_spending_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "committed_spending_items"
             referencedColumns: ["id"]
           },
         ]

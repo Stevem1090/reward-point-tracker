@@ -122,3 +122,8 @@
     background: linear-gradient(90deg, #FEC6A1 0%, #FFDEE2 50%, #E5DEFF 100%);
   }
 }
+
+@layer utilities {
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+}
