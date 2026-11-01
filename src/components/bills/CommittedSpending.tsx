@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Plus, Trash2, ArrowLeftRight, CheckCircle2, Circle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Check } from 'lucide-react';
 import {
   CommittedItem, currentPayPeriodKey, formatGBP, formatRange, groupTotals,
   periodLabel, periodTotals, shiftPeriod,
@@ -33,15 +33,15 @@ function InlineAdd({ label, onAdd, small }: { label: string; onAdd: (name: strin
   );
 }
 
-function MoneyInput({ value, onSave, placeholder, disabled }: { value: number | null; onSave: (v: number | null) => void; placeholder: string; disabled?: boolean }) {
+function MoneyInput({ value, onSave, placeholder, disabled, label }: { value: number | null; onSave: (v: number | null) => void; placeholder: string; disabled?: boolean; label?: string }) {
   const [v, setV] = useState(value?.toString() ?? '');
   useEffect(() => setV(value?.toString() ?? ''), [value]);
   return (
-    <div className="relative w-20 shrink-0">
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">£</span>
+    <div className="relative min-w-0 flex-1">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">£</span>
       <Input
-        inputMode="decimal" value={v} placeholder={placeholder} disabled={disabled}
-        className="h-10 pl-5 pr-1 text-sm"
+        inputMode="decimal" value={v} placeholder={placeholder} disabled={disabled} aria-label={label ?? placeholder}
+        className="h-11 pl-7 pr-2 text-base"
         onChange={(e) => setV(e.target.value)}
         onBlur={() => { const n = num(v); if (n !== value) onSave(n); }}
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
@@ -50,30 +50,46 @@ function MoneyInput({ value, onSave, placeholder, disabled }: { value: number | 
   );
 }
 
-function LineRow({ item, update, remove, showEstimate = true, locked }: {
-  item: CommittedItem; update: (p: Partial<CommittedItem>) => void; remove: () => void; showEstimate?: boolean; locked?: boolean;
+function LineRow({ item, update, remove, locked, sub }: {
+  item: CommittedItem; update: (p: Partial<CommittedItem>) => void; remove: () => void; locked?: boolean; sub?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 py-1">
-      <span className="flex-1 min-w-[6rem] truncate text-sm">{item.name}</span>
-      {showEstimate && (
-        <div className="flex items-center gap-1">
-          <MoneyInput value={item.estimate_min} placeholder={item.is_range ? 'Low' : 'Est.'} onSave={(v) => update({ estimate_min: v })} disabled={locked} />
-          {item.is_range && (<><span className="text-muted-foreground text-xs">–</span>
-            <MoneyInput value={item.estimate_max} placeholder="High" onSave={(v) => update({ estimate_max: v })} disabled={locked} /></>)}
-          <Button
-            variant={item.is_range ? 'secondary' : 'ghost'} size="icon" className="h-10 w-10" disabled={locked}
-            aria-label={item.is_range ? 'Use single amount' : 'Use a range'} title={item.is_range ? 'Single amount' : 'Range'}
-            onClick={() => update({ is_range: !item.is_range, estimate_max: item.is_range ? null : item.estimate_max ?? item.estimate_min })}
-          >
-            <ArrowLeftRight className="h-4 w-4" />
+    <div className={cn('py-2', sub && 'border-t first:border-t-0')}>
+      {sub && (
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="text-sm font-medium truncate min-w-0">{item.name}</span>
+          <Button variant="ghost" size="icon" className="h-11 w-11 -mr-2 shrink-0 text-muted-foreground" aria-label={`Remove ${item.name}`} onClick={remove}>
+            <X className="h-4 w-4" />
           </Button>
         </div>
       )}
-      <MoneyInput value={item.actual_amount} placeholder="Spent" onSave={(v) => update({ actual_amount: v })} />
-      <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" aria-label="Delete" onClick={remove}>
-        <Trash2 className="h-4 w-4" />
-      </Button>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center justify-between h-6 mb-1">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Estimate</span>
+            <button
+              type="button" disabled={locked}
+              className="text-[11px] font-medium text-primary px-1 min-h-[24px] disabled:opacity-50"
+              onClick={() => update({ is_range: !item.is_range, estimate_max: item.is_range ? null : item.estimate_max ?? item.estimate_min })}
+            >
+              {item.is_range ? 'Single' : 'Range'}
+            </button>
+          </div>
+          {item.is_range ? (
+            <div className="flex items-center gap-1">
+              <MoneyInput value={item.estimate_min} placeholder="Low" onSave={(v) => update({ estimate_min: v })} disabled={locked} />
+              <span className="text-muted-foreground text-xs">–</span>
+              <MoneyInput value={item.estimate_max} placeholder="High" onSave={(v) => update({ estimate_max: v })} disabled={locked} />
+            </div>
+          ) : (
+            <MoneyInput value={item.estimate_min} placeholder="0" label="Estimate" onSave={(v) => update({ estimate_min: v })} disabled={locked} />
+          )}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center h-6 mb-1"><span className="text-[11px] uppercase tracking-wide text-muted-foreground">Spent</span></div>
+          <MoneyInput value={item.actual_amount} placeholder="0" label="Spent" onSave={(v) => update({ actual_amount: v })} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -137,38 +153,39 @@ export function CommittedSpending() {
           const kids = items.filter((c) => c.parent_id === top.id);
           const g = groupTotals(top, items);
           return (
-            <div key={top.id} className={cn('rounded-lg border bg-card p-3', top.is_complete && 'opacity-70')}>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold flex-1 truncate">{top.name}</span>
-                <Button
-                  variant={top.is_complete ? 'secondary' : 'outline'} size="sm" className="min-h-[40px] shrink-0"
+            <div key={top.id} className={cn('rounded-xl border bg-card px-3 pt-2 pb-1', top.is_complete && 'bg-muted/40')}>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold flex-1 min-w-0 truncate">{top.name}</span>
+                <button
+                  type="button"
+                  className={cn('shrink-0 rounded-full border px-3 min-h-[32px] text-xs font-medium inline-flex items-center gap-1',
+                    top.is_complete ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground')}
                   onClick={() => update(top.id, { is_complete: !top.is_complete })}
+                  aria-pressed={top.is_complete}
                 >
-                  {top.is_complete ? <CheckCircle2 className="h-4 w-4 mr-1 text-primary" /> : <Circle className="h-4 w-4 mr-1" />}
-                  {top.is_complete ? 'Spending complete' : 'No more spend'}
+                  {top.is_complete ? <><Check className="h-3.5 w-3.5" /> Done</> : 'Open'}
+                </button>
+                <Button variant="ghost" size="icon" className="h-11 w-11 -mr-2 shrink-0 text-muted-foreground" aria-label={`Remove ${top.name}`} onClick={() => remove(top.id)}>
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
-
               {kids.length === 0 ? (
                 <LineRow item={top} update={(p) => update(top.id, p)} remove={() => remove(top.id)} />
               ) : (
-                <>
-                  <div className="pl-3 border-l mt-2 space-y-0.5">
-                    {kids.map((k) => (
-                      <LineRow key={k.id} item={k} update={(p) => update(k.id, p)} remove={() => remove(k.id)} />
-                    ))}
-                  </div>
-                  <div className="flex justify-end">
-                    <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => remove(top.id)}>
-                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove group
-                    </Button>
-                  </div>
-                </>
+                <div className="mt-1 rounded-lg bg-muted/40 px-3">
+                  {kids.map((k) => (
+                    <LineRow sub key={k.id} item={k} update={(p) => update(k.id, p)} remove={() => remove(k.id)} />
+                  ))}
+                </div>
               )}
-              <div className="flex flex-wrap items-center justify-between gap-2 mt-1 text-xs text-muted-foreground">
-                <span>Est. {formatRange(g.estimate)} · Spent {formatGBP(g.actual)} · Left {formatRange(g.left)}</span>
-                <InlineAdd small label="Add sub-line" onAdd={(n) => add(n, top.id)} />
-              </div>
+              {(kids.length > 0 || g.actual > 0 || top.estimate_min != null) && (
+                <div className="grid grid-cols-3 gap-1 text-center text-[11px] text-muted-foreground mt-2 pt-2 border-t">
+                  <div><div>Est.</div><div className="text-sm font-medium text-foreground">{formatRange(g.estimate)}</div></div>
+                  <div><div>Spent</div><div className="text-sm font-medium text-foreground">{formatGBP(g.actual)}</div></div>
+                  <div><div>Left</div><div className="text-sm font-medium text-primary">{formatRange(g.left)}</div></div>
+                </div>
+              )}
+              <InlineAdd small label="Add sub-line" onAdd={(n) => add(n, top.id)} />
             </div>
           );
         })}
