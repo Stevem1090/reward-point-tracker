@@ -16,9 +16,9 @@ export default function BillsPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-4xl min-w-0">
-      <div className="mb-5 flex items-start justify-between gap-3">
+      <div className="mb-2 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold mb-1">Bill Tracker</h1>
+          <h1 className="text-2xl font-bold mb-0.5">Bill Tracker</h1>
           <p className="text-muted-foreground">Manage your bills, income and monthly spending</p>
         </div>
         <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" aria-label="Accounts and types" onClick={() => setSettingsOpen(true)}>
@@ -35,10 +35,10 @@ export default function BillsPage() {
           </TabsList>
         </div>
 
-        <TabsContent value="bills" className="mt-6"><BillList /></TabsContent>
-        <TabsContent value="committed" className="mt-6"><CommittedSpending /></TabsContent>
-        <TabsContent value="income" className="mt-6"><IncomeManager /></TabsContent>
-        <TabsContent value="summary" className="mt-6"><MonthlySummary /></TabsContent>
+        <TabsContent value="bills" className="mt-2"><BillList /></TabsContent>
+        <TabsContent value="committed" className="mt-2"><CommittedSpending /></TabsContent>
+        <TabsContent value="income" className="mt-2"><IncomeManager /></TabsContent>
+        <TabsContent value="summary" className="mt-2"><MonthlySummary /></TabsContent>
       </Tabs>
 
       <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
