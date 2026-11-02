@@ -34,6 +34,15 @@ describe('committed spending left to spend', () => {
     expect(g.left.min).toBe(20);
     expect(periodTotals([top, a, b]).left.min).toBe(20);
   });
+  it('topline estimate with sub-line actuals only', () => {
+    const top = item({ id: 'max', estimate_min: 100 });
+    const a = item({ parent_id: 'max', actual_amount: 25 });
+    const b = item({ parent_id: 'max', actual_amount: 35 });
+    const g = groupTotals(top, [top, a, b]);
+    expect(g.estimate.min).toBe(100);
+    expect(g.actual).toBe(60);
+    expect(g.left).toEqual({ min: 40, max: 40 });
+  });
   it('pay period rolls on the 27th', () => {
     expect(currentPayPeriodKey(new Date(2026, 10, 26))).toBe('2026-11');
     expect(currentPayPeriodKey(new Date(2026, 10, 27))).toBe('2026-12');

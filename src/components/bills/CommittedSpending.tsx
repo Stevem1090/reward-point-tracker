@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBillAccounts } from '@/hooks/useBillAccounts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Plus, X, Check } from 'lucide-react';
@@ -52,8 +53,8 @@ function MoneyInput({ value, onSave, placeholder, disabled, label }: { value: nu
 
 const COLS = 'grid grid-cols-[minmax(0,1fr)_5.5rem_4.5rem_2rem] items-center gap-1.5';
 
-function LineRow({ item, update, remove, locked, name }: {
-  item: CommittedItem; update: (p: Partial<CommittedItem>) => void; remove?: () => void; locked?: boolean; name?: string;
+function LineRow({ item, update, remove, locked, name, spentTotal }: {
+  item: CommittedItem; update: (p: Partial<CommittedItem>) => void; remove?: () => void; locked?: boolean; name?: string; spentTotal?: number;
 }) {
   const toggle = () => update({ is_range: !item.is_range, estimate_max: item.is_range ? null : item.estimate_max ?? item.estimate_min });
   return (
@@ -71,9 +72,13 @@ function LineRow({ item, update, remove, locked, name }: {
           <MoneyInput value={item.estimate_max} placeholder="High" onSave={(v) => update({ estimate_max: v })} disabled={locked} />
         </div>
       ) : (
-        <MoneyInput value={item.estimate_min} placeholder="0" label="Estimate" onSave={(v) => update({ estimate_min: v })} disabled={locked} />
+        <MoneyInput value={item.estimate_min} placeholder="–" label="Estimate" onSave={(v) => update({ estimate_min: v })} disabled={locked} />
       )}
-      <MoneyInput value={item.actual_amount} placeholder="0" label="Spent" onSave={(v) => update({ actual_amount: v })} />
+      {spentTotal !== undefined ? (
+        <span className="text-sm text-right pr-1 text-muted-foreground">{formatGBP(spentTotal)}</span>
+      ) : (
+        <MoneyInput value={item.actual_amount} placeholder="0" label="Spent" onSave={(v) => update({ actual_amount: v })} />
+      )}
       {remove ? (
         <button type="button" className="h-9 w-8 flex items-center justify-center text-muted-foreground" aria-label={`Remove ${name ?? item.name}`} onClick={remove}>
           <X className="h-4 w-4" />
@@ -83,39 +88,65 @@ function LineRow({ item, update, remove, locked, name }: {
   );
 }
 
+function AccountPicker({ label, options, onPick }: { label: string; options: { id: string; name: string }[]; onPick: (id: string) => void }) {
+  return (
+    <Select value="" onValueChange={onPick}>
+      <SelectTrigger className="rounded-full shrink-0 h-9 w-auto gap-1 border-dashed text-sm" aria-label={label}>
+        <Plus className="h-4 w-4" /><span>{label}</span>
+      </SelectTrigger>
+      <SelectContent>
+        {options.length === 0 ? (
+          <div className="px-3 py-2 text-sm text-muted-foreground">All accounts already in use</div>
+        ) : options.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function CommittedSpending() {
   const { accounts } = useBillAccounts();
   const [period, setPeriod] = useState(currentPayPeriodKey());
   const [accountId, setAccountId] = useState<string | null>(null);
-  const [items, setItems] = useState<CommittedItem[]>([]);
-
-  useEffect(() => { if (!accountId && accounts.length) setAccountId(accounts[0].id); }, [accounts, accountId]);
+  const [allItems, setAllItems] = useState<CommittedItem[]>([]);
 
   const load = useCallback(async () => {
-    if (!accountId) return;
-    const { data, error } = await table().select('*').eq('pay_period', period).eq('account_id', accountId).order('sort_order').order('created_at');
+    const { data, error } = await table().select('*').eq('pay_period', period).order('sort_order').order('created_at');
     if (error) toast.error('Failed to load committed spending');
-    setItems((data as CommittedItem[]) || []);
-  }, [period, accountId]);
+    setAllItems((data as CommittedItem[]) || []);
+  }, [period]);
   useEffect(() => { load(); }, [load]);
+
+  const usedIds = useMemo(() => new Set(allItems.map((i) => i.account_id)), [allItems]);
+  const activeAccounts = accounts.filter((a) => usedIds.has(a.id) || a.id === accountId);
+  const unusedAccounts = accounts.filter((a) => !usedIds.has(a.id) && a.id !== accountId);
+
+  // Keep a valid selection: prefer an account that has items this month.
+  useEffect(() => {
+    if (accountId && accounts.some((a) => a.id === accountId)) return;
+    const first = accounts.find((a) => usedIds.has(a.id));
+    setAccountId(first ? first.id : null);
+  }, [accounts, usedIds, accountId]);
+  useEffect(() => { setAccountId(null); }, [period]);
+
+  const items = allItems.filter((i) => i.account_id === accountId);
 
   const add = async (name: string, parent_id: string | null = null) => {
     const { data, error } = await table().insert({ name, parent_id, pay_period: period, account_id: accountId, sort_order: items.length }).select().single();
     if (error) return toast.error('Could not add item');
-    setItems((p) => [...p, data as CommittedItem]);
+    setAllItems((p) => [...p, data as CommittedItem]);
   };
   const update = async (id: string, patch: Partial<CommittedItem>) => {
-    setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    setAllItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
     const { error } = await table().update(patch).eq('id', id);
     if (error) { toast.error('Could not save'); load(); }
   };
   const remove = async (id: string) => {
-    setItems((p) => p.filter((i) => i.id !== id && i.parent_id !== id));
+    setAllItems((p) => p.filter((i) => i.id !== id && i.parent_id !== id));
     const { error } = await table().delete().eq('id', id);
     if (error) { toast.error('Could not delete'); load(); }
   };
 
-  const tops = items.filter((i) => !i.parent_id);
+  const tops = items.filter((i) => !i.parent_id).sort((a, b) => Number(a.is_complete) - Number(b.is_complete));
   const totals = useMemo(() => periodTotals(items), [items]);
 
   if (!accounts.length)
@@ -130,16 +161,17 @@ export function CommittedSpending() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 mb-2 no-scrollbar">
-        {accounts.map((a) => (
+        {activeAccounts.map((a) => (
           <Button key={a.id} size="sm" variant={a.id === accountId ? 'default' : 'outline'} className="rounded-full shrink-0 min-h-[36px] h-9" onClick={() => setAccountId(a.id)}>
             {a.name}
           </Button>
         ))}
+        <AccountPicker label={activeAccounts.length ? 'Account' : 'Select account'} options={unusedAccounts} onPick={setAccountId} />
       </div>
 
-      <div className={cn(COLS, 'px-2.5 text-[10px] uppercase tracking-wide text-muted-foreground')}>
-        <span>Item</span><span className="text-right">Estimate</span><span className="text-right">Spent</span><span />
-      </div>
+      {!accountId ? (
+        <p className="text-sm text-muted-foreground px-1 py-6 text-center">Pick an account to start adding commitments for this month.</p>
+      ) : (
       <div className="space-y-2">
         {tops.map((top) => {
           const kids = items.filter((c) => c.parent_id === top.id);
@@ -164,14 +196,20 @@ export function CommittedSpending() {
               </div>
               {!top.is_complete && (
                 <>
+                  <div className={cn(COLS, 'border-b pb-0.5 mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground')}>
+                    <span>Item</span><span className="text-right">Estimate</span><span className="text-right">Spent</span><span />
+                  </div>
                   {kids.length === 0 ? (
                     <LineRow item={top} update={(p) => update(top.id, p)} />
                   ) : (
-                    <div className="divide-y">
-                      {kids.map((k) => (
-                        <LineRow key={k.id} name={k.name} item={k} update={(p) => update(k.id, p)} remove={() => remove(k.id)} />
-                      ))}
-                    </div>
+                    <>
+                      <LineRow name="Overall budget" item={top} update={(p) => update(top.id, p)} spentTotal={g.actual} />
+                      <div className="divide-y border-t">
+                        {kids.map((k) => (
+                          <LineRow key={k.id} name={k.name} item={k} update={(p) => update(k.id, p)} remove={() => remove(k.id)} />
+                        ))}
+                      </div>
+                    </>
                   )}
                   <div className="flex items-center justify-between gap-2">
                     <InlineAdd small label="Sub-line" onAdd={(n) => add(n, top.id)} />
@@ -188,6 +226,7 @@ export function CommittedSpending() {
         })}
         <InlineAdd label="Add commitment" onAdd={(n) => add(n)} />
       </div>
+      )}
 
       <div className="fixed bottom-0 inset-x-0 z-30 border-t bg-background/95 backdrop-blur px-4 py-1.5 pb-[max(env(safe-area-inset-bottom),0.375rem)]">
         <div className="max-w-4xl mx-auto grid grid-cols-3 gap-2 text-center">

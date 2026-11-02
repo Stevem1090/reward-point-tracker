@@ -13,3 +13,6 @@
 - [x] Setup/health card (permission, battery unrestricted, test)
 - [ ] GitHub build workflow producing signed APK (setup-android step removed after it failed; needs a clean run)
 - [ ] User: Firebase Android app + google-services.json, GitHub secrets, install APK
+## Committed Spending
+- [x] Column labels in every card, Done cards at bottom, topline budget with sub-line actuals
+- [x] Account pills only for accounts used this month + "Select account" dropdown

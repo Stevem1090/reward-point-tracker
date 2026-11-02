@@ -30,9 +30,21 @@ const leaves = (top: CommittedItem, all: CommittedItem[]) => {
 
 export interface GroupTotals { estimate: Range; actual: number; left: Range }
 
+/** True when the top line carries its own budget and sub-lines just record spend. */
+export const usesToplineBudget = (top: CommittedItem, all: CommittedItem[]) =>
+  top.estimate_min != null && all.some((c) => c.parent_id === top.id);
+
 /** Totals for a top-level commitment. Completed = nothing left; overspent lines leave 0. */
 export const groupTotals = (top: CommittedItem, all: CommittedItem[]): GroupTotals => {
   const ls = leaves(top, all);
+  if (usesToplineBudget(top, all)) {
+    const estimate = lineEstimate(top);
+    const actual = ls.reduce((s, l) => s + n(l.actual_amount), 0);
+    const left = top.is_complete
+      ? { min: 0, max: 0 }
+      : { min: Math.max(0, estimate.min - actual), max: Math.max(0, estimate.max - actual) };
+    return { estimate, actual, left };
+  }
   const estimate = { min: 0, max: 0 };
   const left = { min: 0, max: 0 };
   let actual = 0;
