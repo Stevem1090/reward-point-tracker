@@ -19,7 +19,7 @@ function InlineAdd({ label, onAdd, small }: { label: string; onAdd: (name: strin
   const [v, setV] = useState('');
   if (!open)
     return (
-      <Button variant="ghost" size={small ? 'sm' : 'default'} className="text-muted-foreground min-h-[44px]" onClick={() => setOpen(true)}>
+      <Button variant="ghost" size={small ? 'sm' : 'default'} className={cn('text-muted-foreground', small ? 'h-8 px-1 text-xs' : 'min-h-[44px]')} onClick={() => setOpen(true)}>
         <Plus className="h-4 w-4 mr-1" /> {label}
       </Button>
     );
@@ -38,10 +38,10 @@ function MoneyInput({ value, onSave, placeholder, disabled, label }: { value: nu
   useEffect(() => setV(value?.toString() ?? ''), [value]);
   return (
     <div className="relative min-w-0 flex-1">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">£</span>
+      <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">£</span>
       <Input
         inputMode="decimal" value={v} placeholder={placeholder} disabled={disabled} aria-label={label ?? placeholder}
-        className="h-11 pl-7 pr-2 text-base"
+        className="h-9 pl-4 pr-1 text-sm text-right"
         onChange={(e) => setV(e.target.value)}
         onBlur={() => { const n = num(v); if (n !== value) onSave(n); }}
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
@@ -50,46 +50,35 @@ function MoneyInput({ value, onSave, placeholder, disabled, label }: { value: nu
   );
 }
 
-function LineRow({ item, update, remove, locked, sub }: {
-  item: CommittedItem; update: (p: Partial<CommittedItem>) => void; remove: () => void; locked?: boolean; sub?: boolean;
+const COLS = 'grid grid-cols-[minmax(0,1fr)_5.5rem_4.5rem_2rem] items-center gap-1.5';
+
+function LineRow({ item, update, remove, locked, name }: {
+  item: CommittedItem; update: (p: Partial<CommittedItem>) => void; remove?: () => void; locked?: boolean; name?: string;
 }) {
+  const toggle = () => update({ is_range: !item.is_range, estimate_max: item.is_range ? null : item.estimate_max ?? item.estimate_min });
   return (
-    <div className={cn('py-2', sub && 'border-t first:border-t-0')}>
-      {sub && (
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="text-sm font-medium truncate min-w-0">{item.name}</span>
-          <Button variant="ghost" size="icon" className="h-11 w-11 -mr-2 shrink-0 text-muted-foreground" aria-label={`Remove ${item.name}`} onClick={remove}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center justify-between h-6 mb-1">
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Estimate</span>
-            <button
-              type="button" disabled={locked}
-              className="text-[11px] font-medium text-primary px-1 min-h-[24px] disabled:opacity-50"
-              onClick={() => update({ is_range: !item.is_range, estimate_max: item.is_range ? null : item.estimate_max ?? item.estimate_min })}
-            >
-              {item.is_range ? 'Single' : 'Range'}
-            </button>
-          </div>
-          {item.is_range ? (
-            <div className="flex items-center gap-1">
-              <MoneyInput value={item.estimate_min} placeholder="Low" onSave={(v) => update({ estimate_min: v })} disabled={locked} />
-              <span className="text-muted-foreground text-xs">–</span>
-              <MoneyInput value={item.estimate_max} placeholder="High" onSave={(v) => update({ estimate_max: v })} disabled={locked} />
-            </div>
-          ) : (
-            <MoneyInput value={item.estimate_min} placeholder="0" label="Estimate" onSave={(v) => update({ estimate_min: v })} disabled={locked} />
-          )}
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center h-6 mb-1"><span className="text-[11px] uppercase tracking-wide text-muted-foreground">Spent</span></div>
-          <MoneyInput value={item.actual_amount} placeholder="0" label="Spent" onSave={(v) => update({ actual_amount: v })} />
-        </div>
+    <div className={cn(COLS, 'py-1')}>
+      <div className="min-w-0">
+        {name && <div className="text-sm leading-tight break-words">{name}</div>}
+        <button type="button" disabled={locked} onClick={toggle}
+          className="text-[10px] font-medium text-primary disabled:opacity-50 leading-none py-1">
+          {item.is_range ? 'Single' : '↔ Range'}
+        </button>
       </div>
+      {item.is_range ? (
+        <div className="flex flex-col gap-1">
+          <MoneyInput value={item.estimate_min} placeholder="Low" onSave={(v) => update({ estimate_min: v })} disabled={locked} />
+          <MoneyInput value={item.estimate_max} placeholder="High" onSave={(v) => update({ estimate_max: v })} disabled={locked} />
+        </div>
+      ) : (
+        <MoneyInput value={item.estimate_min} placeholder="0" label="Estimate" onSave={(v) => update({ estimate_min: v })} disabled={locked} />
+      )}
+      <MoneyInput value={item.actual_amount} placeholder="0" label="Spent" onSave={(v) => update({ actual_amount: v })} />
+      {remove ? (
+        <button type="button" className="h-9 w-8 flex items-center justify-center text-muted-foreground" aria-label={`Remove ${name ?? item.name}`} onClick={remove}>
+          <X className="h-4 w-4" />
+        </button>
+      ) : <span />}
     </div>
   );
 }
@@ -133,66 +122,74 @@ export function CommittedSpending() {
     return <p className="text-sm text-muted-foreground">Add an account first (cog icon above) to start tracking committed spending.</p>;
 
   return (
-    <div className="pb-32 min-w-0">
-      <div className="flex items-center justify-between mb-3">
+    <div className="pb-20 min-w-0">
+      <div className="flex items-center justify-between mb-1">
         <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Previous month" onClick={() => setPeriod(shiftPeriod(period, -1))}><ChevronLeft /></Button>
         <span className="font-medium">{periodLabel(period)}</span>
         <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Next month" onClick={() => setPeriod(shiftPeriod(period, 1))}><ChevronRight /></Button>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-3 no-scrollbar">
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-2 no-scrollbar">
         {accounts.map((a) => (
-          <Button key={a.id} size="sm" variant={a.id === accountId ? 'default' : 'outline'} className="rounded-full shrink-0 min-h-[40px]" onClick={() => setAccountId(a.id)}>
+          <Button key={a.id} size="sm" variant={a.id === accountId ? 'default' : 'outline'} className="rounded-full shrink-0 min-h-[36px] h-9" onClick={() => setAccountId(a.id)}>
             {a.name}
           </Button>
         ))}
       </div>
 
-      <div className="space-y-3">
+      <div className={cn(COLS, 'px-2.5 text-[10px] uppercase tracking-wide text-muted-foreground')}>
+        <span>Item</span><span className="text-right">Estimate</span><span className="text-right">Spent</span><span />
+      </div>
+      <div className="space-y-2">
         {tops.map((top) => {
           const kids = items.filter((c) => c.parent_id === top.id);
           const g = groupTotals(top, items);
           return (
-            <div key={top.id} className={cn('rounded-xl border bg-card px-3 pt-2 pb-1', top.is_complete && 'bg-muted/40')}>
+            <div key={top.id} className={cn('rounded-lg border bg-card px-2.5 py-1.5', top.is_complete && 'bg-muted/40')}>
               <div className="flex items-center gap-1">
-                <span className="font-semibold flex-1 min-w-0 truncate">{top.name}</span>
+                <span className="font-semibold text-sm flex-1 min-w-0 break-words leading-tight">{top.name}</span>
+                {top.is_complete && <span className="text-xs text-muted-foreground shrink-0">{formatGBP(g.actual)}</span>}
                 <button
                   type="button"
-                  className={cn('shrink-0 rounded-full border px-3 min-h-[32px] text-xs font-medium inline-flex items-center gap-1',
+                  className={cn('shrink-0 rounded-full border px-2.5 min-h-[28px] text-[11px] font-medium inline-flex items-center gap-1',
                     top.is_complete ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground')}
                   onClick={() => update(top.id, { is_complete: !top.is_complete })}
                   aria-pressed={top.is_complete}
                 >
-                  {top.is_complete ? <><Check className="h-3.5 w-3.5" /> Done</> : 'Open'}
+                  {top.is_complete ? <><Check className="h-3 w-3" /> Done</> : 'Open'}
                 </button>
-                <Button variant="ghost" size="icon" className="h-11 w-11 -mr-2 shrink-0 text-muted-foreground" aria-label={`Remove ${top.name}`} onClick={() => remove(top.id)}>
+                <button type="button" className="h-9 w-8 flex items-center justify-center shrink-0 text-muted-foreground" aria-label={`Remove ${top.name}`} onClick={() => remove(top.id)}>
                   <X className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
-              {kids.length === 0 ? (
-                <LineRow item={top} update={(p) => update(top.id, p)} remove={() => remove(top.id)} />
-              ) : (
-                <div className="mt-1 rounded-lg bg-muted/40 px-3">
-                  {kids.map((k) => (
-                    <LineRow sub key={k.id} item={k} update={(p) => update(k.id, p)} remove={() => remove(k.id)} />
-                  ))}
-                </div>
+              {!top.is_complete && (
+                <>
+                  {kids.length === 0 ? (
+                    <LineRow item={top} update={(p) => update(top.id, p)} />
+                  ) : (
+                    <div className="divide-y">
+                      {kids.map((k) => (
+                        <LineRow key={k.id} name={k.name} item={k} update={(p) => update(k.id, p)} remove={() => remove(k.id)} />
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <InlineAdd small label="Sub-line" onAdd={(n) => add(n, top.id)} />
+                    {kids.length > 0 && (
+                      <span className="text-[11px] text-muted-foreground truncate">
+                        Est {formatRange(g.estimate)} · Spent {formatGBP(g.actual)} · <span className="text-primary">Left {formatRange(g.left)}</span>
+                      </span>
+                    )}
+                  </div>
+                </>
               )}
-              {(kids.length > 0 || g.actual > 0 || top.estimate_min != null) && (
-                <div className="grid grid-cols-3 gap-1 text-center text-[11px] text-muted-foreground mt-2 pt-2 border-t">
-                  <div><div>Est.</div><div className="text-sm font-medium text-foreground">{formatRange(g.estimate)}</div></div>
-                  <div><div>Spent</div><div className="text-sm font-medium text-foreground">{formatGBP(g.actual)}</div></div>
-                  <div><div>Left</div><div className="text-sm font-medium text-primary">{formatRange(g.left)}</div></div>
-                </div>
-              )}
-              <InlineAdd small label="Add sub-line" onAdd={(n) => add(n, top.id)} />
             </div>
           );
         })}
         <InlineAdd label="Add commitment" onAdd={(n) => add(n)} />
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 z-30 border-t bg-background/95 backdrop-blur px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+      <div className="fixed bottom-0 inset-x-0 z-30 border-t bg-background/95 backdrop-blur px-4 py-1.5 pb-[max(env(safe-area-inset-bottom),0.375rem)]">
         <div className="max-w-4xl mx-auto grid grid-cols-3 gap-2 text-center">
           <div><div className="text-[11px] text-muted-foreground">Estimated</div><div className="font-semibold text-sm">{formatRange(totals.estimate)}</div></div>
           <div><div className="text-[11px] text-muted-foreground">Spent</div><div className="font-semibold text-sm">{formatGBP(totals.actual)}</div></div>
