@@ -69,6 +69,14 @@ export default function VintedDiagnostics() {
     const id = `diag-${Date.now()}`;
     runId.current = id;
     try {
+      if (!open) {
+        add('Opening Vinted browser for test…');
+        await openVinted(); setOpen(true);
+        await new Promise((r) => setTimeout(r, 5000));
+      } else {
+        await goToNew(); add('Fresh /items/new');
+        await new Promise((r) => setTimeout(r, 4000));
+      }
       const t = performance.now();
       const images = await Promise.all(files.slice(0, 5).map((f, i) => resizeForVinted(f, i)));
       add(`Resized ${images.length} photos in ${Math.round(performance.now() - t)} ms: ${images.map((i) => `${(i.base64.length / 1024).toFixed(0)} KB`).join(', ')}`);
@@ -139,7 +147,7 @@ export default function VintedDiagnostics() {
             <CardContent className="p-3 pt-0 space-y-2 text-sm">
               <input type="file" accept="image/*" multiple className="block w-full text-sm" onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 5))} />
               <p className="text-muted-foreground">{files.length} photo(s) chosen. Nothing is saved to Vinted (saveDraft: false).</p>
-              <Button className="h-11 w-full" disabled={!open || running} onClick={runTest}><Play className="mr-1 h-4 w-4" />{running ? 'Running…' : 'Run test'}</Button>
+              <Button className="h-11 w-full" disabled={files.length === 0 || running} onClick={runTest}><Play className="mr-1 h-4 w-4" />{running ? 'Running…' : 'Run test'}</Button>
             </CardContent>
           </Card>
 
