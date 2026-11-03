@@ -1,0 +1,61 @@
+VINTED UK KIDS CLOTHING REFERENCE (IDs the form-filler needs). Kids only.
+
+RULES: pick ONE leaf category ID. Size must come from that leaf's size group (or be omitted if 'no size'). Colours: up to 2. Materials: any number, only from the list. If the brand is not in the brand list, flag it, do not guess an ID.
+
+BRANDS (id name): 2287 Next; 41711 TU; 13807 F&F; 4691219 Marks & Spencer; 18005 George; 7 H&M; 105 Primark; 9 New Look; 278833 Nutmeg; 110104 Matalan
+Sub-brands seen (use only if the label shows them): 5750094 Next Baby; 1922530 TU Kids; 2138244 Tesco F&F; 567184 F&F Kids; 2963284 George at ASDA; 10389237 Disney at George; 725 H&M Divided; 34319 H&M Mama; 415031 H&M Basic; 6033030 Disney x Primark; 381208 Rebel by Primark; 5759802 New Look Petite; 2897633 Little Nutmeg
+
+CONDITION (id name): 6 New with tags; 1 New without tags; 2 Very good; 3 Good; 4 Satisfactory. Exception: leaves 1602 and 1759 (underwear) only allow 6.
+COLOURS (id name, max 2): 1 Black; 3 Grey; 12 White; 20 Cream; 4 Beige; 21 Apricot; 11 Orange; 22 Coral; 7 Red; 23 Burgundy; 5 Pink; 24 Rose; 6 Purple; 25 Lilac; 26 Light blue; 9 Blue; 27 Navy; 17 Turquoise; 30 Mint; 10 Green; 28 Dark green; 16 Khaki; 2 Brown; 29 Mustard; 8 Yellow; 13 Silver; 14 Gold; 15 Multi; 32 Clear
+MATERIALS (id name): 149 Acrylic; 122 Alpaca; 440 Bamboo; 441 Canvas; 442 Cardboard; 123 Cashmere; 443 Ceramic; 444 Chiffon; 299 Corduroy; 44 Cotton; 303 Denim; 445 Down; 53 Elastane; 446 Faux fur; 447 Faux leather; 448 Felt; 451 Flannel; 120 Fleece; 449 Foam; 452 Glass; 453 Gold; 454 Jute; 455 Lace; 302 Latex; 43 Leather; 146 Linen; 121 Merino; 456 Mesh; 457 Metal; 152 Mohair; 178 Neoprene; 52 Nylon; 458 Paper; 305 Patent leather; 300 Plastic; 45 Polyester; 459 Porcelain; 460 Rattan; 301 Rubber; 311 Satin; 226 Sequin; 470 Silicone; 49 Silk; 461 Silver; 468 Steel; 462 Stone; 463 Straw; 298 Suede; 464 Tulle; 465 Tweed; 177 Velour; 466 Velvet; 48 Viscose; 467 Wood; 46 Wool
+
+SIZE GROUP 32 (Default for clothing (125 leaves): age and height sizes for baby and kids, plus One size and XS to XXL): 610 = Preemie, up to 44cm; 666 = Newborns / 44 cm; 612 = Up to 1 month / 50 cm; 613 = 1-3 months / 56 cm; 614 = 3-6 months / 62 cm; 616 = 6-9 months / 68 cm; 617 = 9-12 months / 74 cm; 618 = 12-18 months / 80 cm; 619 = 18-24 months / 86 cm; 622 = 24-36 months / 92 cm; 1567 = 3 years / 98-103 cm; 623 = 4 years / 104 cm; 624 = 5 years / 110 cm; 625 = 6 years / 116 cm; 626 = 7 years / 122 cm; 627 = 8 years / 128 cm; 628 = 9 years / 134 cm; 629 = 10 years / 140 cm; 630 = 11 years / 146 cm; 631 = 12 years / 152 cm; 632 = 13 years / 158 cm; 633 = 14 years / 164 cm; 634 = 15 years / 170 cm; 635 = 16 years / 176 cm; 620 = One size; 1568 = XS; 1569 = S; 1570 = M; 1571 = L; 1572 = XL; 1723 = XXL
+SIZE GROUP 31 (All shoes (54 leaves): EU shoe sizes with baby, child and junior labels): 657 = Tiny baby | EU 15; 585 = 0 baby | EU 16; 586 = 1 baby | EU 17; 587 = 2 baby | EU 18; 588 = 3 baby | EU 19; 589 = 3.5 baby | EU 20; 590 = 4 baby | EU 21; 591 = 5 baby | EU 22; 592 = 6 baby | EU 23; 593 = 7 child | EU 24; 594 = 8 child | EU 25; 595 = 8.5 child | EU 26; 596 = 9 child | EU 27; 597 = 10 child | EU 28; 598 = 11 child | EU 29; 599 = 11.5 child | EU 30; 600 = 12 child | EU 31; 601 = 13 child | EU 32; 602 = 1 junior | EU 33; 603 = 2 junior | EU 34; 604 = 2.5 junior | EU 35; 605 = 3 junior | EU 36; 606 = 4 junior | EU 37; 607 = 5 junior | EU 38; 608 = 6 junior | EU 39; 609 = 6.5 junior | EU 40
+SIZE GROUP 43 (Caps & hats (1577 girls, 1749 boys)): 928 = Preemies, 12 inches; 929 = 0-3 months, 15 inches; 930 = 3-6 months, 17 inches; 931 = 6-12 months, 18 inches; 932 = 1-2 years, 19 inches; 933 = 2-3 years, 20 inches; 934 = 3-5 years, 21 inches; 935 = 5-8 years, 22 inches; 936 = 8-12 years, 23 inches; 937 = 12 and older > 23 inches; 1189 = One size
+SIZE GROUP 70 (Belts (1581 girls, 1743 boys)): 1496 = 18"; 1497 = 20"; 1498 = 22"; 1499 = 24"; 1500 = 26"; 1501 = 28"; 1663 = 29.5"; 1502 = 31"; 1503 = 33"; 1504 = Adjustable; 1505 = One size
+SIZE GROUP 71 (Socks (1600 girls, 1757 boys)): 1507 = Tiny Baby; 1508 = 0-2 Baby; 1509 = 3-4 Baby; 1510 = 5 Baby - 7 Child; 1511 = 8-9 Child; 1512 = 10-11.5 Child; 1513 = 12 Child - 1 Junior; 1514 = 2-3 Junior; 1515 = 4-6 Junior; 1516 = 7-10 Junior
+NO SIZE FIELD for leaves: 1257, 1258, 1580, 1582, 1584, 1741, 1745, 1746, 1748, 1881, 5593, 5594, 5595, 5596, 5597, 5598, 5599, 5600, 5601, 5602, 5603, 5604, 5605, 5606, 5607, 5608, 5609, 5611, 5612, 5613, 5614, 5615, 5616, 5617, 5618, 5619, 5620, 5621, 5622
+
+CATEGORIES (leafId name [size group]) grouped by parent:
+- Kids > Girls clothing: 1248 Skirts [32]; 1258 Bags & backpacks [none]; 1253 Activewear [32]; 1510 Clothing bundles [32]; 1604 Clothing for twins [32]; 1606 Fancy dress & costumes [32]; 2080 Formal wear & special occasion clothing [32]; 1254 Other girls' clothing [32]
+- Kids > Girls clothing > Baby girls' clothing: 1514 Rompers [32]; 1515 Bodysuits [32]; 1516 Dungarees [32]; 1517 Sets [32]; 1875 Other baby girls' clothing [32]
+- Kids > Girls clothing > Shoes: 1525 Baby shoes [31]; 2690 Clogs & mules [31]; 1528 Formal & special occasion shoes [31]; 2692 Heels [31]; 1534 Slippers [31]
+- Kids > Girls clothing > Shoes > Boots: 2695 Ankle boots [31]; 2696 Mid-calf boots [31]; 2697 Snow boots [31]; 2698 Wellington boots [31]
+- Kids > Girls clothing > Shoes > Flat shoes: 2753 Ballerinas, Mary Janes & T-bar shoes [31]; 2701 Espadrilles [31]; 2702 Lace-up shoes [31]
+- Kids > Girls clothing > Shoes > Flip-flops, sandals & slides: 2704 Flip-flops [31]; 2705 Sandals [31]; 2707 Slides [31]
+- Kids > Girls clothing > Shoes > Sports shoes: 2708 Basketball shoes [31]; 2709 Dance shoes [31]; 2710 Football boots [31]; 2711 Hiking boots & shoes [31]; 2712 Ice skates [31]; 2713 Roller skates & inline skates [31]; 2714 Running shoes [31]; 2715 Ski boots [31]; 2716 Snowboard boots [31]; 2717 Swimming & water shoes [31]
+- Kids > Girls clothing > Shoes > Trainers: 2718 Hook-and-loop trainers [31]; 2719 Lace-up trainers [31]; 2720 Slip-on trainers [31]
+- Kids > Girls clothing > Outerwear: 1518 Gilets & body warmers [32]
+- Kids > Girls clothing > Outerwear > Coats: 2540 Duffle coats [32]; 2541 Parkas [32]; 2542 Peacoats [32]; 2543 Trench coats [32]
+- Kids > Girls clothing > Outerwear > Jackets: 2544 Blazers [32]; 2545 Bomber jackets [32]; 2546 Denim jackets [32]; 2547 Fleece jackets [32]; 2548 Puffer jackets [32]; 2549 Windbreakers [32]
+- Kids > Girls clothing > Outerwear > Rain gear: 2556 Ponchos [32]; 2557 Rain suits & sets [32]; 2555 Rain trousers [32]; 2558 Raincoats [32]
+- Kids > Girls clothing > Outerwear > Snow gear: 2560 Snow jackets & coats [32]; 2565 Snow suits & sets [32]; 2582 Snow trousers [32]
+- Kids > Girls clothing > Jumpers & hoodies: 1542 Jumpers [32]; 1543 V-neck jumpers [32]; 1544 Turtleneck jumpers [32]; 1548 Zip-up jumpers [32]; 1549 Boleros [32]; 1551 Sleeveless jumpers [32]; 1550 Hoodies & sweatshirts [32]; 1877 Other jumpers & hoodies [32]
+- Kids > Girls clothing > Tops & t-shirts: 1535 T-shirts [32]; 1536 Polo shirts [32]; 1537 Shirts [32]; 1538 Short-sleeved tops [32]; 1539 Long-sleeved tops [32]; 1540 Sleeveless tops [32]; 1541 Tunics [32]; 1878 Other tops & t-shirts [32]
+- Kids > Girls clothing > Dresses: 1554 Short dresses [32]; 1553 Long dresses [32]
+- Kids > Girls clothing > Trousers, shorts & dungarees: 1559 Jeans [32]; 1560 Skinny trousers [32]; 1562 Wide-leg trousers [32]; 1565 Leggings [32]; 1568 Jumpsuits & dungarees [32]; 2079 Harem trousers [32]; 1250 Shorts & cropped trousers [32]; 1880 Other trousers, shorts & dungarees [32]
+- Kids > Girls clothing > Accessories: 5593 Bandanas & headscarves [none]; 1581 Belts [70]; 1578 Gloves [32]; 1582 Hairbands & hairclips [none]; 1577 Caps & hats [43]; 5604 Keyrings [none]; 1580 Scarves & shawls [none]; 5605 Sunglasses [none]; 5606 Umbrellas [none]; 1584 Wallets & purses [none]; 5607 Watches [none]; 1881 Other accessories [none]
+- Kids > Girls clothing > Accessories > Jewellery: 5595 Body jewellery [none]; 5596 Bracelets [none]; 5597 Brooches [none]; 5598 Charms & pendants [none]; 5599 Earrings [none]; 5594 Anklets [none]; 5600 Jewellery sets [none]; 5601 Necklaces [none]; 5602 Rings [none]; 5603 Other jewellery [none]
+- Kids > Girls clothing > Swimwear: 1590 One-piece swimsuits [32]; 1592 Bikinis & tankinis [32]; 1593 Bathrobes [32]
+- Kids > Girls clothing > Underwear & socks: 1600 Socks [71]; 1601 Tights & leggings [32]; 1602 Underwear [32]; 1872 Other underwear & socks [32]
+- Kids > Girls clothing > Sleepwear & nightwear: 1596 One-piece pyjamas [32]; 1597 Two-piece pyjamas [32]; 1598 Nighties [32]
+- Kids > Boys clothing: 1257 Bags & backpacks [none]; 1204 Activewear [32]; 1760 Clothing bundles [32]; 1761 Clothing for twins [32]; 1762 Fancy dress & costumes [32]; 2083 Formal wear & special occasion clothing [32]; 1205 Other boys' clothing [32]
+- Kids > Boys clothing > Baby boys' clothing: 1642 Rompers [32]; 1643 Bodysuits [32]; 1644 Dungarees [32]; 1645 Sets [32]; 1883 Other baby boys' clothing [32]
+- Kids > Boys clothing > Shoes: 1653 Baby shoes [31]; 2721 Boat shoes, loafers & moccasins [31]; 2722 Espadrilles [31]; 1655 Formal & special occasion shoes [31]; 1661 Slippers [31]
+- Kids > Boys clothing > Shoes > Boots: 2726 Ankle boots [31]; 2727 Mid-calf boots [31]; 2728 Snow boots [31]; 2729 Wellington boots [31]
+- Kids > Boys clothing > Shoes > Flip-flops, sandals & slides: 2730 Clogs & mules [31]; 2732 Flip-flops [31]; 2733 Sandals [31]; 2734 Slides [31]
+- Kids > Boys clothing > Shoes > Sports shoes: 2735 Basketball shoes [31]; 2737 Dance shoes [31]; 2738 Football boots [31]; 2742 Hiking boots & shoes [31]; 2743 Ice skates [31]; 2744 Roller skates & inline skates [31]; 2745 Running shoes [31]; 2746 Ski boots [31]; 2748 Snowboard boots [31]; 2749 Swimming & water shoes [31]
+- Kids > Boys clothing > Shoes > Trainers: 2750 Hook-and-loop trainers [31]; 2751 Lace-up trainers [31]; 2752 Slip-on trainers [31]
+- Kids > Boys clothing > Outerwear: 1646 Gilets & body warmers [32]
+- Kids > Boys clothing > Outerwear > Coats: 2561 Duffle coats [32]; 2562 Parkas [32]; 2563 Peacoats [32]; 2564 Trench coats [32]
+- Kids > Boys clothing > Outerwear > Jackets: 2571 Blazers [32]; 2573 Bomber jackets [32]; 2574 Denim jackets [32]; 2575 Fleece jackets [32]; 2576 Puffer jackets [32]; 2577 Windbreakers [32]
+- Kids > Boys clothing > Outerwear > Rain gear: 2604 Ponchos [32]; 2609 Rain suits & sets [32]; 2602 Rain trousers [32]; 2606 Raincoats [32]
+- Kids > Boys clothing > Outerwear > Snow gear: 2610 Snow jackets & coats [32]; 2613 Snow suits & sets [32]; 2612 Snow trousers [32]
+- Kids > Boys clothing > Jumpers & hoodies: 1668 Jumpers [32]; 1669 V-neck jumpers [32]; 1670 Turtleneck jumpers [32]; 1671 Zip-up jumpers [32]; 1672 Hoodies & sweatshirts [32]; 1673 Sleeveless jumpers [32]; 1887 Other jumpers & hoodies [32]
+- Kids > Boys clothing > Tops & t-shirts: 1662 T-shirts [32]; 1663 Polo shirts [32]; 1664 Shirts [32]; 1665 Short-sleeved tops [32]; 1666 Long-sleeved tops [32]; 1667 Sleeveless tops [32]; 1886 Other tops & t-shirts [32]
+- Kids > Boys clothing > Trousers, shorts & dungarees: 1696 Jeans [32]; 1697 Skinny trousers [32]; 1698 Wide-leg trousers [32]; 1701 Leggings [32]; 1702 Jumpsuits & dungarees [32]; 1201 Shorts & cropped trousers [32]; 2082 Harem trousers [32]; 1870 Other trousers, shorts & dungarees [32]
+- Kids > Boys clothing > Accessories: 5608 Bandanas & headscarves [none]; 1743 Belts [70]; 5609 Braces [none]; 1740 Gloves [32]; 1749 Caps & hats [43]; 5618 Pocket squares [none]; 5619 Keyrings [none]; 1741 Scarves & shawls [none]; 5620 Sunglasses [none]; 1746 Ties & bow ties [none]; 5621 Umbrellas [none]; 1745 Wallets [none]; 5622 Watches [none]; 1748 Other accessories [none]
+- Kids > Boys clothing > Accessories > Jewellery: 5611 Bracelets [none]; 5612 Charms & pendants [none]; 5613 Cufflinks [none]; 5614 Earrings [none]; 5615 Necklaces [none]; 5616 Rings [none]; 5617 Other jewellery [none]
+- Kids > Boys clothing > Swimwear: 1750 Swimming trunks [32]; 1751 Bathrobes [32]
+- Kids > Boys clothing > Underwear & socks: 1757 Socks [71]; 1758 Tights & leggings [32]; 1759 Underwear [32]; 1871 Other underwear & socks [32]
+- Kids > Boys clothing > Sleepwear: 1754 One-piece pyjamas [32]; 1755 Two-piece pyjamas [32]

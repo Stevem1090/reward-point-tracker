@@ -1,0 +1,444 @@
+/**
+ * Vinted UK: create a clothing draft on https://www.vinted.co.uk/items/new
+ *
+ * Usage (from your app, after the page has loaded and the user is logged in):
+ *
+ *   window.__VINTED_ITEM__ = { ...item };   // see the example at the bottom
+ *   // then inject and run this file. It auto-runs if __VINTED_ITEM__ is set.
+ *
+ * Or call it directly:  const report = await window.vintedCreateDraft(item, { saveDraft: false });
+ *
+ * Native / in-app browser hosts: pass item.itemId (any string) and listen for the events described at
+ * notifyHost() below. Script injection cannot return values, so results are pushed out as events.
+ *
+ * Selector strategy (all verified on the live page, November 2026):
+ *   - Real Vinted IDs wherever they exist: catalogue IDs, brand IDs, size IDs,
+ *     condition IDs, colour IDs, material IDs, package IDs.
+ *   - Stable ids / names / data-testid values only. No CSS classes anywhere.
+ *   - Every step is "act, then read the value back", and a final verify loop
+ *     re-applies anything Vinted's photo suggestions overwrote late.
+ */
+(() => {
+  'use strict';
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+  // ---------- host notification (native app / in-app browser) ----------
+  // A native host cannot read return values from an injected script, so the script PUSHES events out.
+  // It tries, in order: window.mobileApp.postMessage({ detail }) (Capgo Capacitor in-app browser),
+  // window.AndroidBridge.postMessage(jsonString) (a plain Android addJavascriptInterface), and a
+  // window event 'vinted-draft-event'. Every call is wrapped so it can never break the main flow.
+  // Event types: vinted:started, vinted:report (form filled and verified), vinted:saveResult
+  // (sent the instant the save request finishes, before Vinted redirects), vinted:fatal.
+  function notifyHost(type, data) {
+    try {
+      const detail = { type, itemId: window.__VINTED_CURRENT_ID__ || null, at: Date.now(), ...(data || {}) };
+      if (window.mobileApp && typeof window.mobileApp.postMessage === 'function') window.mobileApp.postMessage({ detail });
+      if (window.AndroidBridge && typeof window.AndroidBridge.postMessage === 'function') window.AndroidBridge.postMessage(JSON.stringify(detail));
+      window.dispatchEvent(new CustomEvent('vinted-draft-event', { detail }));
+    } catch (e) { /* never let host messaging break the run */ }
+  }
+
+  // ---------- generic helpers ----------
+
+  async function waitFor(fn, { timeout = 10000, interval = 100, label = 'condition' } = {}) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      let v;
+      try { v = fn(); } catch (e) { v = null; }
+      if (v) return v;
+      await sleep(interval);
+    }
+    throw new Error(`Timed out waiting for ${label}`);
+  }
+
+  // React ignores plain `el.value = x`. Use the native setter, then fire events.
+  function setNativeValue(el, value) {
+    const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, value);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+  }
+
+  // Escape on document closes multi-select panels and keeps the selection.
+  async function pressEscape() {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+    await sleep(500);
+  }
+
+  const isChecked = (el) => el && el.getAttribute('aria-checked') === 'true';
+  const valueOf = (sel) => ($(sel) ? $(sel).value : '');
+
+  // ---------- images ----------
+
+  // Accepts a File/Blob, or { name, type, base64 } / { name, dataUrl } / { name, url }.
+  async function toFile(img, index) {
+    if (img instanceof File) return img;
+    if (img instanceof Blob) return new File([img], `photo_${index + 1}.jpg`, { type: img.type || 'image/jpeg' });
+    const name = img.name || `photo_${index + 1}.jpg`;
+    if (img.base64 || img.dataUrl) {
+      const type = img.type || (img.dataUrl && img.dataUrl.slice(5, img.dataUrl.indexOf(';'))) || 'image/jpeg';
+      const raw = img.base64 || img.dataUrl.split(',')[1];
+      const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+      return new File([bytes], name, { type });
+    }
+    if (img.url) {
+      const blob = await (await fetch(img.url)).blob(); // needs CORS access or a same-origin/data URL
+      return new File([blob], name, { type: blob.type || 'image/jpeg' });
+    }
+    throw new Error(`Unsupported image format at index ${index}`);
+  }
+
+  async function uploadImages(images) {
+    if (!images || !images.length) {
+      // Photos already on the page (for example an existing draft's edit page): just wait for the fields.
+      await waitFor(() => $('#brand') && $('#condition') && $('#color'), { timeout: 20000, label: 'fields (no new photos supplied)' });
+      await sleep(500);
+      return;
+    }
+    const files = [];
+    for (let i = 0; i < images.length; i++) files.push(await toFile(images[i], i));
+
+    const input = await waitFor(() => $('input[type="file"][name="photos"]') || $('[data-testid="add-photos-input"]'), { label: 'photo input' });
+    const dt = new DataTransfer();
+    files.forEach((f) => dt.items.add(f));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // Wait for every thumbnail, then for the extra fields to be revealed.
+    await waitFor(() => $(`[data-testid="media-select-photo-${files.length - 1}"]`), { timeout: 60000, label: 'photo thumbnails' });
+    await waitFor(() => $('#brand') && $('#condition') && $('#color'), { timeout: 20000, label: 'fields revealed after upload' });
+
+    // Vinted fills suggestions from the photo a few seconds later (category, brand,
+    // material, colour). Wait for the first one to land, then carry on. The final
+    // verify loop catches anything that arrives even later.
+    try {
+      await waitFor(() => valueOf('#category'), { timeout: 8000, label: 'photo suggestion' });
+    } catch (e) { /* no suggestion arrived, that is fine */ }
+    await sleep(1500);
+  }
+
+  // ---------- field fillers ----------
+
+  async function setText(selector, value) {
+    const el = await waitFor(() => $(selector), { label: selector });
+    setNativeValue(el, String(value));
+    await sleep(300);
+  }
+
+  // Category: walk the catalogue path by real IDs, then pick the leaf radio.
+  // path = [1193, 1195, 1246], leaf = 1550  (Kids > Girls clothing > Jumpers & hoodies > Hoodies & sweatshirts)
+  async function setCategory(path, leaf) {
+    const input = await waitFor(() => $('#category'), { label: '#category' });
+    input.click();
+    for (const id of path) {
+      const row = await waitFor(() => document.getElementById(`catalog-${id}`), { timeout: 6000, label: `catalogue row ${id}` });
+      row.click();
+      await sleep(600);
+    }
+    const radio = await waitFor(() => document.getElementById(`${leaf}-catalog-radio`), { timeout: 6000, label: `category leaf ${leaf}` });
+    radio.click();
+    await waitFor(() => !$('[data-testid="catalog-select-dropdown-content"]') || valueOf('#category'), { label: 'category panel to close' });
+    await sleep(1200); // size / material fields re-render for the new category
+  }
+
+  // Opens a dropdown panel. A click made while another panel is still closing can be
+  // swallowed as an "outside click", so close anything open first and retry the click.
+  async function openPanel(inputSel, panelTestId) {
+    const isOpen = () => !!$(`[data-testid="${panelTestId}"]`);
+    if (isOpen()) return;
+    await pressEscape();
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      (await waitFor(() => $(inputSel), { label: inputSel })).click();
+      try {
+        await waitFor(isOpen, { timeout: 2500, label: `${panelTestId} panel` });
+        await sleep(300);
+        return;
+      } catch (e) {
+        if (attempt === 3) throw e;
+        await sleep(500);
+      }
+    }
+  }
+
+  // Brand: search by name (React-safe), wait for results, then click the exact brand ID.
+  // Falls back to an exact (case-insensitive) name match if the ID is ever not present.
+  async function setBrand(brandId, brandName) {
+    await openPanel('#brand', 'brand-select-dropdown-content');
+    const search = await waitFor(() => $('#brand-search-input'), { label: 'brand search' });
+    setNativeValue(search, brandName);
+    const findRow = () =>
+      document.getElementById(`brand-${brandId}`) ||
+      $$('[id^="brand-"][role="radio"]').find((e) => e.innerText.trim().split('\n')[0].toLowerCase() === brandName.toLowerCase());
+    let row;
+    try {
+      row = await waitFor(findRow, { timeout: 6000, label: `brand result ${brandName}` });
+    } catch (e) {
+      throw new Error(`Brand not found: ${brandName} (${brandId})`);
+    }
+    row.click();
+    await waitFor(() => !$('[data-testid="brand-select-dropdown-content"]'), { timeout: 4000, label: 'brand panel to close' });
+    await sleep(500);
+  }
+
+  async function setSize(sizeId) {
+    await openPanel('#size', 'category-size-single-grid-content');
+    const opt = await waitFor(() => $(`[data-testid$="-grid-option-${sizeId}"]`), { label: `size ${sizeId} (not offered for this category?)` });
+    opt.click();
+    await sleep(700);
+  }
+
+  // Some categories (bags, jewellery, sunglasses, watches...) have no size field at all.
+  // No field and no sizeId: fine. No field but a sizeId: skip with a warning. Field but no sizeId: error.
+  async function setSizeIfPresent(sizeId, report) {
+    await sleep(300);
+    const present = !!$('#size');
+    if (!present) {
+      if (sizeId != null) report.warnings.push('size skipped: this category has no size field');
+      return;
+    }
+    if (sizeId == null) throw new Error('this category needs a size but none was supplied');
+    await setSize(sizeId);
+  }
+
+  async function setCondition(conditionId) {
+    await openPanel('#condition', 'category-condition-single-list-content');
+    await waitFor(() => $('[role="radio"][id^="condition-"]'), { label: 'condition options' });
+    const row = document.getElementById(`condition-${conditionId}`);
+    if (!row) {
+      const offered = $$('[role="radio"][id^="condition-"]').map((e) => e.id.replace('condition-', '')).join(', ');
+      await pressEscape();
+      throw new Error(`condition ${conditionId} is not offered for this category (offered: ${offered})`);
+    }
+    row.click();
+    await sleep(700);
+  }
+
+  // Multi-selects (colour, material): tick wanted, untick unwanted (incl. stale suggestions), close.
+  async function setMulti({ inputSel, panelId, rowSel, wantedIds, rowId }) {
+    await openPanel(inputSel, panelId);
+    const rows = $$(rowSel).filter((r) => /^[a-z]+-\d+$/.test(r.getAttribute('data-testid') || ''));
+    const wanted = new Set(wantedIds.map(String));
+    // untick anything wrong first (only possible where aria-checked is exposed)
+    for (const r of rows) {
+      const id = rowId(r);
+      if (isChecked(r) && !wanted.has(id)) { r.click(); await sleep(400); }
+    }
+    for (const id of wanted) {
+      const r = rows.find((x) => rowId(x) === id);
+      if (!r) throw new Error(`Option ${id} not found in ${panelId}`);
+      if (r.getAttribute('aria-checked') !== 'true') { r.click(); await sleep(400); }
+    }
+    await pressEscape();
+  }
+
+  const setColours = (ids) => setMulti({
+    inputSel: '#color', panelId: 'color-select-dropdown-content',
+    rowSel: '[data-testid^="color-"]', wantedIds: ids,
+    rowId: (r) => r.getAttribute('data-testid').replace('color-', ''),
+  });
+
+  const setMaterials = (ids) => setMulti({
+    inputSel: '#material', panelId: 'category-material-multi-list-content',
+    rowSel: '[role="checkbox"][data-testid^="material-"]', wantedIds: ids,
+    rowId: (r) => r.getAttribute('data-testid').replace('material-', ''),
+  });
+
+  async function setPackage(packageId) {
+    const radio = await waitFor(() => document.getElementById(`package_type_selector_${packageId}`), { label: `package ${packageId}` });
+    if (!radio.checked) radio.click();
+    await sleep(400);
+  }
+
+  // Vinted's price field only updates its real form state from genuine typing. Setting the text with
+  // the native setter makes the box DISPLAY the price but the draft saves with no price at all
+  // (verified on the live page). Typing via execCommand fixes that.
+  async function typeText(selector, value) {
+    const el = await waitFor(() => $(selector), { label: selector });
+    el.focus();
+    el.select();
+    const typed = document.execCommand('insertText', false, String(value));
+    if (!typed) setNativeValue(el, String(value)); // fallback, may not persist
+    await sleep(400);
+    el.blur();
+    await sleep(400);
+  }
+
+  // Records the draft save request (status, whether our price was in the payload) and any alert text.
+  // Results are also copied to sessionStorage because a successful save redirects to the member page.
+  function installDraftRecorder() {
+    const rec = { requests: [], alerts: [] };
+    const isDraftReq = (m, u) => m !== 'GET' && /\/api\/v2\/item_upload\/drafts/.test(u || '');
+    const summarise = (body) => {
+      try { const o = JSON.parse(body); const d = o.draft || o; return { price: d.price != null ? String(d.price) : null }; }
+      catch (e) { return { price: null }; }
+    };
+    const idFrom = (text) => {
+      try { const o = JSON.parse(text); const v = (o.draft && o.draft.id) ?? o.id ?? (o.item && o.item.id); return v != null ? String(v) : null; }
+      catch (e) { return null; }
+    };
+    // Vinted redirects to the member page within a fraction of a second of a successful save, so the
+    // outcome is written to sessionStorage the moment the request finishes, not after any delay.
+    const persistNow = (entry) => {
+      try {
+        sessionStorage.setItem('vintedDraftResult', JSON.stringify({
+          ok: entry.status >= 200 && entry.status < 300, status: entry.status,
+          draftId: entry.draftId || null, sentPrice: entry.price, alerts: rec.alerts.slice(),
+        }));
+      } catch (e) { /* ignore */ }
+      notifyHost('vinted:saveResult', {
+        ok: entry.status >= 200 && entry.status < 300, status: entry.status,
+        draftId: entry.draftId || null, sentPrice: entry.price, alerts: rec.alerts.slice(),
+      });
+    };
+    const origOpen = XMLHttpRequest.prototype.open;
+    const origSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (m, u) { this.__m = m; this.__u = u; return origOpen.apply(this, arguments); };
+    XMLHttpRequest.prototype.send = function (body) {
+      if (isDraftReq(this.__m, this.__u)) {
+        const entry = { method: this.__m, ...summarise(body) };
+        this.addEventListener('loadend', () => { entry.status = this.status; entry.draftId = idFrom(this.responseText); rec.requests.push(entry); persistNow(entry); });
+      }
+      return origSend.apply(this, arguments);
+    };
+    const origFetch = window.fetch;
+    window.fetch = async function (input, init) {
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      const m = (init && init.method) || 'GET';
+      const entry = isDraftReq(m, url) ? { method: m, ...summarise(init && init.body) } : null;
+      const res = await origFetch.apply(this, arguments);
+      if (entry) { entry.status = res.status; rec.requests.push(entry); persistNow(entry); }
+      return res;
+    };
+    new MutationObserver((muts) => {
+      for (const mu of muts) for (const n of mu.addedNodes) {
+        if (n.nodeType !== 1) continue;
+        const el = n.matches && n.matches('[role="alert"]') ? n : (n.querySelector && n.querySelector('[role="alert"]'));
+        if (el && (el.innerText || '').trim()) rec.alerts.push(el.innerText.trim().slice(0, 200));
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+    return rec;
+  }
+
+  async function saveDraftAndConfirm(item, report) {
+    const rec = installDraftRecorder();
+    try { sessionStorage.setItem('vintedDraftReport', JSON.stringify(report)); } catch (e) { /* ignore */ }
+    const btn = await waitFor(() => $('[data-testid="upload-form-save-draft-button"]'), { label: 'save draft button' });
+    btn.click();
+    try { await waitFor(() => rec.requests.length, { timeout: 15000, label: 'draft save response' }); } catch (e) { /* handled below */ }
+    await sleep(600); // let any error alert render
+    const last = rec.requests[rec.requests.length - 1];
+    const ok = !!last && last.status >= 200 && last.status < 300;
+    const result = {
+      ok, status: last ? last.status : null, draftId: last ? last.draftId || null : null,
+      alerts: rec.alerts.slice(), sentPrice: last ? last.price : null,
+      priceSaved: !!last && last.price != null && Number(last.price) === Number(item.price),
+    };
+    if (!last) result.problem = 'no draft request was seen within 15s';
+    else if (!ok) result.problem = `Vinted rejected the draft (HTTP ${last.status})${rec.alerts.length ? ': ' + rec.alerts.join(' | ') : ''}`;
+    else if (!result.priceSaved) result.problem = 'draft saved but the price was not in the request';
+    try { sessionStorage.setItem('vintedDraftResult', JSON.stringify(result)); } catch (e) { /* ignore */ }
+    return result;
+  }
+
+  // ---------- orchestration ----------
+
+  async function vintedCreateDraft(item, options = {}) {
+    const opts = { saveDraft: false, ...options }; // default is a dry run: fill, verify, do not save
+    const report = { steps: [], warnings: [], errors: [], saved: false };
+    const state = { categoryLabel: '' }; // label we selected, used to spot Vinted overwriting it
+    window.__VINTED_CURRENT_ID__ = item.itemId != null ? String(item.itemId) : null; // echoed on every host event
+    notifyHost('vinted:started', { dryRun: !opts.saveDraft });
+
+    if (!/\/items\/(new|\d+\/edit)/.test(location.pathname)) throw new Error('Run this on /items/new or a draft edit page');
+    const capsWords = (String(item.title || '').match(/\b[A-Z]{3,}\b/g) || []);
+    if (capsWords.length) report.warnings.push(`title has all-caps words (${capsWords.join(', ')}); Vinted rejects titles with too many capitals`);
+
+    // 1. Photos first. The remaining fields do not exist until this is done.
+    await uploadImages(item.images);
+    report.steps.push('images uploaded');
+
+    // 2. Field plan, in dependency order (category first: it drives size and material).
+    //    `read` returns what the page currently shows, `expect` is what we want it to contain.
+    const plan = [
+      { name: 'category',  apply: async () => { await setCategory(item.categoryPath, item.categoryLeafId); state.categoryLabel = valueOf('#category'); },
+        ok: () => !!state.categoryLabel && valueOf('#category') === state.categoryLabel },
+      { name: 'title',     apply: () => setText('#title', item.title),             ok: () => valueOf('#title') === item.title },
+      { name: 'description', apply: () => setText('#description', item.description), ok: () => valueOf('#description') === item.description },
+      { name: 'brand',     apply: () => setBrand(item.brandId, item.brandName),    ok: () => valueOf('#brand').toLowerCase() === item.brandName.toLowerCase() },
+      { name: 'size',      apply: () => setSizeIfPresent(item.sizeId, report),    ok: () => !$('#size') || !!valueOf('#size') },
+      { name: 'condition', apply: () => setCondition(item.conditionId),            ok: () => !!valueOf('#condition') },
+      { name: 'colours',   apply: () => setColours(item.colourIds || []),           ok: () => (valueOf('#color') ? valueOf('#color').split(',').length : 0) === (item.colourIds || []).length },
+      { name: 'material',  apply: () => setMaterials(item.materialIds || []),       ok: () => (valueOf('#material') ? valueOf('#material').split(',').length : 0) === (item.materialIds || []).length },
+      { name: 'price',     apply: () => typeText('#price', item.price),            ok: () => parseFloat(valueOf('#price').replace(/[^\d.]/g, '')) === Number(item.price) },
+      { name: 'package',   apply: () => setPackage(item.packageId || 1),           ok: () => !!document.getElementById(`package_type_selector_${item.packageId || 1}`)?.checked },
+    ];
+
+    // 3. Fill one at a time.
+    for (const step of plan) {
+      try { await step.apply(); report.steps.push(`filled ${step.name}`); }
+      catch (e) { report.errors.push(`${step.name}: ${e.message}`); }
+    }
+
+    // 4. Verify loop: Vinted can overwrite fields late with photo suggestions.
+    //    Wait, re-check everything, re-apply any step that drifted.
+    for (let pass = 1; pass <= 3; pass++) {
+      await sleep(2500);
+      const drifted = plan.filter((s) => { try { return !s.ok(); } catch (e) { return true; } });
+      if (!drifted.length) { report.steps.push(`verified clean on pass ${pass}`); break; }
+      report.steps.push(`pass ${pass} re-applying: ${drifted.map((d) => d.name).join(', ')}`);
+      // if category drifted, everything after it must be redone
+      const from = plan.findIndex((s) => drifted.includes(s));
+      const redo = drifted.some((d) => d.name === 'category') ? plan.slice(from) : drifted;
+      for (const step of redo) {
+        try { await step.apply(); } catch (e) { report.errors.push(`${step.name} (retry ${pass}): ${e.message}`); }
+      }
+      if (pass === 3) report.errors.push('fields still drifting after 3 passes');
+    }
+
+    report.finalValues = {
+      category: valueOf('#category'), title: valueOf('#title'), brand: valueOf('#brand'),
+      size: valueOf('#size'), condition: valueOf('#condition'), colours: valueOf('#color'),
+      material: valueOf('#material'), price: valueOf('#price'),
+    };
+
+    // 5. Save as draft only when explicitly asked and nothing failed.
+    notifyHost('vinted:report', { warnings: report.warnings, errors: report.errors, steps: report.steps, finalValues: report.finalValues, willSave: !!(opts.saveDraft && !report.errors.length) });
+    if (opts.saveDraft && !report.errors.length) {
+      report.save = await saveDraftAndConfirm(item, report);
+      report.saved = report.save.ok;
+      report.steps.push(report.save.ok ? 'draft saved' : 'draft NOT saved');
+      if (report.save.problem) report.errors.push(report.save.problem);
+    }
+    return report;
+  }
+
+  window.vintedCreateDraft = vintedCreateDraft;
+  if (window.__VINTED_ITEM__) {
+    window.__VINTED_REPORT__ = null;
+    vintedCreateDraft(window.__VINTED_ITEM__, window.__VINTED_OPTIONS__ || {})
+      .then((r) => { window.__VINTED_REPORT__ = r; console.log('[vinted-draft]', r); })
+      .catch((e) => { window.__VINTED_REPORT__ = { fatal: e.message }; notifyHost('vinted:fatal', { message: e.message }); console.error('[vinted-draft]', e); });
+  }
+})();
+
+/* ---------- Example item (what your AI analysis step should produce) ----------
+window.__VINTED_ITEM__ = {
+  images: [ { name: 'hoody_one.jpg', type: 'image/jpeg', base64: '...' } ],
+  title: 'Next girls floral zip-up hoodie 12-18 months',
+  description: 'Soft blue floral zip-up hoodie from Next.\nHooded, kangaroo pocket, ribbed cuffs and hem.\n85% cotton, 15% polyester.',
+  categoryPath: [1193, 1195, 1246],   // Kids > Girls clothing > Jumpers & hoodies
+  categoryLeafId: 1550,               // Hoodies & sweatshirts
+  brandId: 2287, brandName: 'Next',
+  sizeId: 618,                        // 12-18 months / 80 cm
+  conditionId: 2,                     // Very good
+  colourIds: [26, 15],                // Light blue, Multi
+  materialIds: [44, 45],              // Cotton, Polyester
+  price: 6,
+  packageId: 1                        // Small
+};
+window.__VINTED_OPTIONS__ = { saveDraft: false };
+*/
