@@ -235,7 +235,7 @@ function CommitmentCard({ top, items, update, remove, addSub }: {
         <button type="button" className="flex-1 min-w-0 text-left min-h-[36px]" onClick={() => setSel((s) => !s)}>
           <span className="font-semibold text-sm break-words leading-tight">{top.name}</span>
           {(g.actual > 0 || hasEst) && (
-            <span className="block text-[11px] text-muted-foreground">
+            <span className="block text-xs text-muted-foreground">
               Spent {formatGBP(g.actual)}{hasEst && <> / Est {formatRange(g.estimate)}</>}
               {!top.is_complete && hasEst && (
                 g.actual > g.estimate.max
