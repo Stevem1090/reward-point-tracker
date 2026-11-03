@@ -64,13 +64,13 @@ export default function VintedDiagnostics() {
   };
 
   const runTest = async () => {
-    if (!files.length) { toast({ title: 'Pick up to 5 photos first' }); return; }
+    if (!files.length) { toast('Pick up to 5 photos first'); return; }
     setRunning(true); setReport(null);
     const id = `diag-${Date.now()}`;
     runId.current = id;
     try {
       const t = performance.now();
-      const images = await Promise.all(files.slice(0, 5).map(resizeForVinted));
+      const images = await Promise.all(files.slice(0, 5).map((f, i) => resizeForVinted(f, i)));
       add(`Resized ${images.length} photos in ${Math.round(performance.now() - t)} ms: ${images.map((i) => `${(i.base64.length / 1024).toFixed(0)} KB`).join(', ')}`);
       const item = buildTestItem(id, images);
       add(`Test item: leaf ${item.categoryLeafId}, path [${item.categoryPath}], size ${item.sizeId}, brand ${item.brandName}`);
@@ -89,7 +89,7 @@ export default function VintedDiagnostics() {
       ...log.map((l) => `${l.at} ${l.text}`),
     ].join('\n');
     await navigator.clipboard.writeText(text);
-    toast({ title: 'Log copied' });
+    toast('Log copied');
   };
 
   const yn = (v?: boolean) => (v === undefined ? '–' : v ? 'Yes' : 'No');

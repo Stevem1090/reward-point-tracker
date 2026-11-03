@@ -1,5 +1,6 @@
 import { InAppBrowser } from '@capgo/inappbrowser';
 import type { PluginListenerHandle } from '@capacitor/core';
+import pluginPkg from '@capgo/inappbrowser/package.json';
 import scriptText from './vinted-create-draft.js?raw';
 
 export const VINTED_NEW_URL = 'https://www.vinted.co.uk/items/new';
@@ -27,7 +28,7 @@ export async function openVinted() {
 export const exec = (code: string) => InAppBrowser.executeScript({ code, id: webviewId });
 export const goToNew = () => InAppBrowser.setUrl({ url: VINTED_NEW_URL, id: webviewId });
 export const closeVinted = () => InAppBrowser.close().catch(() => {});
-export const pluginVersion = () => InAppBrowser.getPluginVersion().then((r) => r.version).catch(() => 'unknown');
+export const pluginVersion = async () => pluginPkg.version;
 
 export type Handlers = {
   onMessage: (detail: Record<string, any>) => void;
