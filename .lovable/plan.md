@@ -48,7 +48,7 @@ There is no stopgap bridge. The app listens only through `messageFromWebview`. E
 - On the website (not the Android app), the screen just says "Android app only".
 
 ## Assets
-- `src/vinted/vinted-create-draft.js`: copied byte-for-byte and imported with `?raw`.
+- `src/vinted/vinted-create-draft.js`: copied byte-for-byte from the new upload (`vinted-create-draft-2.js`, 444 lines) and imported with `?raw`. The old version is never copied into the app.
 - `src/vinted/vinted-reference-kids.json` and `src/vinted/vinted-reference-kids-for-ai.txt`: stored as given. The capture date (3 Nov 2026) is shown on the screen.
 
 ## Technical details
@@ -56,7 +56,6 @@ There is no stopgap bridge. The app listens only through `messageFromWebview`. E
   - `src/vinted/browser.ts`: plugin wrapper (open, inject, listeners)
   - `src/vinted/imageResize.ts`
   - `src/vinted/testItem.ts`
-  - `src/vinted/bridge.ts`: stopgap B
   - `src/pages/VintedDiagnostics.tsx` and its route
 - The Android app needs a reinstall, because this adds a new native plugin. The GitHub workflow already runs `cap sync`, so it picks the plugin up.
 - I'll record the "in-app browser plugin + script as a raw asset" decision in AGENTS.md.
