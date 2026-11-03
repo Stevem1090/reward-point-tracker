@@ -268,7 +268,7 @@ function CommitmentCard({ top, items, update, remove, addSub }: {
               <div className="w-[5.5rem]"><EstimateCell item={top} update={(p) => update(top.id, p)} /></div>
             </div>
           )}
-          <div className={cn(COLS, 'border-b text-[10px] uppercase tracking-wide text-muted-foreground')}>
+          <div className={cn(COLS, 'mt-1 border-b text-[10px] uppercase tracking-wide text-muted-foreground')}>
             <span>Item</span><span className="text-right">Estimate</span><span className="text-right">Spent</span><span />
           </div>
           {kids.length === 0 ? (
