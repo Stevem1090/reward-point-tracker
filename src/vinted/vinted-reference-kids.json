@@ -1,0 +1,1045 @@
+{
+  "meta": {
+    "source": "Live sweep of https://www.vinted.co.uk/items/new, 3 November 2026. All 224 Kids clothing leaf categories were selected one by one and their options read.",
+    "scope": "Kids clothing only: Girls clothing and Boys clothing. Women, Men and adult sizes are not included.",
+    "howToSelectCategory": "Click catalog rows by ID in the order of 'pick' (always starting with 1193 for Kids), then click the leaf radio with id '<leafId>-catalog-radio'.",
+    "howToReadSizes": "Each category has a sizeGroup. Group 32 is the default for clothing. null means the category has no size field, so skip size.",
+    "separatorWarning": "Shoe size labels contain the character '|' themselves, so never split option lists on it."
+  },
+  "brands": {
+    "main": {
+      "2287": "Next",
+      "41711": "TU",
+      "13807": "F&F",
+      "4691219": "Marks & Spencer",
+      "18005": "George",
+      "7": "H&M",
+      "105": "Primark",
+      "9": "New Look",
+      "278833": "Nutmeg",
+      "110104": "Matalan"
+    },
+    "subBrandVariantsSeenInSearch": {
+      "5750094": "Next Baby",
+      "1922530": "TU Kids",
+      "2138244": "Tesco F&F",
+      "567184": "F&F Kids",
+      "2963284": "George at ASDA",
+      "10389237": "Disney at George",
+      "725": "H&M Divided",
+      "34319": "H&M Mama",
+      "415031": "H&M Basic",
+      "6033030": "Disney x Primark",
+      "381208": "Rebel by Primark",
+      "5759802": "New Look Petite",
+      "2897633": "Little Nutmeg"
+    },
+    "note": "Each ID was read from the brand search results on 3 November 2026. Search matches on name, so the main brand is not always first (for example, Matalan's search lists unrelated brands after it). Match on exact name, then ID. If a label shows a sub-brand, flag it rather than guessing. If the brand is not in this list, flag it during creation."
+  },
+  "conditions": {
+    "default": {
+      "6": "New with tags",
+      "1": "New without tags",
+      "2": "Very good",
+      "3": "Good",
+      "4": "Satisfactory"
+    },
+    "exceptions": {
+      "onlyNewWithTags": {
+        "leaves": [
+          "1602",
+          "1759"
+        ],
+        "options": {
+          "6": "New with tags"
+        },
+        "note": "Underwear (girls 1602, boys 1759) only offers New with tags."
+      }
+    }
+  },
+  "colours": {
+    "maxSelectable": 2,
+    "options": {
+      "1": "Black",
+      "3": "Grey",
+      "12": "White",
+      "20": "Cream",
+      "4": "Beige",
+      "21": "Apricot",
+      "11": "Orange",
+      "22": "Coral",
+      "7": "Red",
+      "23": "Burgundy",
+      "5": "Pink",
+      "24": "Rose",
+      "6": "Purple",
+      "25": "Lilac",
+      "26": "Light blue",
+      "9": "Blue",
+      "27": "Navy",
+      "17": "Turquoise",
+      "30": "Mint",
+      "10": "Green",
+      "28": "Dark green",
+      "16": "Khaki",
+      "2": "Brown",
+      "29": "Mustard",
+      "8": "Yellow",
+      "13": "Silver",
+      "14": "Gold",
+      "15": "Multi",
+      "32": "Clear"
+    }
+  },
+  "materials": {
+    "note": "Identical list for all 224 leaves. Multi-select.",
+    "options": {
+      "149": "Acrylic",
+      "122": "Alpaca",
+      "440": "Bamboo",
+      "441": "Canvas",
+      "442": "Cardboard",
+      "123": "Cashmere",
+      "443": "Ceramic",
+      "444": "Chiffon",
+      "299": "Corduroy",
+      "44": "Cotton",
+      "303": "Denim",
+      "445": "Down",
+      "53": "Elastane",
+      "446": "Faux fur",
+      "447": "Faux leather",
+      "448": "Felt",
+      "451": "Flannel",
+      "120": "Fleece",
+      "449": "Foam",
+      "452": "Glass",
+      "453": "Gold",
+      "454": "Jute",
+      "455": "Lace",
+      "302": "Latex",
+      "43": "Leather",
+      "146": "Linen",
+      "121": "Merino",
+      "456": "Mesh",
+      "457": "Metal",
+      "152": "Mohair",
+      "178": "Neoprene",
+      "52": "Nylon",
+      "458": "Paper",
+      "305": "Patent leather",
+      "300": "Plastic",
+      "45": "Polyester",
+      "459": "Porcelain",
+      "460": "Rattan",
+      "301": "Rubber",
+      "311": "Satin",
+      "226": "Sequin",
+      "470": "Silicone",
+      "49": "Silk",
+      "461": "Silver",
+      "468": "Steel",
+      "462": "Stone",
+      "463": "Straw",
+      "298": "Suede",
+      "464": "Tulle",
+      "465": "Tweed",
+      "177": "Velour",
+      "466": "Velvet",
+      "48": "Viscose",
+      "467": "Wood",
+      "46": "Wool"
+    }
+  },
+  "sizeGroups": {
+    "32": {
+      "usedFor": "Default for clothing (125 leaves): age and height sizes for baby and kids, plus One size and XS to XXL",
+      "options": {
+        "610": "Preemie, up to 44cm",
+        "666": "Newborns / 44 cm",
+        "612": "Up to 1 month / 50 cm",
+        "613": "1-3 months / 56 cm",
+        "614": "3-6 months / 62 cm",
+        "616": "6-9 months / 68 cm",
+        "617": "9-12 months / 74 cm",
+        "618": "12-18 months / 80 cm",
+        "619": "18-24 months / 86 cm",
+        "622": "24-36 months / 92 cm",
+        "1567": "3 years / 98-103 cm",
+        "623": "4 years / 104 cm",
+        "624": "5 years / 110 cm",
+        "625": "6 years / 116 cm",
+        "626": "7 years / 122 cm",
+        "627": "8 years / 128 cm",
+        "628": "9 years / 134 cm",
+        "629": "10 years / 140 cm",
+        "630": "11 years / 146 cm",
+        "631": "12 years / 152 cm",
+        "632": "13 years / 158 cm",
+        "633": "14 years / 164 cm",
+        "634": "15 years / 170 cm",
+        "635": "16 years / 176 cm",
+        "620": "One size",
+        "1568": "XS",
+        "1569": "S",
+        "1570": "M",
+        "1571": "L",
+        "1572": "XL",
+        "1723": "XXL"
+      }
+    },
+    "31": {
+      "usedFor": "All shoes (54 leaves): EU shoe sizes with baby, child and junior labels",
+      "options": {
+        "657": "Tiny baby | EU 15",
+        "585": "0 baby | EU 16",
+        "586": "1 baby | EU 17",
+        "587": "2 baby | EU 18",
+        "588": "3 baby | EU 19",
+        "589": "3.5 baby | EU 20",
+        "590": "4 baby | EU 21",
+        "591": "5 baby | EU 22",
+        "592": "6 baby | EU 23",
+        "593": "7 child | EU 24",
+        "594": "8 child | EU 25",
+        "595": "8.5 child | EU 26",
+        "596": "9 child | EU 27",
+        "597": "10 child | EU 28",
+        "598": "11 child | EU 29",
+        "599": "11.5 child | EU 30",
+        "600": "12 child | EU 31",
+        "601": "13 child | EU 32",
+        "602": "1 junior | EU 33",
+        "603": "2 junior | EU 34",
+        "604": "2.5 junior | EU 35",
+        "605": "3 junior | EU 36",
+        "606": "4 junior | EU 37",
+        "607": "5 junior | EU 38",
+        "608": "6 junior | EU 39",
+        "609": "6.5 junior | EU 40"
+      }
+    },
+    "43": {
+      "usedFor": "Caps & hats (1577 girls, 1749 boys)",
+      "options": {
+        "928": "Preemies, 12 inches",
+        "929": "0-3 months, 15 inches",
+        "930": "3-6 months, 17 inches",
+        "931": "6-12 months, 18 inches",
+        "932": "1-2 years, 19 inches",
+        "933": "2-3 years, 20 inches",
+        "934": "3-5 years, 21 inches",
+        "935": "5-8 years, 22 inches",
+        "936": "8-12 years, 23 inches",
+        "937": "12 and older > 23 inches",
+        "1189": "One size"
+      }
+    },
+    "70": {
+      "usedFor": "Belts (1581 girls, 1743 boys)",
+      "options": {
+        "1496": "18\"",
+        "1497": "20\"",
+        "1498": "22\"",
+        "1499": "24\"",
+        "1500": "26\"",
+        "1501": "28\"",
+        "1663": "29.5\"",
+        "1502": "31\"",
+        "1503": "33\"",
+        "1504": "Adjustable",
+        "1505": "One size"
+      }
+    },
+    "71": {
+      "usedFor": "Socks (1600 girls, 1757 boys)",
+      "options": {
+        "1507": "Tiny Baby",
+        "1508": "0-2 Baby",
+        "1509": "3-4 Baby",
+        "1510": "5 Baby - 7 Child",
+        "1511": "8-9 Child",
+        "1512": "10-11.5 Child",
+        "1513": "12 Child - 1 Junior",
+        "1514": "2-3 Junior",
+        "1515": "4-6 Junior",
+        "1516": "7-10 Junior"
+      }
+    }
+  },
+  "leafSizeGroupExceptions": {
+    "noSizeField": [
+      "1257",
+      "1258",
+      "1580",
+      "1582",
+      "1584",
+      "1741",
+      "1745",
+      "1746",
+      "1748",
+      "1881",
+      "5593",
+      "5594",
+      "5595",
+      "5596",
+      "5597",
+      "5598",
+      "5599",
+      "5600",
+      "5601",
+      "5602",
+      "5603",
+      "5604",
+      "5605",
+      "5606",
+      "5607",
+      "5608",
+      "5609",
+      "5611",
+      "5612",
+      "5613",
+      "5614",
+      "5615",
+      "5616",
+      "5617",
+      "5618",
+      "5619",
+      "5620",
+      "5621",
+      "5622"
+    ],
+    "31": [
+      "1525",
+      "1528",
+      "1534",
+      "1653",
+      "1655",
+      "1661",
+      "2690",
+      "2692",
+      "2695",
+      "2696",
+      "2697",
+      "2698",
+      "2701",
+      "2702",
+      "2704",
+      "2705",
+      "2707",
+      "2708",
+      "2709",
+      "2710",
+      "2711",
+      "2712",
+      "2713",
+      "2714",
+      "2715",
+      "2716",
+      "2717",
+      "2718",
+      "2719",
+      "2720",
+      "2721",
+      "2722",
+      "2726",
+      "2727",
+      "2728",
+      "2729",
+      "2730",
+      "2732",
+      "2733",
+      "2734",
+      "2735",
+      "2737",
+      "2738",
+      "2742",
+      "2743",
+      "2744",
+      "2745",
+      "2746",
+      "2748",
+      "2749",
+      "2750",
+      "2751",
+      "2752",
+      "2753"
+    ],
+    "43": [
+      "1577",
+      "1749"
+    ],
+    "70": [
+      "1581",
+      "1743"
+    ],
+    "71": [
+      "1600",
+      "1757"
+    ],
+    "default": 32
+  },
+  "categories": [
+    {
+      "group": "Kids > Girls clothing",
+      "pick": [
+        1193,
+        1195
+      ],
+      "leaves": {
+        "1248": "Skirts",
+        "1258": "Bags & backpacks",
+        "1253": "Activewear",
+        "1510": "Clothing bundles",
+        "1604": "Clothing for twins",
+        "1606": "Fancy dress & costumes",
+        "2080": "Formal wear & special occasion clothing",
+        "1254": "Other girls' clothing"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Baby girls' clothing",
+      "pick": [
+        1193,
+        1195,
+        1243
+      ],
+      "leaves": {
+        "1514": "Rompers",
+        "1515": "Bodysuits",
+        "1516": "Dungarees",
+        "1517": "Sets",
+        "1875": "Other baby girls' clothing"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Shoes",
+      "pick": [
+        1193,
+        1195,
+        1255
+      ],
+      "leaves": {
+        "1525": "Baby shoes",
+        "2690": "Clogs & mules",
+        "1528": "Formal & special occasion shoes",
+        "2692": "Heels",
+        "1534": "Slippers"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Shoes > Boots",
+      "pick": [
+        1193,
+        1195,
+        1255,
+        1530
+      ],
+      "leaves": {
+        "2695": "Ankle boots",
+        "2696": "Mid-calf boots",
+        "2697": "Snow boots",
+        "2698": "Wellington boots"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Shoes > Flat shoes",
+      "pick": [
+        1193,
+        1195,
+        1255,
+        1526
+      ],
+      "leaves": {
+        "2753": "Ballerinas, Mary Janes & T-bar shoes",
+        "2701": "Espadrilles",
+        "2702": "Lace-up shoes"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Shoes > Flip-flops, sandals & slides",
+      "pick": [
+        1193,
+        1195,
+        1255,
+        2691
+      ],
+      "leaves": {
+        "2704": "Flip-flops",
+        "2705": "Sandals",
+        "2707": "Slides"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Shoes > Sports shoes",
+      "pick": [
+        1193,
+        1195,
+        1255,
+        2693
+      ],
+      "leaves": {
+        "2708": "Basketball shoes",
+        "2709": "Dance shoes",
+        "2710": "Football boots",
+        "2711": "Hiking boots & shoes",
+        "2712": "Ice skates",
+        "2713": "Roller skates & inline skates",
+        "2714": "Running shoes",
+        "2715": "Ski boots",
+        "2716": "Snowboard boots",
+        "2717": "Swimming & water shoes"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Shoes > Trainers",
+      "pick": [
+        1193,
+        1195,
+        1255,
+        1533
+      ],
+      "leaves": {
+        "2718": "Hook-and-loop trainers",
+        "2719": "Lace-up trainers",
+        "2720": "Slip-on trainers"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Outerwear",
+      "pick": [
+        1193,
+        1195,
+        1244
+      ],
+      "leaves": {
+        "1518": "Gilets & body warmers"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Outerwear > Coats",
+      "pick": [
+        1193,
+        1195,
+        1244,
+        1519
+      ],
+      "leaves": {
+        "2540": "Duffle coats",
+        "2541": "Parkas",
+        "2542": "Peacoats",
+        "2543": "Trench coats"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Outerwear > Jackets",
+      "pick": [
+        1193,
+        1195,
+        1244,
+        1521
+      ],
+      "leaves": {
+        "2544": "Blazers",
+        "2545": "Bomber jackets",
+        "2546": "Denim jackets",
+        "2547": "Fleece jackets",
+        "2548": "Puffer jackets",
+        "2549": "Windbreakers"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Outerwear > Rain gear",
+      "pick": [
+        1193,
+        1195,
+        1244,
+        2554
+      ],
+      "leaves": {
+        "2556": "Ponchos",
+        "2557": "Rain suits & sets",
+        "2555": "Rain trousers",
+        "2558": "Raincoats"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Outerwear > Snow gear",
+      "pick": [
+        1193,
+        1195,
+        1244,
+        2559
+      ],
+      "leaves": {
+        "2560": "Snow jackets & coats",
+        "2565": "Snow suits & sets",
+        "2582": "Snow trousers"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Jumpers & hoodies",
+      "pick": [
+        1193,
+        1195,
+        1246
+      ],
+      "leaves": {
+        "1542": "Jumpers",
+        "1543": "V-neck jumpers",
+        "1544": "Turtleneck jumpers",
+        "1548": "Zip-up jumpers",
+        "1549": "Boleros",
+        "1551": "Sleeveless jumpers",
+        "1550": "Hoodies & sweatshirts",
+        "1877": "Other jumpers & hoodies"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Tops & t-shirts",
+      "pick": [
+        1193,
+        1195,
+        1245
+      ],
+      "leaves": {
+        "1535": "T-shirts",
+        "1536": "Polo shirts",
+        "1537": "Shirts",
+        "1538": "Short-sleeved tops",
+        "1539": "Long-sleeved tops",
+        "1540": "Sleeveless tops",
+        "1541": "Tunics",
+        "1878": "Other tops & t-shirts"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Dresses",
+      "pick": [
+        1193,
+        1195,
+        1247
+      ],
+      "leaves": {
+        "1554": "Short dresses",
+        "1553": "Long dresses"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Trousers, shorts & dungarees",
+      "pick": [
+        1193,
+        1195,
+        1249
+      ],
+      "leaves": {
+        "1559": "Jeans",
+        "1560": "Skinny trousers",
+        "1562": "Wide-leg trousers",
+        "1565": "Leggings",
+        "1568": "Jumpsuits & dungarees",
+        "2079": "Harem trousers",
+        "1250": "Shorts & cropped trousers",
+        "1880": "Other trousers, shorts & dungarees"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Accessories",
+      "pick": [
+        1193,
+        1195,
+        1574
+      ],
+      "leaves": {
+        "5593": "Bandanas & headscarves",
+        "1581": "Belts",
+        "1578": "Gloves",
+        "1582": "Hairbands & hairclips",
+        "1577": "Caps & hats",
+        "5604": "Keyrings",
+        "1580": "Scarves & shawls",
+        "5605": "Sunglasses",
+        "5606": "Umbrellas",
+        "1584": "Wallets & purses",
+        "5607": "Watches",
+        "1881": "Other accessories"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Accessories > Jewellery",
+      "pick": [
+        1193,
+        1195,
+        1574,
+        1586
+      ],
+      "leaves": {
+        "5595": "Body jewellery",
+        "5596": "Bracelets",
+        "5597": "Brooches",
+        "5598": "Charms & pendants",
+        "5599": "Earrings",
+        "5594": "Anklets",
+        "5600": "Jewellery sets",
+        "5601": "Necklaces",
+        "5602": "Rings",
+        "5603": "Other jewellery"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Swimwear",
+      "pick": [
+        1193,
+        1195,
+        1251
+      ],
+      "leaves": {
+        "1590": "One-piece swimsuits",
+        "1592": "Bikinis & tankinis",
+        "1593": "Bathrobes"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Underwear & socks",
+      "pick": [
+        1193,
+        1195,
+        1252
+      ],
+      "leaves": {
+        "1600": "Socks",
+        "1601": "Tights & leggings",
+        "1602": "Underwear",
+        "1872": "Other underwear & socks"
+      }
+    },
+    {
+      "group": "Kids > Girls clothing > Sleepwear & nightwear",
+      "pick": [
+        1193,
+        1195,
+        1594
+      ],
+      "leaves": {
+        "1596": "One-piece pyjamas",
+        "1597": "Two-piece pyjamas",
+        "1598": "Nighties"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing",
+      "pick": [
+        1193,
+        1194
+      ],
+      "leaves": {
+        "1257": "Bags & backpacks",
+        "1204": "Activewear",
+        "1760": "Clothing bundles",
+        "1761": "Clothing for twins",
+        "1762": "Fancy dress & costumes",
+        "2083": "Formal wear & special occasion clothing",
+        "1205": "Other boys' clothing"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Baby boys' clothing",
+      "pick": [
+        1193,
+        1194,
+        1196
+      ],
+      "leaves": {
+        "1642": "Rompers",
+        "1643": "Bodysuits",
+        "1644": "Dungarees",
+        "1645": "Sets",
+        "1883": "Other baby boys' clothing"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Shoes",
+      "pick": [
+        1193,
+        1194,
+        1256
+      ],
+      "leaves": {
+        "1653": "Baby shoes",
+        "2721": "Boat shoes, loafers & moccasins",
+        "2722": "Espadrilles",
+        "1655": "Formal & special occasion shoes",
+        "1661": "Slippers"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Shoes > Boots",
+      "pick": [
+        1193,
+        1194,
+        1256,
+        1657
+      ],
+      "leaves": {
+        "2726": "Ankle boots",
+        "2727": "Mid-calf boots",
+        "2728": "Snow boots",
+        "2729": "Wellington boots"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Shoes > Flip-flops, sandals & slides",
+      "pick": [
+        1193,
+        1194,
+        1256,
+        2723
+      ],
+      "leaves": {
+        "2730": "Clogs & mules",
+        "2732": "Flip-flops",
+        "2733": "Sandals",
+        "2734": "Slides"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Shoes > Sports shoes",
+      "pick": [
+        1193,
+        1194,
+        1256,
+        2724
+      ],
+      "leaves": {
+        "2735": "Basketball shoes",
+        "2737": "Dance shoes",
+        "2738": "Football boots",
+        "2742": "Hiking boots & shoes",
+        "2743": "Ice skates",
+        "2744": "Roller skates & inline skates",
+        "2745": "Running shoes",
+        "2746": "Ski boots",
+        "2748": "Snowboard boots",
+        "2749": "Swimming & water shoes"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Shoes > Trainers",
+      "pick": [
+        1193,
+        1194,
+        1256,
+        1660
+      ],
+      "leaves": {
+        "2750": "Hook-and-loop trainers",
+        "2751": "Lace-up trainers",
+        "2752": "Slip-on trainers"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Outerwear",
+      "pick": [
+        1193,
+        1194,
+        1197
+      ],
+      "leaves": {
+        "1646": "Gilets & body warmers"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Outerwear > Coats",
+      "pick": [
+        1193,
+        1194,
+        1197,
+        1647
+      ],
+      "leaves": {
+        "2561": "Duffle coats",
+        "2562": "Parkas",
+        "2563": "Peacoats",
+        "2564": "Trench coats"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Outerwear > Jackets",
+      "pick": [
+        1193,
+        1194,
+        1197,
+        1649
+      ],
+      "leaves": {
+        "2571": "Blazers",
+        "2573": "Bomber jackets",
+        "2574": "Denim jackets",
+        "2575": "Fleece jackets",
+        "2576": "Puffer jackets",
+        "2577": "Windbreakers"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Outerwear > Rain gear",
+      "pick": [
+        1193,
+        1194,
+        1197,
+        2583
+      ],
+      "leaves": {
+        "2604": "Ponchos",
+        "2609": "Rain suits & sets",
+        "2602": "Rain trousers",
+        "2606": "Raincoats"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Outerwear > Snow gear",
+      "pick": [
+        1193,
+        1194,
+        1197,
+        2590
+      ],
+      "leaves": {
+        "2610": "Snow jackets & coats",
+        "2613": "Snow suits & sets",
+        "2612": "Snow trousers"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Jumpers & hoodies",
+      "pick": [
+        1193,
+        1194,
+        1199
+      ],
+      "leaves": {
+        "1668": "Jumpers",
+        "1669": "V-neck jumpers",
+        "1670": "Turtleneck jumpers",
+        "1671": "Zip-up jumpers",
+        "1672": "Hoodies & sweatshirts",
+        "1673": "Sleeveless jumpers",
+        "1887": "Other jumpers & hoodies"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Tops & t-shirts",
+      "pick": [
+        1193,
+        1194,
+        1198
+      ],
+      "leaves": {
+        "1662": "T-shirts",
+        "1663": "Polo shirts",
+        "1664": "Shirts",
+        "1665": "Short-sleeved tops",
+        "1666": "Long-sleeved tops",
+        "1667": "Sleeveless tops",
+        "1886": "Other tops & t-shirts"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Trousers, shorts & dungarees",
+      "pick": [
+        1193,
+        1194,
+        1200
+      ],
+      "leaves": {
+        "1696": "Jeans",
+        "1697": "Skinny trousers",
+        "1698": "Wide-leg trousers",
+        "1701": "Leggings",
+        "1702": "Jumpsuits & dungarees",
+        "1201": "Shorts & cropped trousers",
+        "2082": "Harem trousers",
+        "1870": "Other trousers, shorts & dungarees"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Accessories",
+      "pick": [
+        1193,
+        1194,
+        1714
+      ],
+      "leaves": {
+        "5608": "Bandanas & headscarves",
+        "1743": "Belts",
+        "5609": "Braces",
+        "1740": "Gloves",
+        "1749": "Caps & hats",
+        "5618": "Pocket squares",
+        "5619": "Keyrings",
+        "1741": "Scarves & shawls",
+        "5620": "Sunglasses",
+        "1746": "Ties & bow ties",
+        "5621": "Umbrellas",
+        "1745": "Wallets",
+        "5622": "Watches",
+        "1748": "Other accessories"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Accessories > Jewellery",
+      "pick": [
+        1193,
+        1194,
+        1714,
+        5610
+      ],
+      "leaves": {
+        "5611": "Bracelets",
+        "5612": "Charms & pendants",
+        "5613": "Cufflinks",
+        "5614": "Earrings",
+        "5615": "Necklaces",
+        "5616": "Rings",
+        "5617": "Other jewellery"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Swimwear",
+      "pick": [
+        1193,
+        1194,
+        1202
+      ],
+      "leaves": {
+        "1750": "Swimming trunks",
+        "1751": "Bathrobes"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Underwear & socks",
+      "pick": [
+        1193,
+        1194,
+        1203
+      ],
+      "leaves": {
+        "1757": "Socks",
+        "1758": "Tights & leggings",
+        "1759": "Underwear",
+        "1871": "Other underwear & socks"
+      }
+    },
+    {
+      "group": "Kids > Boys clothing > Sleepwear",
+      "pick": [
+        1193,
+        1194,
+        1752
+      ],
+      "leaves": {
+        "1754": "One-piece pyjamas",
+        "1755": "Two-piece pyjamas"
+      }
+    }
+  ]
+}

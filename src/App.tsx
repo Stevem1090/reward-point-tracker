@@ -10,6 +10,7 @@ import CalendarPage from "./pages/CalendarPage";
 import ListsPage from "./pages/ListsPage";
 import RemindersPage from "./pages/RemindersPage";
 import ProfilePage from "./pages/ProfilePage";
+import VintedDiagnostics from "./pages/VintedDiagnostics";
 import BillsPage from "./pages/BillsPage";
 import MealPlanningPage from "./pages/MealPlanningPage";
 import ChoresPage from "./pages/ChoresPage";
@@ -71,6 +72,7 @@ const App = () => {
                     <Route path="/chores" element={<ChoresPage />} />
                     <Route path="/slimming-world" element={<SlimmingWorldPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/profile/diagnostics/vinted" element={<VintedDiagnostics />} />
                   </Route>
 
                   <Route path="*" element={<NotFound />} />
