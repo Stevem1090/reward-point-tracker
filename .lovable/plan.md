@@ -2,21 +2,16 @@
 
 Build Phase 0, then stop so you can test on the phone. Phases 1–2 (AI analysis, validation, review UI, queue, README) wait for your go-ahead.
 
-## Issue to settle first: the script does not send the events in the brief
-The uploaded `vinted-create-draft.js` never calls `window.mobileApp.postMessage`. It sends no `vinted:started`, `vinted:report`, `vinted:saveResult` or `vinted:fatal` events. It only:
-- sets `window.__VINTED_REPORT__` when it finishes (or `{ fatal }` on error)
-- logs `[vinted-draft]` to the console
+## Script check (new upload)
+The new `vinted-create-draft.js` replaces the old copy. It has 444 lines and defines `notifyHost` at line 35. It sends all four events through `window.mobileApp.postMessage({ detail })`, with the AndroidBridge and window-event fallbacks:
+- `vinted:started`
+- `vinted:report`
+- `vinted:saveResult`
+- `vinted:fatal`
 
-I won't touch the script. There are two ways to handle this:
-- **A (recommended): you add the event calls to the script.** Add a small `emit(type, data)` helper that calls `window.mobileApp?.postMessage({ detail: { type, itemId, at, ...data } })`, and call it at the 4 points in the brief. `saveResult` has to fire inside the script the moment the save request returns. Nothing outside the script can see that reliably before Vinted redirects.
-- **B (stopgap for Phase 0 only):** a separate bridge script, injected before yours, that:
-  - watches the console for `[vinted-draft]` lines through the plugin's console capture
-  - polls `window.__VINTED_REPORT__`
-  - turns both into the same events
-
-  This works for the dry run, because dry runs don't redirect. It can't give a reliable `saveResult` for live saves.
-
-Phase 0 will listen for the brief's events, so it works without changes once you've done A. It will also run bridge B, so a dry run still shows a report today.
+There is no stopgap bridge. The app listens only through `messageFromWebview`. Every run injects the item (with `itemId`) first, then the script, which runs on its own.
+- `itemId` comes back as text, so the app compares it as text.
+- A `fatal` event with no `itemId` counts as part of the run in progress, because only one run happens at a time.
 
 ## Plugin findings
 - Package: `@capgo/inappbrowser`, used through `openWebView()`. I'll pin a version that has `customUserAgent`, which was added in 8.13.0. The npm "latest" tag currently shows 8.6.14, so I'll check this at install time.
