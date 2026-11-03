@@ -16,3 +16,9 @@
 ## Committed Spending
 - [x] Column labels in every card, Done cards at bottom, topline budget with sub-line actuals
 - [x] Account pills only for accounts used this month + "Select account" dropdown
+
+## Vinted drafts
+- [x] Phase 0: Diagnostics screen (in-app browser, login, dry-run test, payload measurement)
+- [ ] Phase 0 phone test — waiting on Steve's results from the device
+- [ ] Phase 1: AI photo analysis (after Phase 0 confirmed)
+- [ ] Phase 2: validation, review UI, queue, README (after Phase 1)
