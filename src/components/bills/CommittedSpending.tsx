@@ -237,7 +237,11 @@ function CommitmentCard({ top, items, update, remove, addSub }: {
           {(g.actual > 0 || hasEst) && (
             <span className="block text-[11px] text-muted-foreground">
               Spent {formatGBP(g.actual)}{hasEst && <> / Est {formatRange(g.estimate)}</>}
-              {!top.is_complete && hasEst && <span className="text-primary"> · Left {formatRange(g.left)}</span>}
+              {!top.is_complete && hasEst && (
+                g.actual > g.estimate.max
+                  ? <span className="text-destructive font-medium"> · Over {formatGBP(g.actual - g.estimate.max)}</span>
+                  : <span className="text-primary"> · Left {formatRange(g.left)}</span>
+              )}
             </span>
           )}
         </button>
