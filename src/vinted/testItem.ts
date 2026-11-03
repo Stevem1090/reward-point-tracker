@@ -10,7 +10,7 @@ export function buildTestItem(itemId: string, images: VintedImage[]) {
   const sizeOptions = sizeGroup
     ? ((ref.sizeGroups as Record<string, { options: Record<string, string> }>)[sizeGroup].options)
     : null;
-  const sizeEntry = sizeOptions ? Object.entries(sizeOptions).find(([, n]) => /4-5 years/i.test(n)) ?? Object.entries(sizeOptions)[0] : null;
+  const sizeEntry = sizeOptions ? Object.entries(sizeOptions).find(([, n]) => /^4 years/i.test(n)) ?? Object.entries(sizeOptions)[0] : null;
 
   return {
     itemId,
