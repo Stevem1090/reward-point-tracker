@@ -12,6 +12,7 @@ import RemindersPage from "./pages/RemindersPage";
 import ProfilePage from "./pages/ProfilePage";
 import VintedDiagnostics from "./pages/VintedDiagnostics";
 import VintedPricingRules from "./pages/VintedPricingRules";
+import VintedBatch from "./pages/VintedBatch";
 import BillsPage from "./pages/BillsPage";
 import MealPlanningPage from "./pages/MealPlanningPage";
 import ChoresPage from "./pages/ChoresPage";
@@ -75,6 +76,7 @@ const App = () => {
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/profile/diagnostics/vinted" element={<VintedDiagnostics />} />
                     <Route path="/profile/vinted/pricing" element={<VintedPricingRules />} />
+                    <Route path="/profile/vinted/batch" element={<VintedBatch />} />
                   </Route>
 
                   <Route path="*" element={<NotFound />} />
