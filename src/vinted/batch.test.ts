@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { acceptAllPrices, blockerFor, canAdd, MAX_ITEMS, newItem, recoverAfterRestart, type BatchItem } from './batch';
 
 const base = (o: Partial<BatchItem>): BatchItem => ({ ...newItem([], '', ''), ...o });
