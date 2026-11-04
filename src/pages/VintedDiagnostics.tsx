@@ -10,6 +10,10 @@ import { REFERENCE_CAPTURED } from '@/vinted/reference';
 import { resizeForVinted } from '@/vinted/imageResize';
 import { buildTestItem } from '@/vinted/testItem';
 import { Progress } from '@/components/ui/progress';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { analysePhotos, analysisToDraft, type Analysis } from '@/vinted/analysis';
+import { validateDraft } from '@/vinted/validate';
 import { closeVinted, exec, goToNew, hideVinted, resizeVinted, showVinted, type DockSize, injectAndRun, listen, openVinted, pluginVersion, PROBE_SCRIPT, VINTED_SCRIPT } from '@/vinted/browser';
 
 type Probe = { url: string; userAgent: string; width: number; hasTitleField: boolean; botCheck: boolean; loginWall: boolean; openInApp: boolean };
@@ -32,6 +36,17 @@ export default function VintedDiagnostics() {
   const [dock, setDock] = useState<DockSize>('small');
   const [hidden, setHidden] = useState(false);
   const runId = useRef<string | null>(null);
+  const [confirmLive, setConfirmLive] = useState(false);
+  const [save, setSave] = useState<{ ok: boolean; status: number; draftId: any; sentPrice: any; alerts?: any[]; at: number; receivedAt: number } | null>(null);
+  const saveRef = useRef<number | null>(null);
+  const liveMode = useRef(false);
+  const liveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [redirectAt, setRedirectAt] = useState<{ url: string; at: number } | null>(null);
+  const [liveUnknown, setLiveUnknown] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [aiPrice, setAiPrice] = useState('');
+  const [aiImagesCount, setAiImagesCount] = useState(0);
 
   const add = (text: string) => setLog((l) => [...l, { at: new Date().toLocaleTimeString('en-GB'), text }]);
 
@@ -51,12 +66,21 @@ export default function VintedDiagnostics() {
           add(`${d.type} ${JSON.stringify(d)}`);
           if (d.type === 'vinted:progress') setSteps((p) => [...p, { step: String(d.step), ok: d.ok, done: Number(d.done) || 0, total: Number(d.total) || 0 }]);
           if (d.type === 'vinted:report') setReport(d);
-          if (d.type === 'vinted:report' || d.type === 'vinted:fatal' || d.type === 'vinted:saveResult') setRunning(false);
+          if (d.type === 'vinted:saveResult') {
+            const receivedAt = Date.now();
+            saveRef.current = receivedAt;
+            setSave({ ok: !!d.ok, status: Number(d.status), draftId: d.draftId, sentPrice: d.sentPrice, alerts: d.alerts, at: Number(d.at) || receivedAt, receivedAt });
+          }
+          if ((d.type === 'vinted:saveResult' || d.type === 'vinted:fatal') && liveTimer.current) { clearTimeout(liveTimer.current); liveTimer.current = null; }
+          if ((d.type === 'vinted:report' && !liveMode.current) || d.type === 'vinted:fatal' || d.type === 'vinted:saveResult') setRunning(false);
         } else {
           add(`message ${JSON.stringify(d)}`);
         }
       },
-      onUrl: (u) => { setUrl(u); add(`URL ${u}`); },
+      onUrl: (u) => {
+        setUrl(u); add(`URL ${u}`);
+        if (liveMode.current && !/\/items\/new/.test(u)) setRedirectAt((p) => p ?? { url: u, at: Date.now() });
+      },
       onLoaded: () => { add('Page loaded'); setTimeout(() => exec(PROBE_SCRIPT).catch(() => {}), 1500); },
       onConsole: (level, msg) => { if (msg.includes('[vinted-draft]')) add(`console.${level}: ${msg.slice(0, 500)}`); },
       onClose: () => { setOpen(false); add('Browser closed'); },
@@ -69,10 +93,12 @@ export default function VintedDiagnostics() {
     catch (e: any) { add(`Open failed: ${e?.message || e}`); }
   };
 
-  const runTest = async () => {
+  const runTest = async (live = false) => {
     if (!files.length) { toast('Pick up to 5 photos first'); return; }
-    setRunning(true); setReport(null); setSteps([]);
-    const id = `diag-${Date.now()}`;
+    setRunning(true); setReport(null); setSteps([]); setSave(null); setRedirectAt(null); setLiveUnknown(false);
+    saveRef.current = null;
+    liveMode.current = live;
+    const id = `diag-${live ? 'live' : 'dry'}-${Date.now()}`;
     runId.current = id;
     try {
       if (!open) {
@@ -87,14 +113,37 @@ export default function VintedDiagnostics() {
       const images = await Promise.all(files.slice(0, 5).map((f, i) => resizeForVinted(f, i)));
       add(`Resized ${images.length} photos in ${Math.round(performance.now() - t)} ms: ${images.map((i) => `${(i.base64.length / 1024).toFixed(0)} KB`).join(', ')}`);
       const item = buildTestItem(id, images);
+      if (live) { item.title = 'Test draft please delete'; item.description = 'Test draft created by Family Hub diagnostics. Please delete.'; }
       add(`Test item: leaf ${item.categoryLeafId}, path [${item.categoryPath}], size ${item.sizeId}, brand ${item.brandName}`);
-      const stats = await injectAndRun(item, false, add);
+      liveMode.current = live; // ignore URL changes from the fresh-form navigation above
+      setRedirectAt(null);
+      const stats = await injectAndRun(item, live, add);
+      if (live) {
+        liveTimer.current = setTimeout(() => { setLiveUnknown(true); setRunning(false); add('No saveResult or fatal within 120 s: result unknown. Check your Vinted drafts by hand before retrying.'); }, 120_000);
+      }
       add(`Payload: ${JSON.stringify(stats)}`);
     } catch (e: any) {
       add(`Run failed: ${e?.message || e}`);
       setRunning(false);
     }
   };
+
+  const runAnalysis = async () => {
+    if (!files.length) { toast('Pick photos first'); return; }
+    setAiBusy(true); setAnalysis(null);
+    try {
+      const images = await Promise.all(files.slice(0, 5).map((f, i) => resizeForVinted(f, i)));
+      setAiImagesCount(images.length);
+      const t = performance.now();
+      const a = await analysePhotos(images);
+      add(`AI analysis in ${Math.round(performance.now() - t)} ms: ${JSON.stringify(a)}`);
+      setAnalysis(a);
+    } catch (e: any) { add(`AI analysis failed: ${e?.message || e}`); toast(`Analysis failed: ${e?.message || e}`); }
+    finally { setAiBusy(false); }
+  };
+  const aiErrors = analysis
+    ? validateDraft(analysisToDraft(analysis, 'preview', Array.from({ length: aiImagesCount }, (_, i) => ({ name: `p${i}.jpg`, type: 'image/jpeg', base64: 'x' })), aiPrice ? Number(aiPrice) : null))
+    : [];
 
   const copyLog = async () => {
     const text = [
@@ -186,9 +235,60 @@ export default function VintedDiagnostics() {
             <CardContent className="p-3 pt-0 space-y-2 text-sm">
               <input type="file" accept="image/*" multiple className="block w-full text-sm" onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 5))} />
               <p className="text-muted-foreground">{files.length} photo(s) chosen. Nothing is saved to Vinted (saveDraft: false).</p>
-              <Button className="h-11 w-full" disabled={files.length === 0 || running} onClick={runTest}><Play className="mr-1 h-4 w-4" />{running ? 'Running…' : 'Run test'}</Button>
+              <Button className="h-11 w-full" disabled={files.length === 0 || running} onClick={() => runTest(false)}><Play className="mr-1 h-4 w-4" />{running ? 'Running…' : 'Run test'}</Button>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="p-3 pb-1"><CardTitle className="text-base">Live test (creates a real draft)</CardTitle></CardHeader>
+            <CardContent className="p-3 pt-0 space-y-2 text-sm">
+              <p className="text-muted-foreground">Uses the photos above and the title "Test draft please delete". Saves one draft to your Vinted account.</p>
+              <Button className="h-11 w-full" variant="destructive" disabled={files.length === 0 || running} onClick={() => setConfirmLive(true)}>Run live test</Button>
+              {(save || liveUnknown) && (
+                <div className="space-y-1 rounded border p-2">
+                  {save ? (<>
+                    <div><span className="text-muted-foreground">ok:</span> <b className={save.ok ? '' : 'text-destructive'}>{String(save.ok)}</b> · <span className="text-muted-foreground">status:</span> {save.status}</div>
+                    <div><span className="text-muted-foreground">draftId:</span> {save.draftId ?? '–'} · <span className="text-muted-foreground">sentPrice:</span> {save.sentPrice ?? '–'}</div>
+                    {save.alerts?.length ? <div className="text-destructive">Alerts: {save.alerts.join('; ')}</div> : null}
+                    {save.draftId && <a className="text-primary underline break-all" href={`https://www.vinted.co.uk/items/${save.draftId}/edit`} target="_blank" rel="noreferrer">https://www.vinted.co.uk/items/{save.draftId}/edit</a>}
+                    <div className="text-xs">
+                      Result event: {new Date(save.receivedAt).toLocaleTimeString('en-GB')}.{String(save.receivedAt % 1000).padStart(3, '0')}
+                      {redirectAt ? <> · Page changed: {new Date(redirectAt.at).toLocaleTimeString('en-GB')}.{String(redirectAt.at % 1000).padStart(3, '0')} → <b>{save.receivedAt <= redirectAt.at ? `result arrived first (${redirectAt.at - save.receivedAt} ms earlier)` : `page changed first (${save.receivedAt - redirectAt.at} ms earlier)`}</b></> : ' · No page change seen yet'}
+                    </div>
+                  </>) : <div className="text-destructive">Unknown: no result within 120 seconds. Check your Vinted drafts before trying again.</div>}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="p-3 pb-1"><CardTitle className="text-base">AI analysis test</CardTitle></CardHeader>
+            <CardContent className="p-3 pt-0 space-y-2 text-sm">
+              <p className="text-muted-foreground">Reads the photos above and suggests a listing. Nothing is sent to Vinted.</p>
+              <Button className="h-11 w-full" variant="outline" disabled={files.length === 0 || aiBusy} onClick={runAnalysis}>{aiBusy ? 'Analysing…' : 'Analyse photos'}</Button>
+              {analysis && (
+                <div className="space-y-2">
+                  <Input className="h-11" inputMode="decimal" placeholder="Price £ (you set this)" value={aiPrice} onChange={(e) => setAiPrice(e.target.value)} />
+                  {analysis.flags.length > 0 && <div className="flex flex-wrap gap-1">{analysis.flags.map((f) => <Badge key={f} variant="secondary">{f}</Badge>)}</div>}
+                  <div className={aiErrors.length ? 'text-destructive' : ''}>{aiErrors.length ? `Blocked: ${aiErrors.join('; ')}` : 'Passes all checks'}</div>
+                  <pre className="text-xs bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap">{JSON.stringify(analysis, null, 2)}</pre>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <AlertDialog open={confirmLive} onOpenChange={setConfirmLive}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Create a real Vinted draft?</AlertDialogTitle>
+                <AlertDialogDescription>This saves a real draft called "Test draft please delete" in your Vinted account. It won't be published, and Family Hub won't delete it. You'll need to delete it yourself.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="h-11">Cancel</AlertDialogCancel>
+                <AlertDialogAction className="h-11" onClick={() => runTest(true)}>Create draft</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {report && (
             <Card>
