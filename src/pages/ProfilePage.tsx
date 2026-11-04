@@ -174,6 +174,9 @@ const ProfilePage = () => {
       <Button asChild variant="outline" className="mb-4 h-11 w-full">
         <Link to="/profile/diagnostics/vinted">Diagnostics: Vinted browser</Link>
       </Button>
+      <Button asChild variant="outline" className="mb-4 h-11 w-full">
+        <Link to="/profile/vinted/pricing">Vinted pricing rules</Link>
+      </Button>
       
       {error && (
         <Alert variant="destructive" className="mb-4">
