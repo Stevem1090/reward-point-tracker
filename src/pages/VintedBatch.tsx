@@ -19,7 +19,7 @@ import { allowedConditions } from '@/vinted/validate';
 import { exec, goToNew, hideVinted, injectAndRun, listen, openVinted, PROBE_SCRIPT, resizeVinted, showVinted, type DockSize } from '@/vinted/browser';
 import {
   acceptAllPrices, applyAnalysis, approvalErrors, blockerFor, canAdd, deleteItem, draftLink, loadItems, MAX_ITEMS,
-  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, toDraft, type BatchItem,
+  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, toDraft, describeReportErrors, type BatchItem,
 } from '@/vinted/batch';
 
 const STATUS: Record<BatchItem['status'], string> = {
@@ -106,8 +106,10 @@ export default function VintedBatch() {
         if (d.type === 'vinted:fatal') waiter.current?.({ kind: 'fatal', reason: String(d.error ?? d.message ?? 'Form filling failed') });
         if (d.type === 'vinted:report') {
           const errs = Array.isArray(d.errors) ? d.errors : [];
-          if ((window as any).__batchDry) waiter.current?.(errs.length ? { kind: 'fatal', reason: `Field problems: ${errs.map((e: any) => typeof e === 'string' ? e : (e?.field ?? e?.message ?? JSON.stringify(e))).join(', ')}` } : { kind: 'dryOk' });
-          else if (d.willSave === false || errs.length) waiter.current?.({ kind: 'fatal', reason: errs.length ? `Field problems: ${errs.map((e: any) => typeof e === 'string' ? e : (e?.field ?? e?.message ?? JSON.stringify(e))).join(', ')}` : 'Vinted form was not ready to save' });
+          const cur = itemsRef.current.find((x) => x.id === currentId.current);
+          const problems = errs.length ? `Field problems: ${describeReportErrors(d, cur ? toDraft(cur) : undefined)}` : '';
+          if ((window as any).__batchDry) waiter.current?.(errs.length ? { kind: 'fatal', reason: problems } : { kind: 'dryOk' });
+          else if (d.willSave === false || errs.length) waiter.current?.({ kind: 'fatal', reason: problems || 'Vinted form was not ready to save' });
         }
       },
       onUrl: () => {}, onLoaded: () => {}, onConsole: () => {},

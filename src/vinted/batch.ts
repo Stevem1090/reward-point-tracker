@@ -50,12 +50,58 @@ export function applyAnalysis(it: BatchItem, a: Analysis): BatchItem {
   };
 }
 
+/** Title as Vinted stores it: single spaces, no leading/trailing space. */
+export const cleanTitle = (s: string) => String(s ?? '').replace(/\s+/g, ' ').trim();
+
+/**
+ * Description as Vinted stores it. Vinted tidies stray spaces and line breaks, so text sent
+ * with them reads back different and the script's check sees it as "drifting".
+ */
+export const cleanDescription = (s: string) =>
+  String(s ?? '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n').map((l) => l.replace(/[ \t\u00a0]+/g, ' ').trim()).join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
 export function toDraft(it: BatchItem): Partial<DraftItem> {
   if (!it.analysis) return {};
   return {
     ...analysisToDraft(it.analysis, it.id, it.images, it.price ? Number(it.price) : null),
-    title: it.title, description: it.description, conditionId: it.conditionId ?? undefined,
+    title: cleanTitle(it.title), description: cleanDescription(it.description), conditionId: it.conditionId ?? undefined,
   };
+}
+
+const FIELD_VALUE_KEY: Record<string, string> = {
+  category: 'category', title: 'title', brand: 'brand', size: 'size', condition: 'condition',
+  colours: 'colours', material: 'material', price: 'price',
+};
+
+/**
+ * Turn the script's report into a readable problem. For "still drifting", name the fields that
+ * kept changing (from the last "pass N re-applying: …" step) and what Vinted showed.
+ */
+export function describeReportErrors(report: { errors?: unknown[]; steps?: unknown[]; finalValues?: Record<string, unknown> }, draft?: Partial<DraftItem>): string {
+  const errs = (Array.isArray(report.errors) ? report.errors : []).map((e: any) =>
+    typeof e === 'string' ? e : (e?.field ?? e?.message ?? JSON.stringify(e)));
+  const steps = (Array.isArray(report.steps) ? report.steps : []).map(String);
+  const last = [...steps].reverse().find((s) => /^pass \d+ re-applying:/.test(s));
+  const fields = last ? last.replace(/^pass \d+ re-applying:\s*/, '').split(',').map((s) => s.trim()).filter(Boolean) : [];
+  const fv = report.finalValues ?? {};
+  const want: Record<string, unknown> = {
+    title: draft?.title, description: draft?.description, brand: draft?.brandName, price: draft?.price,
+    colours: draft?.colourIds ? `${draft.colourIds.length} colour(s)` : undefined,
+    material: draft?.materialIds ? `${draft.materialIds.length} material(s)` : undefined,
+  };
+  const detail = fields.map((f) => {
+    const key = FIELD_VALUE_KEY[f];
+    const shown = key ? fv[key] : undefined;
+    const parts = [f];
+    if (want[f] != null && f !== 'description') parts.push(`wanted "${want[f]}"`);
+    if (shown != null) parts.push(`Vinted shows "${shown || 'nothing'}"`);
+    return parts.join(' – ');
+  });
+  return errs.map((e) => /still drifting/.test(e) && detail.length ? `${e} (kept changing: ${detail.join('; ')})` : e).join(', ');
 }
 
 export const approvalErrors = (it: BatchItem) =>
