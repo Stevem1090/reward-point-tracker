@@ -182,6 +182,5 @@ export function analysisToDraft(a: Analysis, itemId: string, images: DraftItem['
     colourIds: a.colourIds,
     materialIds: a.materialIds,
     price: price ?? undefined,
-    packageId: 1,
   };
 }

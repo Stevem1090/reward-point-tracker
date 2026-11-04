@@ -16,7 +16,8 @@ export type DraftItem = {
   colourIds: number[];
   materialIds: number[];
   price: number;
-  packageId: 1 | 2 | 3;
+  /** Optional: leave out to use Vinted's recommended parcel size. Only send when manually overridden. */
+  packageId?: 1 | 2 | 3;
 };
 
 const has = (o: Record<string, unknown>, id: unknown) => id != null && Object.prototype.hasOwnProperty.call(o, String(id));
@@ -66,7 +67,7 @@ export function validateDraft(item: Partial<DraftItem>): string[] {
 
   if (!(typeof item.price === 'number' && Number.isFinite(item.price) && item.price > 0)) e.push('Price must be more than £0');
   if (!item.images?.length) e.push('At least one photo is needed');
-  if (![1, 2, 3].includes(item.packageId as number)) e.push('Package size must be Small, Medium or Large');
+  if (item.packageId != null && ![1, 2, 3].includes(item.packageId as number)) e.push('Package size must be Small, Medium or Large');
 
   const title = (item.title ?? '').trim();
   if (!title) e.push('Title is missing');
