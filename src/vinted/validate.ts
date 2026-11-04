@@ -69,3 +69,14 @@ export function validateDraft(item: Partial<DraftItem>): string[] {
   if (!(item.description ?? '').trim()) e.push('Description is missing');
   return e;
 }
+
+/**
+ * Approval gate: hard validation plus human checks. Nothing is sent with an unconfirmed price,
+ * and worn or flawed underwear can never be listed.
+ */
+export function validateForApproval(item: Partial<DraftItem>, opts: { priceConfirmed: boolean; flags?: string[] }): string[] {
+  const e = validateDraft(item);
+  if (!opts.priceConfirmed) e.push('Price must be confirmed');
+  if (opts.flags?.includes('cannot_list_underwear')) e.push('Underwear with wear or flaws cannot be listed');
+  return e;
+}

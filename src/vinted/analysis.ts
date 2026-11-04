@@ -2,6 +2,7 @@ import aiReference from './vinted-reference-kids-for-ai.txt?raw';
 import { VINTED_REFERENCE as ref, findLeaf } from './reference';
 import type { DraftItem } from './validate';
 import { supabase } from '@/integrations/supabase/client';
+import { applyPricing, loadRules, rulesForAI, type PricingRule } from './pricing';
 
 type Confidence = 'low' | 'medium' | 'high';
 export type Analysis = {
@@ -13,9 +14,13 @@ export type Analysis = {
   sizeId: number | null;
   sizeEvidence: string;
   conditionId: number | null;
+  conditionReason: string;
+  notesUsed: string[];
   colourIds: number[];
   materialIds: number[];
-  price: null;
+  suggestedPrice: number | null;
+  priceRationale: string;
+  priceConfidence: Confidence;
   confidence: Record<string, Confidence>;
   flags: string[];
 };
@@ -24,6 +29,7 @@ const leafIds = (ref.categories as { leaves: Record<string, string> }[]).flatMap
 const allSizeIds = [...new Set(Object.values(ref.sizeGroups as Record<string, { options: Record<string, string> }>).flatMap((g) => Object.keys(g.options)))];
 const conf = { type: 'string', enum: ['low', 'medium', 'high'] };
 const nullableEnum = (ids: string[]) => ({ type: ['string', 'null'], enum: [...ids, null] });
+export const UNDERWEAR_LEAVES = ref.conditions.exceptions.onlyNewWithTags.leaves.map(Number);
 
 /** JSON schema whose ID fields are enums built from the reference JSON (IDs as strings). */
 export function analysisSchema() {
@@ -31,7 +37,7 @@ export function analysisSchema() {
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['title', 'description', 'categoryLeafId', 'brandNameRead', 'brandId', 'sizeId', 'sizeEvidence', 'conditionId', 'colourIds', 'materialIds', 'price', 'confidence', 'flags'],
+    required: ['title', 'description', 'categoryLeafId', 'brandNameRead', 'brandId', 'sizeId', 'sizeEvidence', 'conditionId', 'conditionReason', 'notesUsed', 'colourIds', 'materialIds', 'suggestedPrice', 'priceRationale', 'priceConfidence', 'confidence', 'flags'],
     properties: {
       title: { type: 'string' },
       description: { type: 'string' },
@@ -41,46 +47,107 @@ export function analysisSchema() {
       sizeId: nullableEnum(allSizeIds),
       sizeEvidence: { type: 'string' },
       conditionId: { type: 'string', enum: Object.keys(ref.conditions.default) },
+      conditionReason: { type: 'string' },
+      notesUsed: { type: 'array', items: { type: 'string' } },
       colourIds: { type: 'array', maxItems: 2, items: { type: 'string', enum: Object.keys(ref.colours.options) } },
       materialIds: { type: 'array', items: { type: 'string', enum: Object.keys(ref.materials.options) } },
-      price: { type: 'null' },
+      suggestedPrice: { type: 'number' },
+      priceRationale: { type: 'string' },
+      priceConfidence: conf,
       confidence: { type: 'object', additionalProperties: false, required: fields, properties: Object.fromEntries(fields.map((f) => [f, conf])) },
       flags: { type: 'array', items: { type: 'string' } },
     },
   };
 }
 
-export const ANALYSIS_RULES = `You write Vinted UK listings for second-hand KIDS clothing from photos. Use ONLY IDs from the reference below; never invent an ID.
+export const ANALYSIS_RULES = `You write Vinted UK listings for second-hand KIDS clothing from photos and the seller's notes. Use ONLY IDs from the reference below; never invent an ID.
 - categoryLeafId: one leaf category ID. If the item is not kids clothing (women, men, adult sizes), still pick the closest leaf and add flag "not_kids".
 - Brand: brandNameRead = the brand text you can read on a label (or null). brandId only if it is one of the ten main brands in the reference; otherwise brandId null and add flag "unknown_brand". Do not use sub-brand IDs.
 - Size: use the printed AGE on the label (e.g. "4-5 years"), not cm. Choose a size from the size group of the chosen category. Put the label text you read in sizeEvidence. If no size label is readable or it only shows height, choose the closest and add flag "size_unclear". sizeId null ONLY for categories with no size field.
 - Materials: only from a readable composition label; otherwise empty and flag "no_material_label".
 - Colours: one or two, main colours only.
-- Condition: your best guess from the photos; a human always confirms it. Underwear (leaves 1602, 1759) must be 6 (New with tags).
-- price is always null. Never suggest a price.
-- title: short, sentence case, e.g. "Navy cotton skirt age 4". Never write any word of 3+ letters in ALL CAPITALS (write "Next", not "NEXT").
-- description: 1-3 short sentences with only facts visible in the photos or labels. No made-up measurements, no claims you can't see.
-- confidence: low/medium/high per field. flags: short codes for anything a human must check.`;
+
+SELLER NOTES (may be empty):
+- Every defect or fact in the notes MUST appear in the description, in plain honest words, in the final line. Never drop, soften or hide a defect. Never add defects that are not in the notes or clearly visible in the photos.
+- notesUsed: the note facts you included, one short phrase each (empty if no notes).
+
+CONDITION (IDs: 6 New with tags, 1 New without tags, 2 Very good, 3 Good, 4 Satisfactory):
+- No notes and no visible flaws: normally 2. Use 6 or 1 only if tags or packaging are clearly visible.
+- 6 only if tags are visible AND the notes mention no flaws. Any flaw means at most 2.
+- Barely noticeable flaw (slight mark, light bobbling, worn once or twice): 2, or 3 if the flaw would be noticed.
+- Visible mark or stain, noticeable wear or fading: 3.
+- Significant stain, hole, tear, broken zip, missing button, heavy fading: 4.
+- If the notes and photos disagree, add flag "notes_photos_disagree" and choose the lower condition.
+- Underwear (leaves 1602 and 1759) only allows 6. If the notes or photos show any wear or flaw on underwear, still return 6 but add flag "cannot_list_underwear".
+- conditionReason: one short sentence, e.g. "Downgraded to Good because the notes mention a mark on the front."
+
+PRICE (GBP): suggestedPrice in whole pounds or 50p steps. If one of the seller's PRICING RULES matches the category type and brand, use it and say so in priceRationale; you may move it by at most £1 up or down for condition. With no matching rule (only the fallback), suggest a sensible second-hand price and set priceConfidence "low". You have no live market data, so priceConfidence is normally "low" unless a rule matches. priceRationale: one short sentence.
+
+TITLE: short, sentence case, e.g. "Navy cotton skirt age 4". Never write any word of 3+ letters in ALL CAPITALS (write "Next", not "NEXT").
+
+DESCRIPTION: plain text, 2 to 4 short lines separated by line breaks, about 25 to 60 words in total. No markdown, emojis, hashtags or all-caps. No invented details. No measurements unless on the label.
+- Line 1: what it is (item type, brand, size as printed on the label), e.g. "Next girls floral zip-up hoodie, 12-18 months."
+- Line 2: only features a buyer cares about (hood, zip, pockets, pattern). No fabric descriptions or marketing language.
+- Line 3: composition if the label is readable, e.g. "85% cotton, 15% polyester." Leave this line out if not readable.
+- Final line: condition and any flaws (from the notes or clearly visible in the photos).
+
+confidence: low/medium/high per field. flags: short codes for anything a human must check.`;
 
 const num = (v: unknown) => (v == null || v === '' ? null : Number(v));
 
-export async function analysePhotos(images: { base64: string }[]): Promise<Analysis> {
+export type AnalyseInput = { notes?: string; hints?: string; rules?: PricingRule[] };
+
+export async function analysePhotos(images: { base64: string }[], input: AnalyseInput = {}): Promise<Analysis> {
+  const rules = input.rules ?? loadRules();
   const { data, error } = await supabase.functions.invoke('vinted-analyse', {
-    body: { images: images.map((i) => i.base64), schema: analysisSchema(), rules: ANALYSIS_RULES, reference: aiReference },
+    body: {
+      images: images.map((i) => i.base64),
+      schema: analysisSchema(),
+      rules: ANALYSIS_RULES,
+      reference: aiReference,
+      notes: (input.notes ?? '').slice(0, 1000),
+      hints: (input.hints ?? '').slice(0, 300),
+      pricingRules: rulesForAI(rules),
+    },
   });
   if (error) throw new Error(error.message);
   if (data?.error) throw new Error(data.error);
-  const r = data.result;
+  return normaliseAnalysis(data.result, rules);
+}
+
+/** Convert raw AI output (string IDs) into typed values and apply the seller's pricing rules. */
+export function normaliseAnalysis(r: any, rules: PricingRule[]): Analysis {
+  const leafId = num(r.categoryLeafId);
+  const brandId = num(r.brandId);
+  const flags = new Set<string>([...(r.flags ?? []), 'confirm_condition']);
+  let conditionId = num(r.conditionId);
+  if (leafId != null && UNDERWEAR_LEAVES.includes(leafId) && conditionId !== 6) {
+    flags.add('cannot_list_underwear');
+    conditionId = 6;
+  }
+  const price = applyPricing(rules, leafId, brandId, {
+    suggestedPrice: typeof r.suggestedPrice === 'number' ? r.suggestedPrice : null,
+    priceRationale: r.priceRationale ?? '',
+    priceConfidence: r.priceConfidence ?? 'low',
+  });
   return {
-    ...r,
-    categoryLeafId: num(r.categoryLeafId),
-    brandId: num(r.brandId),
+    title: r.title ?? '',
+    description: r.description ?? '',
+    categoryLeafId: leafId,
+    brandNameRead: r.brandNameRead ?? null,
+    brandId,
     sizeId: num(r.sizeId),
-    conditionId: num(r.conditionId),
+    sizeEvidence: r.sizeEvidence ?? '',
+    conditionId,
+    conditionReason: r.conditionReason ?? '',
+    notesUsed: r.notesUsed ?? [],
     colourIds: (r.colourIds ?? []).map(Number).slice(0, 2),
     materialIds: (r.materialIds ?? []).map(Number),
-    price: null,
-    flags: [...(r.flags ?? []), 'confirm_condition'],
+    suggestedPrice: price.suggestedPrice,
+    priceRationale: price.priceRationale,
+    priceConfidence: price.priceConfidence,
+    confidence: r.confidence ?? {},
+    flags: [...flags],
   };
 }
 
