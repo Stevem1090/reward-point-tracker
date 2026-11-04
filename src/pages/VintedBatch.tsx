@@ -368,17 +368,23 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
           <Textarea rows={5} value={it.description} onChange={(e) => set({ description: e.target.value })} />
           <Label>Brand</Label>
           {a.brandNameRead && <p className="text-xs text-muted-foreground">Label reads: {a.brandNameRead}</p>}
-          <select className="h-11 w-full rounded-md border border-input bg-background px-2" value={it.brandId == null ? '' : String(it.brandId)}
+          {it.brandId == null && (it.noBrand || a.brandStatus === 'none_visible') && <Badge variant="secondary">No brand</Badge>}
+          {a.brandStatus === 'not_in_list' && it.brandId == null && !it.noBrand && <p className="text-xs text-destructive">A brand is visible but isn't in the list. Pick one, or confirm "No brand".</p>}
+          <div className="flex gap-2">
+          <select className="h-11 min-w-0 flex-1 rounded-md border border-input bg-background px-2" value={it.brandId == null ? '' : String(it.brandId)}
             onChange={(e) => {
               const v = e.target.value;
               if (v === '') set({ brandId: null, brandName: '' });
-              else if (v === '0') set({ brandId: 0, brandName: it.brandId === 0 ? it.brandName : (a.brandNameRead ?? '') });
-              else set({ brandId: Number(v), brandName: (VINTED_REFERENCE.brands.main as Record<string, string>)[v] });
+              else if (v === '0') set({ noBrand: false, brandId: 0, brandName: it.brandId === 0 ? it.brandName : (a.brandNameRead ?? '') });
+              else set({ noBrand: false, brandId: Number(v), brandName: (VINTED_REFERENCE.brands.main as Record<string, string>)[v] });
             }}>
             <option value="">Choose a brand…</option>
             {Object.entries(VINTED_REFERENCE.brands.main as Record<string, string>).sort((x, y) => x[1].localeCompare(y[1])).map(([id, n]) => <option key={id} value={id}>{n}</option>)}
             <option value="0">Other (type it)…</option>
           </select>
+          <Button type="button" className="h-11 shrink-0" variant={it.noBrand && it.brandId == null ? 'secondary' : 'outline'}
+            onClick={() => set({ noBrand: !(it.noBrand && it.brandId == null), brandId: null, brandName: '' })}>No brand</Button>
+          </div>
           {it.brandId === 0 && <Input placeholder="Brand name exactly as on Vinted" value={it.brandName ?? ''} onChange={(e) => set({ brandName: e.target.value })} />}
           <Label>Condition</Label>
           <select className="h-11 w-full rounded-md border border-input bg-background px-2" value={it.conditionId ?? ''} onChange={(e) => set({ conditionId: Number(e.target.value) })}>

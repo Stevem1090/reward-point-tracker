@@ -5,12 +5,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { applyPricing, loadRules, rulesForAI, type PricingRule } from './pricing';
 
 type Confidence = 'low' | 'medium' | 'high';
+export type BrandStatus = 'identified' | 'none_visible' | 'not_in_list';
+
 export type Analysis = {
   title: string;
   description: string;
   categoryLeafId: number | null;
   brandNameRead: string | null;
   brandId: number | null;
+  /** identified = brand from the list; none_visible = no brand anywhere; not_in_list = brand seen but not in the list. */
+  brandStatus: BrandStatus;
   sizeId: number | null;
   sizeEvidence: string;
   conditionId: number | null;
@@ -37,13 +41,14 @@ export function analysisSchema() {
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['title', 'description', 'categoryLeafId', 'brandNameRead', 'brandId', 'sizeId', 'sizeEvidence', 'conditionId', 'conditionReason', 'notesUsed', 'colourIds', 'materialIds', 'suggestedPrice', 'priceRationale', 'priceConfidence', 'confidence', 'flags'],
+    required: ['title', 'description', 'categoryLeafId', 'brandNameRead', 'brandId', 'brandStatus', 'sizeId', 'sizeEvidence', 'conditionId', 'conditionReason', 'notesUsed', 'colourIds', 'materialIds', 'suggestedPrice', 'priceRationale', 'priceConfidence', 'confidence', 'flags'],
     properties: {
       title: { type: 'string' },
       description: { type: 'string' },
       categoryLeafId: { type: 'string', enum: leafIds },
       brandNameRead: { type: ['string', 'null'] },
       brandId: nullableEnum(Object.keys(ref.brands.main)),
+      brandStatus: { type: 'string', enum: ['identified', 'none_visible', 'not_in_list'] },
       sizeId: nullableEnum(allSizeIds),
       sizeEvidence: { type: 'string' },
       conditionId: { type: 'string', enum: Object.keys(ref.conditions.default) },
@@ -62,7 +67,10 @@ export function analysisSchema() {
 
 export const ANALYSIS_RULES = `You write Vinted UK listings for second-hand KIDS clothing from photos and the seller's notes. Use ONLY IDs from the reference below; never invent an ID.
 - categoryLeafId: one leaf category ID. If the item is not kids clothing (women, men, adult sizes), still pick the closest leaf and add flag "not_kids".
-- Brand: brandNameRead = the brand text you can read on a label (or null). brandId only if it is one of the ten main brands in the reference; otherwise brandId null and add flag "unknown_brand". Do not use sub-brand IDs.
+- Brand: brandNameRead = the brand text you can read on a label or the item (or null). Do not use sub-brand IDs. brandStatus:
+  - "identified": a brand from the reference list is clearly shown on the label or item (or stated in the notes). Set brandId.
+  - "none_visible": no brand is visible anywhere in the photos or notes. brandId null. The item will be listed without a brand.
+  - "not_in_list": a brand IS visible but it is not in the reference list. brandId null, put what you read in brandNameRead, and add flag "unknown_brand".
 - Size: use the printed AGE on the label (e.g. "4-5 years"), not cm. Choose a size from the size group of the chosen category. Put the label text you read in sizeEvidence. If no size label is readable or it only shows height, choose the closest and add flag "size_unclear". sizeId null ONLY for categories with no size field.
 - Materials: only from a readable composition label; otherwise empty and flag "no_material_label".
 - Colours: one or two, main colours only.
@@ -119,6 +127,9 @@ export async function analysePhotos(images: { base64: string }[], input: Analyse
 export function normaliseAnalysis(r: any, rules: PricingRule[]): Analysis {
   const leafId = num(r.categoryLeafId);
   const brandId = num(r.brandId);
+  const brandStatus: BrandStatus = brandId != null ? 'identified'
+    : r.brandStatus === 'none_visible' && !r.brandNameRead ? 'none_visible' : r.brandStatus === 'none_visible' ? 'not_in_list'
+    : r.brandStatus === 'identified' ? (r.brandNameRead ? 'not_in_list' : 'none_visible') : 'not_in_list';
   const flags = new Set<string>([...(r.flags ?? []), 'confirm_condition']);
   let conditionId = num(r.conditionId);
   if (leafId != null && UNDERWEAR_LEAVES.includes(leafId) && conditionId !== 6) {
@@ -136,6 +147,7 @@ export function normaliseAnalysis(r: any, rules: PricingRule[]): Analysis {
     categoryLeafId: leafId,
     brandNameRead: r.brandNameRead ?? null,
     brandId,
+    brandStatus,
     sizeId: num(r.sizeId),
     sizeEvidence: r.sizeEvidence ?? '',
     conditionId,
@@ -164,6 +176,7 @@ export function analysisToDraft(a: Analysis, itemId: string, images: DraftItem['
     categoryPath: leaf?.pick,
     brandId: a.brandId ?? undefined,
     brandName: a.brandId != null ? main[String(a.brandId)] : undefined,
+    noBrand: a.brandId == null && a.brandStatus === 'none_visible' ? true : undefined,
     sizeId: a.sizeId,
     conditionId: a.conditionId ?? undefined,
     colourIds: a.colourIds,
