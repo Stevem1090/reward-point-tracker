@@ -11,7 +11,28 @@ export const DESKTOP_UA =
 
 let webviewId: string | undefined;
 
-export async function openVinted() {
+/** Fraction of the screen given to Vinted (lower part). The app stays visible above it. */
+export type DockSize = 'small' | 'large';
+const FRACTION: Record<DockSize, number> = { small: 0.45, large: 0.62 };
+
+/**
+ * Plugin 8.6.14 on Android: width/height/x/y are dp (= CSS px here). The dialog window has no
+ * gravity set, so Android centres it and x/y are offsets from the centre. We keep full width
+ * (>= 360px viewport) and push it down so it sits on the bottom edge.
+ */
+export function dockRect(size: DockSize) {
+  const W = Math.max(360, Math.round(window.innerWidth));
+  const H = Math.round(window.screen?.height || window.innerHeight);
+  const height = Math.round(H * FRACTION[size]);
+  return { width: W, height, x: 0, y: Math.round((H - height) / 2) };
+}
+
+export const resizeVinted = (size: DockSize) =>
+  InAppBrowser.updateDimensions({ ...dockRect(size), id: webviewId } as any);
+export const hideVinted = () => InAppBrowser.hide({ id: webviewId });
+export const showVinted = () => InAppBrowser.show({ id: webviewId });
+
+export async function openVinted(size: DockSize = 'small') {
   // Plugin 8.6.x: a "User-Agent" header sets the WebView UA string; wide viewport is on by default.
   const { id } = await InAppBrowser.openWebView({
     url: VINTED_NEW_URL,
@@ -20,6 +41,7 @@ export async function openVinted() {
     preventDeeplink: true,
     captureConsoleLogs: true,
     isPresentAfterPageLoad: false,
+    ...dockRect(size),
   } as any);
   webviewId = id;
   return id;

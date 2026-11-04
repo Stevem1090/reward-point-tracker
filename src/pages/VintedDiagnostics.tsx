@@ -9,10 +9,12 @@ import { toast } from '@/lib/toast';
 import { REFERENCE_CAPTURED } from '@/vinted/reference';
 import { resizeForVinted } from '@/vinted/imageResize';
 import { buildTestItem } from '@/vinted/testItem';
-import { closeVinted, exec, goToNew, injectAndRun, listen, openVinted, pluginVersion, PROBE_SCRIPT, VINTED_SCRIPT } from '@/vinted/browser';
+import { Progress } from '@/components/ui/progress';
+import { closeVinted, exec, goToNew, hideVinted, resizeVinted, showVinted, type DockSize, injectAndRun, listen, openVinted, pluginVersion, PROBE_SCRIPT, VINTED_SCRIPT } from '@/vinted/browser';
 
 type Probe = { url: string; userAgent: string; width: number; hasTitleField: boolean; botCheck: boolean; loginWall: boolean; openInApp: boolean };
 type LogLine = { at: string; text: string };
+type Step = { step: string; ok?: boolean; done: number; total: number };
 
 const SCRIPT_LINES = VINTED_SCRIPT.split('\n').length;
 
@@ -26,6 +28,9 @@ export default function VintedDiagnostics() {
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<LogLine[]>([]);
   const [report, setReport] = useState<any>(null);
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [dock, setDock] = useState<DockSize>('small');
+  const [hidden, setHidden] = useState(false);
   const runId = useRef<string | null>(null);
 
   const add = (text: string) => setLog((l) => [...l, { at: new Date().toLocaleTimeString('en-GB'), text }]);
@@ -44,6 +49,7 @@ export default function VintedDiagnostics() {
             return;
           }
           add(`${d.type} ${JSON.stringify(d)}`);
+          if (d.type === 'vinted:progress') setSteps((p) => [...p, { step: String(d.step), ok: d.ok, done: Number(d.done) || 0, total: Number(d.total) || 0 }]);
           if (d.type === 'vinted:report') setReport(d);
           if (d.type === 'vinted:report' || d.type === 'vinted:fatal' || d.type === 'vinted:saveResult') setRunning(false);
         } else {
@@ -59,19 +65,19 @@ export default function VintedDiagnostics() {
   }, [native]);
 
   const doOpen = async () => {
-    try { await openVinted(); setOpen(true); add('Opened Vinted'); }
+    try { await openVinted(dock); setOpen(true); setHidden(false); add('Opened Vinted (docked below)'); }
     catch (e: any) { add(`Open failed: ${e?.message || e}`); }
   };
 
   const runTest = async () => {
     if (!files.length) { toast('Pick up to 5 photos first'); return; }
-    setRunning(true); setReport(null);
+    setRunning(true); setReport(null); setSteps([]);
     const id = `diag-${Date.now()}`;
     runId.current = id;
     try {
       if (!open) {
         add('Opening Vinted browser for test…');
-        await openVinted(); setOpen(true);
+        await openVinted(dock); setOpen(true); setHidden(false);
         await new Promise((r) => setTimeout(r, 5000));
       } else {
         await goToNew(); add('Fresh /items/new');
@@ -100,16 +106,24 @@ export default function VintedDiagnostics() {
     toast('Log copied');
   };
 
+  const setSize = async (s: DockSize) => { setDock(s); try { await resizeVinted(s); } catch (e: any) { add(`Resize failed: ${e?.message || e}`); } };
+  const toggleHidden = async () => {
+    try { hidden ? await showVinted() : await hideVinted(); setHidden(!hidden); }
+    catch (e: any) { add(`${hidden ? 'Show' : 'Hide'} failed: ${e?.message || e}`); }
+  };
+  const last = steps[steps.length - 1];
+  const pct = last && last.total ? Math.round((last.done / last.total) * 100) : 0;
+
   const yn = (v?: boolean) => (v === undefined ? '–' : v ? 'Yes' : 'No');
   const blockers = probe ? [
     probe.botCheck && 'Bot check / captcha',
     probe.loginWall && 'Login wall',
     probe.openInApp && '"Open in the app" screen',
-    probe.width < 900 && 'Mobile layout (narrow page)',
+    probe.width < 360 && 'Page narrower than 360px',
   ].filter(Boolean) as string[] : [];
 
   return (
-    <div className="container mx-auto max-w-2xl px-3 py-4 space-y-3">
+    <div className="container mx-auto max-w-2xl px-3 py-4 space-y-3" style={open && !hidden ? { paddingBottom: `${Math.round((dock === 'large' ? 0.62 : 0.45) * 100)}vh` } : undefined}>
       <div className="flex items-center gap-2">
         <Button asChild variant="ghost" size="icon" className="h-11 w-11"><Link to="/profile" aria-label="Back"><ArrowLeft /></Link></Button>
         <h1 className="text-xl font-bold">Vinted browser diagnostics</h1>
@@ -119,6 +133,31 @@ export default function VintedDiagnostics() {
         <Card><CardContent className="p-4 text-sm text-muted-foreground">Android app only. Open this screen in the Family Hub app on your phone.</CardContent></Card>
       ) : (
         <>
+          {(running || steps.length > 0) && (
+            <Card className="sticky top-0 z-10">
+              <CardContent className="p-3 space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{running ? `Filling form… ${last?.step ?? 'starting'}` : report ? 'Finished' : 'Stopped'}</span>
+                  <span className="text-muted-foreground">{last ? `${last.done}/${last.total}` : ''}</span>
+                </div>
+                <Progress value={pct} />
+                <ul className="max-h-28 overflow-y-auto text-xs space-y-0.5">
+                  {steps.map((s, i) => (
+                    <li key={i} className={s.ok === false ? 'text-destructive' : ''}>{s.ok === false ? '✕' : '✓'} {s.step}</li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          {open && (
+            <div className="grid grid-cols-3 gap-2">
+              <Button className="h-11" variant={dock === 'small' && !hidden ? 'default' : 'outline'} onClick={() => setSize('small')}>Small</Button>
+              <Button className="h-11" variant={dock === 'large' && !hidden ? 'default' : 'outline'} onClick={() => setSize('large')}>Large</Button>
+              <Button className="h-11" variant="outline" onClick={toggleHidden}>{hidden ? 'Show' : 'Hide'}</Button>
+            </div>
+          )}
+
           <Card>
             <CardHeader className="p-3 pb-1"><CardTitle className="text-base">Status</CardTitle></CardHeader>
             <CardContent className="p-3 pt-0 text-sm space-y-1 break-all">
