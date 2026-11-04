@@ -79,9 +79,9 @@ export const PROBE_SCRIPT = `(() => {
     url: location.href,
     userAgent: navigator.userAgent,
     width: window.innerWidth,
-    hasTitleField: !!document.querySelector('#title'),
+    hasTitleField: !!document.querySelector('#title') || !!document.querySelector('input[type="file"]') || /\\/items\\/new/.test(location.pathname),
     botCheck: !!document.querySelector('iframe[src*="captcha"], iframe[src*="datadome"], #cmsg, .g-recaptcha, [data-hcaptcha-widget-id]') || /verify you are (a )?human|are you a robot|unusual activity/.test(t),
-    loginWall: /\\/(member\\/signup|signup|login|session)/.test(location.pathname) || (/log in|sign up/.test(t) && !document.querySelector('#title')),
+    loginWall: /\\/(member\\/signup|signup|login|session)/.test(location.pathname),
     openInApp: /open (in|the) (vinted )?app|get the app|continue in app/.test(t),
   };
   try { window.mobileApp.postMessage({ detail }); } catch (e) {}

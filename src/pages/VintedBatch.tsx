@@ -104,7 +104,11 @@ export default function VintedBatch() {
         if (d.type === 'vinted:progress') setSteps((p) => [...p, { step: String(d.step), ok: d.ok, done: Number(d.done) || 0, total: Number(d.total) || 0 }]);
         if (d.type === 'vinted:saveResult') waiter.current?.(d.ok && d.draftId ? { kind: 'saved', draftId: d.draftId } : { kind: 'notSaved', reason: `Vinted refused the save (status ${d.status})` });
         if (d.type === 'vinted:fatal') waiter.current?.({ kind: 'fatal', reason: String(d.error ?? d.message ?? 'Form filling failed') });
-        if (d.type === 'vinted:report' && (window as any).__batchDry) waiter.current?.({ kind: 'dryOk' });
+        if (d.type === 'vinted:report') {
+          const errs = Array.isArray(d.errors) ? d.errors : [];
+          if ((window as any).__batchDry) waiter.current?.(errs.length ? { kind: 'fatal', reason: `Field problems: ${errs.map((e: any) => typeof e === 'string' ? e : (e?.field ?? e?.message ?? JSON.stringify(e))).join(', ')}` } : { kind: 'dryOk' });
+          else if (d.willSave === false || errs.length) waiter.current?.({ kind: 'fatal', reason: errs.length ? `Field problems: ${errs.map((e: any) => typeof e === 'string' ? e : (e?.field ?? e?.message ?? JSON.stringify(e))).join(', ')}` : 'Vinted form was not ready to save' });
+        }
       },
       onUrl: () => {}, onLoaded: () => {}, onConsole: () => {},
       onClose: () => setBrowserOpen(false),
