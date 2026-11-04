@@ -23,6 +23,9 @@ export type BatchItem = {
   title: string;
   description: string;
   conditionId: number | null;
+  /** Brand chosen in review. brandId 0 = custom brand not in the reference list (matched by name on Vinted). */
+  brandId?: number | null;
+  brandName?: string;
   price: string;
   priceConfirmed: boolean;
   error?: string;
@@ -46,6 +49,7 @@ export function applyAnalysis(it: BatchItem, a: Analysis): BatchItem {
   return {
     ...it, analysis: a, status: 'needs_review', error: undefined,
     title: a.title, description: a.description, conditionId: a.conditionId,
+    brandId: a.brandId, brandName: a.brandId != null ? (ref.brands.main as Record<string, string>)[String(a.brandId)] : '',
     price: a.suggestedPrice != null ? String(a.suggestedPrice) : '', priceConfirmed: false,
   };
 }
@@ -69,6 +73,7 @@ export function toDraft(it: BatchItem): Partial<DraftItem> {
   return {
     ...analysisToDraft(it.analysis, it.id, it.images, it.price ? Number(it.price) : null),
     title: cleanTitle(it.title), description: cleanDescription(it.description), conditionId: it.conditionId ?? undefined,
+    ...(it.brandId !== undefined ? { brandId: it.brandId ?? undefined, brandName: cleanTitle(it.brandName ?? '') || undefined } : {}),
   };
 }
 

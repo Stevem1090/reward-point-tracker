@@ -51,7 +51,8 @@ export function validateDraft(item: Partial<DraftItem>): string[] {
   } else if (!has(ref.conditions.default, item.conditionId)) e.push('Condition is missing or not valid');
 
   const main = ref.brands.main as Record<string, string>;
-  if (!has(main, item.brandId)) e.push('Brand is missing or not in the brand list');
+  if (item.brandId === 0) { if (!String(item.brandName ?? '').trim()) e.push('Type the custom brand name'); }
+  else if (!has(main, item.brandId)) e.push('Brand is missing or not in the brand list');
   else if (main[String(item.brandId)] !== item.brandName) e.push('Brand name does not match the brand');
 
   const colours = item.colourIds ?? [];
