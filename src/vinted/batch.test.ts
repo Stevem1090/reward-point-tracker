@@ -39,12 +39,12 @@ describe('batch rules', () => {
 
 import { cleanDescription, cleanTitle, describeReportErrors } from './batch';
 
-test('text is tidied the way Vinted stores it, so it does not read back as drifting', () => {
+it('text is tidied the way Vinted stores it, so it does not read back as drifting', () => {
   expect(cleanTitle('  Primark  black puffer \n')).toBe('Primark black puffer');
   expect(cleanDescription('Black puffer.  \r\nHooded.\n\n\n\nGood condition. ')).toBe('Black puffer.\nHooded.\n\nGood condition.');
 });
 
-test('drifting error names the field that kept changing', () => {
+it('drifting error names the field that kept changing', () => {
   const msg = describeReportErrors(
     { errors: ['fields still drifting after 3 passes'], steps: ['pass 1 re-applying: brand', 'pass 3 re-applying: brand'], finalValues: { brand: 'Primark Kids' } },
     { brandName: 'Primark' },
