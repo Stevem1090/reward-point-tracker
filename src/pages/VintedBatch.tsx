@@ -16,6 +16,7 @@ import { toast } from '@/lib/toast';
 import { resizeForVinted } from '@/vinted/imageResize';
 import { analysePhotos } from '@/vinted/analysis';
 import { allowedConditions } from '@/vinted/validate';
+import { VINTED_REFERENCE } from '@/vinted/reference';
 import { exec, goToNew, hideVinted, injectAndRun, listen, openVinted, PROBE_SCRIPT, resizeVinted, showVinted, type DockSize } from '@/vinted/browser';
 import {
   acceptAllPrices, applyAnalysis, approvalErrors, blockerFor, canAdd, deleteItem, draftLink, loadItems, MAX_ITEMS,
@@ -365,6 +366,20 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
           <Input value={it.title} onChange={(e) => set({ title: e.target.value })} />
           <Label>Description</Label>
           <Textarea rows={5} value={it.description} onChange={(e) => set({ description: e.target.value })} />
+          <Label>Brand</Label>
+          {a.brandNameRead && <p className="text-xs text-muted-foreground">Label reads: {a.brandNameRead}</p>}
+          <select className="h-11 w-full rounded-md border border-input bg-background px-2" value={it.brandId == null ? '' : String(it.brandId)}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === '') set({ brandId: null, brandName: '' });
+              else if (v === '0') set({ brandId: 0, brandName: it.brandId === 0 ? it.brandName : (a.brandNameRead ?? '') });
+              else set({ brandId: Number(v), brandName: (VINTED_REFERENCE.brands.main as Record<string, string>)[v] });
+            }}>
+            <option value="">Choose a brand…</option>
+            {Object.entries(VINTED_REFERENCE.brands.main as Record<string, string>).sort((x, y) => x[1].localeCompare(y[1])).map(([id, n]) => <option key={id} value={id}>{n}</option>)}
+            <option value="0">Other (type it)…</option>
+          </select>
+          {it.brandId === 0 && <Input placeholder="Brand name exactly as on Vinted" value={it.brandName ?? ''} onChange={(e) => set({ brandName: e.target.value })} />}
           <Label>Condition</Label>
           <select className="h-11 w-full rounded-md border border-input bg-background px-2" value={it.conditionId ?? ''} onChange={(e) => set({ conditionId: Number(e.target.value) })}>
             {Object.entries(conds).map(([id, n]) => <option key={id} value={id}>{n}</option>)}
