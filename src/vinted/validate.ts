@@ -7,8 +7,10 @@ export type DraftItem = {
   description: string;
   categoryPath: number[];
   categoryLeafId: number;
-  brandId: number;
-  brandName: string;
+  /** Optional: an item may go without a brand ("List without brand") when noBrand is true. */
+  brandId?: number;
+  brandName?: string;
+  noBrand?: boolean;
   sizeId: number | null;
   conditionId: number;
   colourIds: number[];
@@ -51,7 +53,9 @@ export function validateDraft(item: Partial<DraftItem>): string[] {
   } else if (!has(ref.conditions.default, item.conditionId)) e.push('Condition is missing or not valid');
 
   const main = ref.brands.main as Record<string, string>;
-  if (item.brandId === 0) { if (!String(item.brandName ?? '').trim()) e.push('Type the custom brand name'); }
+  if (item.noBrand) { if (item.brandId != null || String(item.brandName ?? '').trim()) e.push('Pick a brand or "No brand", not both'); }
+  else if (item.brandId == null && !String(item.brandName ?? '').trim()) e.push('Choose a brand, or confirm "No brand"');
+  else if (item.brandId === 0) { if (!String(item.brandName ?? '').trim()) e.push('Type the custom brand name'); }
   else if (!has(main, item.brandId)) e.push('Brand is missing or not in the brand list');
   else if (main[String(item.brandId)] !== item.brandName) e.push('Brand name does not match the brand');
 

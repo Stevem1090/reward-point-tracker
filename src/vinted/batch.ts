@@ -27,6 +27,8 @@ export type BatchItem = {
   /** Brand chosen in review. brandId 0 = custom brand not in the reference list (matched by name on Vinted). */
   brandId?: number | null;
   brandName?: string;
+  /** Seller confirmed "No brand" in review. */
+  noBrand?: boolean;
   price: string;
   priceConfirmed: boolean;
   error?: string;
@@ -50,7 +52,7 @@ export function applyAnalysis(it: BatchItem, a: Analysis): BatchItem {
   return {
     ...it, analysis: a, status: 'needs_review', error: undefined,
     title: a.title, description: a.description, conditionId: a.conditionId,
-    brandId: a.brandId, brandName: a.brandId != null ? (ref.brands.main as Record<string, string>)[String(a.brandId)] : '',
+    brandId: a.brandId, brandName: a.brandId != null ? (ref.brands.main as Record<string, string>)[String(a.brandId)] : '', noBrand: false,
     price: a.suggestedPrice != null ? String(a.suggestedPrice) : '', priceConfirmed: false,
   };
 }
@@ -69,12 +71,19 @@ export const cleanDescription = (s: string) =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
+/** Brand part of the payload: a picked brand, or "List without brand" only when confirmed or none was visible. */
+function brandFields(it: BatchItem): Partial<DraftItem> {
+  if (it.brandId != null) return { brandId: it.brandId, brandName: cleanTitle(it.brandName ?? '') || undefined, noBrand: undefined };
+  const noBrand = !!it.noBrand || it.analysis?.brandStatus === 'none_visible';
+  return { brandId: undefined, brandName: undefined, noBrand: noBrand || undefined };
+}
+
 export function toDraft(it: BatchItem): Partial<DraftItem> {
   if (!it.analysis) return {};
   return {
     ...analysisToDraft(it.analysis, it.id, it.images, it.price ? Number(it.price) : null),
     title: cleanTitle(it.title), description: cleanDescription(it.description), conditionId: it.conditionId ?? undefined,
-    ...(it.brandId !== undefined ? { brandId: it.brandId ?? undefined, brandName: cleanTitle(it.brandName ?? '') || undefined } : {}),
+    ...brandFields(it),
   };
 }
 
