@@ -52,3 +52,12 @@ it('drifting error names the field that kept changing', () => {
   expect(msg).toContain('brand');
   expect(msg).toContain('Primark Kids');
 });
+
+import { toDraft as _toDraft, newItem as _newItem } from './batch';
+describe('parcel size', () => {
+  const base = () => ({ ..._newItem([], '', ''), analysis: { flags: [], categoryLeafId: undefined } as any });
+  it('leaves packageId out unless overridden', () => {
+    expect(_toDraft(base()).packageId).toBeUndefined();
+    expect(_toDraft({ ...base(), packageId: 2 }).packageId).toBe(2);
+  });
+});

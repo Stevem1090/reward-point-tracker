@@ -29,6 +29,10 @@ export type BatchItem = {
   brandName?: string;
   /** Seller confirmed "No brand" in review. */
   noBrand?: boolean;
+  /** Manual parcel override (1 Small, 2 Medium, 3 Large). Unset = Vinted recommended. */
+  packageId?: 1 | 2 | 3;
+  /** Parcel the script actually used, from its report. */
+  parcel?: { id: number; name: string; source: string };
   price: string;
   priceConfirmed: boolean;
   error?: string;
@@ -78,12 +82,16 @@ function brandFields(it: BatchItem): Partial<DraftItem> {
   return { brandId: undefined, brandName: undefined, noBrand: noBrand || undefined };
 }
 
+const PARCEL_SOURCE: Record<string, string> = { vinted: 'Vinted recommended', explicit: 'chosen by you', fallback: 'no recommendation shown' };
+export const parcelLabel = (p?: { name: string; source: string }) => p ? `Parcel: ${p.name} (${PARCEL_SOURCE[p.source] ?? p.source})` : '';
+
 export function toDraft(it: BatchItem): Partial<DraftItem> {
   if (!it.analysis) return {};
   return {
     ...analysisToDraft(it.analysis, it.id, it.images, it.price ? Number(it.price) : null),
     title: cleanTitle(it.title), description: cleanDescription(it.description), conditionId: it.conditionId ?? undefined,
     ...brandFields(it),
+    packageId: it.packageId ?? undefined,
   };
 }
 

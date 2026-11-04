@@ -20,7 +20,7 @@ import { VINTED_REFERENCE } from '@/vinted/reference';
 import { exec, goToNew, hideVinted, injectAndRun, listen, openVinted, PROBE_SCRIPT, resizeVinted, showVinted, type DockSize } from '@/vinted/browser';
 import {
   acceptAllPrices, applyAnalysis, approvalErrors, blockerFor, canAdd, deleteItem, draftLink, loadItems, MAX_ITEMS,
-  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, toDraft, describeReportErrors, type BatchItem,
+  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, toDraft, describeReportErrors, parcelLabel, type BatchItem,
 } from '@/vinted/batch';
 
 const STATUS: Record<BatchItem['status'], string> = {
@@ -57,6 +57,7 @@ export default function VintedBatch() {
   const pausedRef = useRef(false);
   const stopRef = useRef(false);
   const currentId = useRef<string | null>(null);
+  const lastParcel = useRef<{ id: string; parcel: any } | null>(null);
   const waiter = useRef<((o: Outcome) => void) | null>(null);
   const probeWaiter = useRef<((p: any) => void) | null>(null);
   const wakeLock = useRef<any>(null);
@@ -106,6 +107,7 @@ export default function VintedBatch() {
         if (d.type === 'vinted:saveResult') waiter.current?.(d.ok && d.draftId ? { kind: 'saved', draftId: d.draftId } : { kind: 'notSaved', reason: `Vinted refused the save (status ${d.status})` });
         if (d.type === 'vinted:fatal') waiter.current?.({ kind: 'fatal', reason: String(d.error ?? d.message ?? 'Form filling failed') });
         if (d.type === 'vinted:report') {
+          if (d.parcel && currentId.current) lastParcel.current = { id: currentId.current, parcel: d.parcel };
           const errs = Array.isArray(d.errors) ? d.errors : [];
           const cur = itemsRef.current.find((x) => x.id === currentId.current);
           const problems = errs.length ? `Field problems: ${describeReportErrors(d, cur ? toDraft(cur) : undefined)}` : '';
@@ -189,7 +191,7 @@ export default function VintedBatch() {
         catch (e: any) { waiter.current?.({ kind: 'fatal', reason: e?.message || String(e) }); }
         const o = await outcome; waiter.current = null; currentId.current = null;
         const cur = itemsRef.current.find((x) => x.id === it.id)!;
-        if (o.kind === 'saved') { const s = { ...cur, status: 'drafted' as const, draftId: o.draftId, draftedAt: Date.now(), error: undefined }; save(s); done.push(s); }
+        if (o.kind === 'saved') { const s = { ...cur, status: 'drafted' as const, draftId: o.draftId, parcel: lastParcel.current?.id === it.id ? lastParcel.current.parcel : cur.parcel, draftedAt: Date.now(), error: undefined }; save(s); done.push(s); }
         else if (o.kind === 'dryOk') { const s = { ...cur, dryRun: 'ok' as const, error: undefined }; save(s); done.push(s); }
         else if (o.kind === 'timeout') {
           const s = { ...cur, status: dry ? cur.status : 'unknown' as const, dryRun: dry ? 'failed' as const : cur.dryRun, error: 'No answer from Vinted within 2 minutes. Check your Vinted drafts before retrying.' };
@@ -350,6 +352,7 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
       <div className="flex gap-2 overflow-x-auto">{it.images.map((im, i) => <img key={i} src={`data:image/jpeg;base64,${im.base64}`} alt="" className="h-20 w-20 rounded object-cover shrink-0" />)}</div>
       {it.error && <p className="text-destructive">{it.error}</p>}
       {done && it.draftId && <a className="text-primary underline" href={draftLink(it.draftId)} target="_blank" rel="noreferrer">Open draft on Vinted</a>}
+      {it.parcel && <p className="text-xs text-muted-foreground">{parcelLabel(it.parcel)}</p>}
       {it.status === 'unknown' && (
         <div className="grid grid-cols-2 gap-2">
           <Button variant="outline" className="h-11" onClick={() => onChange({ ...it, status: 'drafted', error: undefined })}>It's in my drafts</Button>
@@ -386,6 +389,13 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
             onClick={() => set({ noBrand: !(it.noBrand && it.brandId == null), brandId: null, brandName: '' })}>No brand</Button>
           </div>
           {it.brandId === 0 && <Input placeholder="Brand name exactly as on Vinted" value={it.brandName ?? ''} onChange={(e) => set({ brandName: e.target.value })} />}
+          <Label>Parcel size</Label>
+          <select className="h-11 w-full rounded-md border border-input bg-background px-2" value={it.packageId ?? ''} onChange={(e) => set({ packageId: e.target.value ? Number(e.target.value) as 1 | 2 | 3 : undefined })}>
+            <option value="">Vinted recommended</option>
+            <option value="1">Small</option>
+            <option value="2">Medium</option>
+            <option value="3">Large</option>
+          </select>
           <Label>Condition</Label>
           <select className="h-11 w-full rounded-md border border-input bg-background px-2" value={it.conditionId ?? ''} onChange={(e) => set({ conditionId: Number(e.target.value) })}>
             {Object.entries(conds).map(([id, n]) => <option key={id} value={id}>{n}</option>)}
