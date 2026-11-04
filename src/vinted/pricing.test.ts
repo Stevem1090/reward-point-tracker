@@ -1,4 +1,5 @@
 // @ts-nocheck -- run with `bun test`
+import './testSetup';
 import { describe, it, expect } from 'bun:test';
 import { applyPricing, matchRule, roundPrice, categoryType } from './pricing';
 import { normaliseAnalysis } from './analysis';
