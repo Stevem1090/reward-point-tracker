@@ -30,7 +30,7 @@
   // It tries, in order: window.mobileApp.postMessage({ detail }) (Capgo Capacitor in-app browser),
   // window.AndroidBridge.postMessage(jsonString) (a plain Android addJavascriptInterface), and a
   // window event 'vinted-draft-event'. Every call is wrapped so it can never break the main flow.
-  // Event types: vinted:started, vinted:report (form filled and verified), vinted:saveResult
+  // Event types: vinted:started, vinted:progress (step, done, total), vinted:report (form filled and verified), vinted:saveResult
   // (sent the instant the save request finishes, before Vinted redirects), vinted:fatal.
   function notifyHost(type, data) {
     try {
@@ -67,6 +67,45 @@
   async function pressEscape() {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
     await sleep(500);
+  }
+
+  // ---------- layout-agnostic panel handling ----------
+  // Desktop: a panel has a [data-testid="<field>-content"] container, closes with Escape, and single
+  // selects close themselves. Mobile (narrow viewport, for example an Android WebView): panels are
+  // full-screen dialogs with NO such container, Escape does nothing, and a choice only applies once the
+  // dialog's Save button is pressed. Everything below handles both layouts.
+  const SAVE_SEL = '[data-testid="input-dropdown-save-button"]';
+  const saveBtn = () => $(SAVE_SEL);
+
+  async function dismissPanels() {
+    await pressEscape();
+    for (let i = 0; i < 3 && saveBtn(); i++) {
+      const dlg = saveBtn().closest('[role="dialog"]');
+      const closeBtn = dlg && dlg.querySelector('[data-testid$="-close-button"]');
+      if (closeBtn) closeBtn.click(); else await pressEscape();
+      await sleep(500);
+    }
+  }
+
+  // Call right after clicking an option. Mobile: press Save (or just close if nothing changed).
+  // Desktop: single selects close themselves; multi-selects are closed with Escape.
+  async function finishSelection(panelTestId, multi) {
+    await sleep(300);
+    if (saveBtn()) {
+      await waitFor(() => { const b = saveBtn(); return !b || !b.disabled; }, { timeout: 3000, label: 'save button' }).catch(() => {});
+      const b = saveBtn();
+      if (b && !b.disabled) {
+        b.click();
+        await waitFor(() => !saveBtn(), { timeout: 5000, label: 'panel to close after Save' });
+      } else {
+        await dismissPanels();
+      }
+      await sleep(400);
+      return;
+    }
+    if (multi) { await pressEscape(); return; }
+    await waitFor(() => !$(`[data-testid="${panelTestId}"]`), { timeout: 4000, label: `${panelTestId} to close` });
+    await sleep(400);
   }
 
   const isChecked = (el) => el && el.getAttribute('aria-checked') === 'true';
@@ -131,26 +170,55 @@
 
   // Category: walk the catalogue path by real IDs, then pick the leaf radio.
   // path = [1193, 1195, 1246], leaf = 1550  (Kids > Girls clothing > Jumpers & hoodies > Hoodies & sweatshirts)
-  async function setCategory(path, leaf) {
+  // Returns the leaf's visible label, which is what the #category field shows once it is set.
+  async function selectCategoryLeaf(path, leaf, viaSibling) {
+    await dismissPanels();
     const input = await waitFor(() => $('#category'), { label: '#category' });
     input.click();
+    const leafRadio = () => document.getElementById(`${leaf}-catalog-radio`);
+    await waitFor(() => document.getElementById(`catalog-${path[0]}`) || leafRadio(), { timeout: 6000, label: 'category panel' });
     for (const id of path) {
+      if (leafRadio()) break; // the panel reopened at the right level already
       const row = await waitFor(() => document.getElementById(`catalog-${id}`), { timeout: 6000, label: `catalogue row ${id}` });
       row.click();
       await sleep(600);
     }
-    const radio = await waitFor(() => document.getElementById(`${leaf}-catalog-radio`), { timeout: 6000, label: `category leaf ${leaf}` });
-    radio.click();
-    await waitFor(() => !$('[data-testid="catalog-select-dropdown-content"]') || valueOf('#category'), { label: 'category panel to close' });
+    const wanted = await waitFor(leafRadio, { timeout: 6000, label: `category leaf ${leaf}` });
+    const labelBox = wanted.closest('li') || wanted.parentElement.parentElement;
+    const label = ((labelBox && labelBox.innerText) || '').trim().split('\n')[0];
+    let target = wanted;
+    if (viaSibling) {
+      target = $$('input[id$="-catalog-radio"]').find((r) => r.id !== wanted.id);
+      if (!target) throw new Error('no sibling category available to reset the category dialog');
+    }
+    target.click();
+    await finishSelection('catalog-select-dropdown-content', false); // mobile: presses Save
+    await sleep(500);
+    return label;
+  }
+
+  // The mobile category dialog can keep stale "already selected" state after repeated selections in one
+  // page session (for example when the script must redo the category after Vinted's photo suggestion
+  // overwrote it). Pressing Save then changes nothing and the field stays wrong. Selecting a different
+  // sibling first resets the dialog, after which the wanted leaf saves normally (verified live).
+  async function setCategory(path, leaf) {
+    const label = await selectCategoryLeaf(path, leaf, false);
+    const matches = () => valueOf('#category').trim() === label;
+    const settled = async () => { try { await waitFor(matches, { timeout: 2500, label: 'category value' }); return true; } catch (e) { return false; } };
+    if (!(await settled())) {
+      await selectCategoryLeaf(path, leaf, true);   // pick a sibling to reset the dialog
+      await selectCategoryLeaf(path, leaf, false);  // then pick the wanted leaf again
+      if (!(await settled())) throw new Error(`category could not be set to "${label}" (field shows "${valueOf('#category')}")`);
+    }
+    await waitFor(() => !$('input[id$="-catalog-radio"]'), { timeout: 4000, label: 'category dialog to close' });
     await sleep(1200); // size / material fields re-render for the new category
   }
 
   // Opens a dropdown panel. A click made while another panel is still closing can be
   // swallowed as an "outside click", so close anything open first and retry the click.
   async function openPanel(inputSel, panelTestId) {
-    const isOpen = () => !!$(`[data-testid="${panelTestId}"]`);
-    if (isOpen()) return;
-    await pressEscape();
+    const isOpen = () => !!$(`[data-testid="${panelTestId}"]`) || !!saveBtn(); // desktop container, or mobile dialog
+    await dismissPanels();
     for (let attempt = 1; attempt <= 3; attempt++) {
       (await waitFor(() => $(inputSel), { label: inputSel })).click();
       try {
@@ -180,15 +248,16 @@
       throw new Error(`Brand not found: ${brandName} (${brandId})`);
     }
     row.click();
-    await waitFor(() => !$('[data-testid="brand-select-dropdown-content"]'), { timeout: 4000, label: 'brand panel to close' });
-    await sleep(500);
+    await finishSelection('brand-select-dropdown-content', false);
+    await sleep(300);
   }
 
   async function setSize(sizeId) {
     await openPanel('#size', 'category-size-single-grid-content');
     const opt = await waitFor(() => $(`[data-testid$="-grid-option-${sizeId}"]`), { label: `size ${sizeId} (not offered for this category?)` });
     opt.click();
-    await sleep(700);
+    await finishSelection('category-size-single-grid-content', false);
+    await sleep(300);
   }
 
   // Some categories (bags, jewellery, sunglasses, watches...) have no size field at all.
@@ -210,11 +279,12 @@
     const row = document.getElementById(`condition-${conditionId}`);
     if (!row) {
       const offered = $$('[role="radio"][id^="condition-"]').map((e) => e.id.replace('condition-', '')).join(', ');
-      await pressEscape();
+      await dismissPanels();
       throw new Error(`condition ${conditionId} is not offered for this category (offered: ${offered})`);
     }
     row.click();
-    await sleep(700);
+    await finishSelection('category-condition-single-list-content', false);
+    await sleep(300);
   }
 
   // Multi-selects (colour, material): tick wanted, untick unwanted (incl. stale suggestions), close.
@@ -232,7 +302,7 @@
       if (!r) throw new Error(`Option ${id} not found in ${panelId}`);
       if (r.getAttribute('aria-checked') !== 'true') { r.click(); await sleep(400); }
     }
-    await pressEscape();
+    await finishSelection(panelId, true); // mobile: Save, desktop: Escape
   }
 
   const setColours = (ids) => setMulti({
@@ -377,10 +447,18 @@
       { name: 'package',   apply: () => setPackage(item.packageId || 1),           ok: () => !!document.getElementById(`package_type_selector_${item.packageId || 1}`)?.checked },
     ];
 
+    // Progress events let a host app show how far along the run is.
+    const totalSteps = plan.length + 2 + (opts.saveDraft ? 1 : 0); // images + each field + verify (+ save)
+    let doneSteps = 1;
+    notifyHost('vinted:progress', { step: 'images', done: doneSteps, total: totalSteps });
+
     // 3. Fill one at a time.
     for (const step of plan) {
+      let stepOk = true;
       try { await step.apply(); report.steps.push(`filled ${step.name}`); }
-      catch (e) { report.errors.push(`${step.name}: ${e.message}`); }
+      catch (e) { stepOk = false; report.errors.push(`${step.name}: ${e.message}`); }
+      doneSteps += 1;
+      notifyHost('vinted:progress', { step: step.name, done: doneSteps, total: totalSteps, ok: stepOk });
     }
 
     // 4. Verify loop: Vinted can overwrite fields late with photo suggestions.
@@ -399,6 +477,9 @@
       if (pass === 3) report.errors.push('fields still drifting after 3 passes');
     }
 
+    doneSteps += 1;
+    notifyHost('vinted:progress', { step: 'verified', done: doneSteps, total: totalSteps, ok: !report.errors.length });
+
     report.finalValues = {
       category: valueOf('#category'), title: valueOf('#title'), brand: valueOf('#brand'),
       size: valueOf('#size'), condition: valueOf('#condition'), colours: valueOf('#color'),
@@ -408,6 +489,7 @@
     // 5. Save as draft only when explicitly asked and nothing failed.
     notifyHost('vinted:report', { warnings: report.warnings, errors: report.errors, steps: report.steps, finalValues: report.finalValues, willSave: !!(opts.saveDraft && !report.errors.length) });
     if (opts.saveDraft && !report.errors.length) {
+      notifyHost('vinted:progress', { step: 'saving', done: totalSteps - 1, total: totalSteps });
       report.save = await saveDraftAndConfirm(item, report);
       report.saved = report.save.ok;
       report.steps.push(report.save.ok ? 'draft saved' : 'draft NOT saved');
