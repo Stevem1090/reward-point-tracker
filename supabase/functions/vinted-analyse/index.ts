@@ -23,30 +23,48 @@ Deno.serve(async (req) => {
     const key = Deno.env.get("LOVABLE_API_KEY");
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${key}`, "Lovable-API-Key": key, "X-Lovable-AIG-SDK": "fetch", "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: `${rules}\n\nREFERENCE:\n${reference}` },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: `These ${images.length} photos show ONE item. Analyse them and return the listing.` },
-              ...images.map((b64: string) => ({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } })),
-            ],
-          },
-        ],
-        tools: [{ type: "function", function: { name: "return_listing", description: "Return the structured listing", parameters: schema } }],
-        tool_choice: { type: "function", function: { name: "return_listing" } },
+        model: "openai/gpt-6-astra",
+        stream: true,
+        store: false,
+        reasoning: { effort: "low" },
+        instructions: `${rules}\n\nREFERENCE:\n${reference}`,
+        input: [{
+          role: "user",
+          content: [
+            { type: "input_text", text: `These ${images.length} photos show ONE item. Analyse them and return the listing as JSON.` },
+            ...images.map((b64: string) => ({ type: "input_image", image_url: `data:image/jpeg;base64,${b64}` })),
+          ],
+        }],
+        text: { format: { type: "json_schema", name: "listing", schema, strict: true } },
       }),
     });
     if (res.status === 429) return json({ error: "AI is busy, try again in a minute" }, 429);
     if (res.status === 402) return json({ error: "AI credits have run out" }, 402);
-    if (!res.ok) { console.error("gateway", res.status, await res.text()); return json({ error: `AI request failed (${res.status})` }, 500); }
-    const data = await res.json();
-    const args = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+    if (!res.ok || !res.body) { console.error("gateway", res.status, await res.text()); return json({ error: `AI request failed (${res.status})` }, 500); }
+    let args = "", buf = "", failed = "";
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+        if (!line.startsWith("data:")) continue;
+        const d = line.slice(5).trim();
+        if (!d || d === "[DONE]") continue;
+        try {
+          const ev = JSON.parse(d);
+          if (ev.type === "response.output_text.delta") args += ev.delta ?? "";
+          if (ev.type === "response.failed" || ev.type === "error") failed = JSON.stringify(ev).slice(0, 300);
+        } catch { /* partial */ }
+      }
+    }
+    if (failed) { console.error("ai failed", failed); return json({ error: "AI analysis failed" }, 500); }
     if (!args) return json({ error: "AI returned no listing" }, 500);
     return json({ result: JSON.parse(args) });
   } catch (e) {
