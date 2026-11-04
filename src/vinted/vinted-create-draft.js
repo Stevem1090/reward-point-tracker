@@ -301,6 +301,36 @@
     }
   }
 
+  // Brand is MANDATORY on Vinted: either a brand is chosen, or, for an item with no brand, the dialog's
+  // "List without brand" option (id "empty-brand") must be chosen (Vinted help page 47). Leaving the field alone is
+  // not the same thing: Vinted may have filled in a wrong brand from the photo, which would then stay on the listing.
+  // So an item with no brand supplied is set to "List without brand" explicitly.
+  const NO_BRAND_LABEL = 'list without brand';
+  async function chooseNoBrand(viaOther) {
+    await openPanel('#brand', 'brand-select-dropdown-content');
+    const noBrandRow = await waitFor(() => document.getElementById('empty-brand'), { timeout: 6000, label: 'the "List without brand" option' });
+    let target = noBrandRow;
+    if (viaOther) {
+      target = $$('[id^="brand-"][role="radio"]')[0];
+      if (!target) throw new Error('no brand available to reset the brand dialog');
+    }
+    if (!isChecked(target)) target.click();
+    await finishSelection('brand-select-dropdown-content', false);
+    await sleep(300);
+  }
+
+  async function setNoBrand() {
+    const same = () => valueOf('#brand').trim().toLowerCase() === NO_BRAND_LABEL;
+    if (same()) return;
+    await chooseNoBrand(false);
+    const settled = async () => { try { await waitFor(same, { timeout: 2500, label: 'brand value' }); return true; } catch (e) { return false; } };
+    if (!(await settled())) {
+      await chooseNoBrand(true);   // pick any brand first to reset the dialog
+      await chooseNoBrand(false);  // then pick "List without brand" again
+      if (!(await settled())) throw new Error(`could not set "List without brand" (field shows "${valueOf('#brand') || 'nothing'}")`);
+    }
+  }
+
   async function setSize(sizeId) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       await openPanel('#size', 'category-size-single-grid-content');
@@ -508,6 +538,10 @@
     if (capsWords.length) report.warnings.push(`title has all-caps words (${capsWords.join(', ')}); Vinted rejects titles with too many capitals`);
 
     // 1. Photos first. The remaining fields do not exist until this is done.
+    // No brand name supplied (or item.noBrand is true) means the item is listed as "List without brand".
+    const hasBrand = !item.noBrand && !!(item.brandName && String(item.brandName).trim());
+    if (!hasBrand) report.warnings.push('no brand supplied: the item will be listed as "List without brand"');
+
     const upload = await uploadImages(item.images);
     if (upload && upload.fieldsRevealed === false) {
       report.warnings.push('the other form fields were not shown within 20s of the upload; continuing with the category step, which also reveals them');
@@ -523,7 +557,8 @@
         ok: () => !!($('#brand') && $('#condition') && $('#color')) },
       { name: 'title',     apply: () => setText('#title', item.title),             ok: () => valueOf('#title') === item.title },
       { name: 'description', apply: () => setText('#description', item.description), ok: () => valueOf('#description') === item.description },
-      { name: 'brand',     apply: () => setBrand(item.brandId, item.brandName),    ok: () => valueOf('#brand').toLowerCase() === item.brandName.toLowerCase() },
+      { name: 'brand',     apply: () => (hasBrand ? setBrand(item.brandId, item.brandName) : setNoBrand()),
+        ok: () => valueOf('#brand').trim().toLowerCase() === (hasBrand ? String(item.brandName).toLowerCase() : NO_BRAND_LABEL) },
       { name: 'size',      apply: () => setSizeIfPresent(item.sizeId, report),    ok: () => !$('#size') || !!valueOf('#size') },
       { name: 'condition', apply: () => setCondition(item.conditionId),            ok: () => !!valueOf('#condition') },
       { name: 'colours',   apply: async () => { state.colourNames = await setColours(item.colourIds || []); }, ok: () => sameNames(valueOf('#color'), state.colourNames || []) },
