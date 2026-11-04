@@ -25,6 +25,24 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+  // ---------- diagnostics ----------
+  // A compact picture of the page, attached to failure reports so a failed run can be understood
+  // without being there: which form fields exist, whether a dialog is stuck open, alert text, size of screen.
+  function pageSnapshot() {
+    try {
+      const has = (id) => !!document.getElementById(id);
+      return {
+        path: location.pathname.replace(/\d{6,}/, '<id>'),
+        viewportWidth: window.innerWidth,
+        photoThumbnails: document.querySelectorAll('[data-testid^="media-select-photo-"]:not([data-testid$="--img"])').length,
+        fields: { title: has('title'), description: has('description'), category: has('category'), brand: has('brand'), size: has('size'), condition: has('condition'), colour: has('color'), material: has('material'), price: has('price') },
+        values: { category: (document.getElementById('category') || {}).value || '', brand: (document.getElementById('brand') || {}).value || '', size: (document.getElementById('size') || {}).value || '' },
+        dialogOpen: !!document.querySelector('[data-testid="input-dropdown-save-button"]'),
+        alerts: [...document.querySelectorAll('[role="alert"]')].map((e) => (e.innerText || '').trim().slice(0, 120)).filter(Boolean).slice(0, 3),
+      };
+    } catch (e) { return { snapshotError: String(e && e.message) }; }
+  }
+
   // ---------- host notification (native app / in-app browser) ----------
   // A native host cannot read return values from an injected script, so the script PUSHES events out.
   // It tries, in order: window.mobileApp.postMessage({ detail }) (Capgo Capacitor in-app browser),
@@ -136,7 +154,7 @@
       // Photos already on the page (for example an existing draft's edit page): just wait for the fields.
       await waitFor(() => $('#brand') && $('#condition') && $('#color'), { timeout: 20000, label: 'fields (no new photos supplied)' });
       await sleep(500);
-      return;
+      return { fieldsRevealed: true };
     }
     const files = [];
     for (let i = 0; i < images.length; i++) files.push(await toFile(images[i], i));
@@ -149,15 +167,24 @@
 
     // Wait for every thumbnail, then for the extra fields to be revealed.
     await waitFor(() => $(`[data-testid="media-select-photo-${files.length - 1}"]`), { timeout: 60000, label: 'photo thumbnails' });
-    await waitFor(() => $('#brand') && $('#condition') && $('#color'), { timeout: 20000, label: 'fields revealed after upload' });
-
-    // Vinted fills suggestions from the photo a few seconds later (category, brand,
-    // material, colour). Wait for the first one to land, then carry on. The final
-    // verify loop catches anything that arrives even later.
+    // The brand, condition, colour and other fields normally appear a few seconds after the photos land.
+    // If they are slow (seen on a real phone), do NOT fail: carry on to the category step, because
+    // choosing a category also reveals them. The 'fields' step in the plan then waits for them.
+    let fieldsRevealed = true;
     try {
-      await waitFor(() => valueOf('#category'), { timeout: 8000, label: 'photo suggestion' });
-    } catch (e) { /* no suggestion arrived, that is fine */ }
-    await sleep(1500);
+      await waitFor(() => $('#brand') && $('#condition') && $('#color'), { timeout: 20000, label: 'fields revealed after upload' });
+    } catch (e) { fieldsRevealed = false; }
+
+    if (fieldsRevealed) {
+      // Vinted fills suggestions from the photo a few seconds later (category, brand,
+      // material, colour). Wait for the first one to land, then carry on. The final
+      // verify loop catches anything that arrives even later.
+      try {
+        await waitFor(() => valueOf('#category'), { timeout: 8000, label: 'photo suggestion' });
+      } catch (e) { /* no suggestion arrived, that is fine */ }
+      await sleep(1500);
+    }
+    return { fieldsRevealed };
   }
 
   // ---------- field fillers ----------
@@ -234,7 +261,12 @@
 
   // Brand: search by name (React-safe), wait for results, then click the exact brand ID.
   // Falls back to an exact (case-insensitive) name match if the ID is ever not present.
-  async function setBrand(brandId, brandName) {
+  // Two protections, because a real phone run left the brand empty although Primark was chosen:
+  //  1. Vinted can pre-select a brand from the photo (for example from a visible label). Tapping a row
+  //     that is already selected may DESELECT it, so an already-correct brand is left alone.
+  //  2. The dialog can keep stale state where Save changes nothing. If the field is still wrong,
+  //     pick a different brand first to reset the dialog, then pick the wanted one (same fix as category).
+  async function chooseBrand(brandId, brandName, viaOther) {
     await openPanel('#brand', 'brand-select-dropdown-content');
     const search = await waitFor(() => $('#brand-search-input'), { label: 'brand search' });
     setNativeValue(search, brandName);
@@ -247,17 +279,38 @@
     } catch (e) {
       throw new Error(`Brand not found: ${brandName} (${brandId})`);
     }
-    row.click();
+    let target = row;
+    if (viaOther) {
+      target = $$('[id^="brand-"][role="radio"]').find((e) => e !== row);
+      if (!target) throw new Error('no other brand available to reset the brand dialog');
+    }
+    if (!isChecked(target)) target.click();
     await finishSelection('brand-select-dropdown-content', false);
     await sleep(300);
   }
 
+  async function setBrand(brandId, brandName) {
+    const same = () => valueOf('#brand').trim().toLowerCase() === String(brandName).toLowerCase();
+    if (same()) return; // already correct (for example chosen by Vinted from the photo)
+    await chooseBrand(brandId, brandName, false);
+    const settled = async () => { try { await waitFor(same, { timeout: 2500, label: 'brand value' }); return true; } catch (e) { return false; } };
+    if (!(await settled())) {
+      await chooseBrand(brandId, brandName, true);   // pick a different brand to reset the dialog
+      await chooseBrand(brandId, brandName, false);  // then pick the wanted one again
+      if (!(await settled())) throw new Error(`brand could not be set to "${brandName}" (field shows "${valueOf('#brand') || 'nothing'}")`);
+    }
+  }
+
   async function setSize(sizeId) {
-    await openPanel('#size', 'category-size-single-grid-content');
-    const opt = await waitFor(() => $(`[data-testid$="-grid-option-${sizeId}"]`), { label: `size ${sizeId} (not offered for this category?)` });
-    opt.click();
-    await finishSelection('category-size-single-grid-content', false);
-    await sleep(300);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await openPanel('#size', 'category-size-single-grid-content');
+      const opt = await waitFor(() => $(`[data-testid$="-grid-option-${sizeId}"]`), { label: `size ${sizeId} (not offered for this category?)` });
+      if (!isChecked(opt)) opt.click(); // a second tap on a selected option can deselect it
+      await finishSelection('category-size-single-grid-content', false);
+      await sleep(300);
+      if (valueOf('#size')) return;
+    }
+    throw new Error(`size ${sizeId} could not be set (the field stayed empty)`);
   }
 
   // Some categories (bags, jewellery, sunglasses, watches...) have no size field at all.
@@ -274,35 +327,62 @@
   }
 
   async function setCondition(conditionId) {
-    await openPanel('#condition', 'category-condition-single-list-content');
-    await waitFor(() => $('[role="radio"][id^="condition-"]'), { label: 'condition options' });
-    const row = document.getElementById(`condition-${conditionId}`);
-    if (!row) {
-      const offered = $$('[role="radio"][id^="condition-"]').map((e) => e.id.replace('condition-', '')).join(', ');
-      await dismissPanels();
-      throw new Error(`condition ${conditionId} is not offered for this category (offered: ${offered})`);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await openPanel('#condition', 'category-condition-single-list-content');
+      await waitFor(() => $('[role="radio"][id^="condition-"]'), { label: 'condition options' });
+      const row = document.getElementById(`condition-${conditionId}`);
+      if (!row) {
+        const offered = $$('[role="radio"][id^="condition-"]').map((e) => e.id.replace('condition-', '')).join(', ');
+        await dismissPanels();
+        throw new Error(`condition ${conditionId} is not offered for this category (offered: ${offered})`);
+      }
+      if (!isChecked(row)) row.click(); // a second tap on a selected option can deselect it
+      await finishSelection('category-condition-single-list-content', false);
+      await sleep(300);
+      if (valueOf('#condition')) return;
     }
-    row.click();
-    await finishSelection('category-condition-single-list-content', false);
-    await sleep(300);
+    throw new Error(`condition ${conditionId} could not be set (the field stayed empty)`);
   }
 
+  // Names currently shown in a multi-select field, for example "Light blue, Multi" -> ['light blue', 'multi'].
+  const namesIn = (fieldValue) => String(fieldValue || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const sameNames = (fieldValue, wantedNames) => {
+    const a = namesIn(fieldValue).sort();
+    const b = [...wantedNames].sort();
+    return a.length === b.length && a.every((x, i) => x === b[i]);
+  };
+
   // Multi-selects (colour, material): tick wanted, untick unwanted (incl. stale suggestions), close.
+  // Colour rows expose NO selected state (no aria-checked, no role). So the selection is read from the field's
+  // text BEFORE the dialog opens (the committed text is accurate; once the dialog is opening, the field text can be
+  // momentarily empty, which made an earlier version toggle correct colours off - verified live) and every tap is
+  // tracked in a local set. Rows that do expose aria-checked (materials) use that instead.
+  // Returns the lower-cased names that should now be selected, for verification.
   async function setMulti({ inputSel, panelId, rowSel, wantedIds, rowId }) {
+    const selected = new Set(namesIn(valueOf(inputSel)));
     await openPanel(inputSel, panelId);
     const rows = $$(rowSel).filter((r) => /^[a-z]+-\d+$/.test(r.getAttribute('data-testid') || ''));
+    const rowName = (r) => (r.innerText || '').trim().split('\n')[0].toLowerCase();
+    const isOn = (r) => { const attr = r.getAttribute('aria-checked'); return attr !== null ? attr === 'true' : selected.has(rowName(r)); };
+    const tap = async (r) => {
+      r.click();
+      const n = rowName(r);
+      if (selected.has(n)) selected.delete(n); else selected.add(n);
+      await sleep(450);
+    };
     const wanted = new Set(wantedIds.map(String));
-    // untick anything wrong first (only possible where aria-checked is exposed)
+    // untick anything wrong first (this also frees a slot when the field allows only two colours)
     for (const r of rows) {
-      const id = rowId(r);
-      if (isChecked(r) && !wanted.has(id)) { r.click(); await sleep(400); }
+      if (!wanted.has(rowId(r)) && isOn(r)) await tap(r);
     }
     for (const id of wanted) {
       const r = rows.find((x) => rowId(x) === id);
       if (!r) throw new Error(`Option ${id} not found in ${panelId}`);
-      if (r.getAttribute('aria-checked') !== 'true') { r.click(); await sleep(400); }
+      if (!isOn(r)) await tap(r);
     }
+    const wantedNames = rows.filter((r) => wanted.has(rowId(r))).map(rowName);
     await finishSelection(panelId, true); // mobile: Save, desktop: Escape
+    return wantedNames;
   }
 
   const setColours = (ids) => setMulti({
@@ -428,7 +508,10 @@
     if (capsWords.length) report.warnings.push(`title has all-caps words (${capsWords.join(', ')}); Vinted rejects titles with too many capitals`);
 
     // 1. Photos first. The remaining fields do not exist until this is done.
-    await uploadImages(item.images);
+    const upload = await uploadImages(item.images);
+    if (upload && upload.fieldsRevealed === false) {
+      report.warnings.push('the other form fields were not shown within 20s of the upload; continuing with the category step, which also reveals them');
+    }
     report.steps.push('images uploaded');
 
     // 2. Field plan, in dependency order (category first: it drives size and material).
@@ -436,13 +519,15 @@
     const plan = [
       { name: 'category',  apply: async () => { await setCategory(item.categoryPath, item.categoryLeafId); state.categoryLabel = valueOf('#category'); },
         ok: () => !!state.categoryLabel && valueOf('#category') === state.categoryLabel },
+      { name: 'fields',    apply: async () => { await waitFor(() => $('#brand') && $('#condition') && $('#color'), { timeout: 40000, label: 'the other form fields (shown after a photo upload or a category choice)' }); await sleep(800); },
+        ok: () => !!($('#brand') && $('#condition') && $('#color')) },
       { name: 'title',     apply: () => setText('#title', item.title),             ok: () => valueOf('#title') === item.title },
       { name: 'description', apply: () => setText('#description', item.description), ok: () => valueOf('#description') === item.description },
       { name: 'brand',     apply: () => setBrand(item.brandId, item.brandName),    ok: () => valueOf('#brand').toLowerCase() === item.brandName.toLowerCase() },
       { name: 'size',      apply: () => setSizeIfPresent(item.sizeId, report),    ok: () => !$('#size') || !!valueOf('#size') },
       { name: 'condition', apply: () => setCondition(item.conditionId),            ok: () => !!valueOf('#condition') },
-      { name: 'colours',   apply: () => setColours(item.colourIds || []),           ok: () => (valueOf('#color') ? valueOf('#color').split(',').length : 0) === (item.colourIds || []).length },
-      { name: 'material',  apply: () => setMaterials(item.materialIds || []),       ok: () => (valueOf('#material') ? valueOf('#material').split(',').length : 0) === (item.materialIds || []).length },
+      { name: 'colours',   apply: async () => { state.colourNames = await setColours(item.colourIds || []); }, ok: () => sameNames(valueOf('#color'), state.colourNames || []) },
+      { name: 'material',  apply: async () => { state.materialNames = await setMaterials(item.materialIds || []); }, ok: () => sameNames(valueOf('#material'), state.materialNames || []) },
       { name: 'price',     apply: () => typeText('#price', item.price),            ok: () => parseFloat(valueOf('#price').replace(/[^\d.]/g, '')) === Number(item.price) },
       { name: 'package',   apply: () => setPackage(item.packageId || 1),           ok: () => !!document.getElementById(`package_type_selector_${item.packageId || 1}`)?.checked },
     ];
@@ -487,7 +572,8 @@
     };
 
     // 5. Save as draft only when explicitly asked and nothing failed.
-    notifyHost('vinted:report', { warnings: report.warnings, errors: report.errors, steps: report.steps, finalValues: report.finalValues, willSave: !!(opts.saveDraft && !report.errors.length) });
+    if (report.errors.length) report.diagnostics = pageSnapshot();
+    notifyHost('vinted:report', { warnings: report.warnings, errors: report.errors, steps: report.steps, finalValues: report.finalValues, willSave: !!(opts.saveDraft && !report.errors.length), diagnostics: report.diagnostics });
     if (opts.saveDraft && !report.errors.length) {
       notifyHost('vinted:progress', { step: 'saving', done: totalSteps - 1, total: totalSteps });
       report.save = await saveDraftAndConfirm(item, report);
@@ -503,7 +589,7 @@
     window.__VINTED_REPORT__ = null;
     vintedCreateDraft(window.__VINTED_ITEM__, window.__VINTED_OPTIONS__ || {})
       .then((r) => { window.__VINTED_REPORT__ = r; console.log('[vinted-draft]', r); })
-      .catch((e) => { window.__VINTED_REPORT__ = { fatal: e.message }; notifyHost('vinted:fatal', { message: e.message }); console.error('[vinted-draft]', e); });
+      .catch((e) => { window.__VINTED_REPORT__ = { fatal: e.message }; notifyHost('vinted:fatal', { message: e.message, diagnostics: pageSnapshot() }); console.error('[vinted-draft]', e); });
   }
 })();
 
