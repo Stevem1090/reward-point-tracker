@@ -1,6 +1,7 @@
 import type { Analysis } from './analysis';
 import { analysisToDraft } from './analysis';
 import type { VintedImage } from './imageResize';
+import { VINTED_REFERENCE as ref } from './reference';
 import { validateForApproval, type DraftItem } from './validate';
 
 export const MAX_ITEMS = 25;
