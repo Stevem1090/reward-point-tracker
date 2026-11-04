@@ -19,6 +19,7 @@
 
 ## Vinted drafts
 - [x] Phase 0: Diagnostics screen (in-app browser, login, dry-run test, payload measurement)
-- [ ] Phase 0 phone test — waiting on Steve's results from the device
-- [ ] Phase 1: AI photo analysis (after Phase 0 confirmed)
-- [ ] Phase 2: validation, review UI, queue, README (after Phase 1)
+- [x] Phase 0 phone test (dry run passed)
+- [ ] Live test on phone: waiting on Steve to confirm ok: true + draftId
+- [x] Phase 1: AI photo analysis + hard validation (analysis test on Diagnostics)
+- [ ] Phase 2 (blocked until live test confirmed): review UI, queue, README (after Phase 1)
