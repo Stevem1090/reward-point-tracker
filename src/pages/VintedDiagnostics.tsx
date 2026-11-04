@@ -13,7 +13,8 @@ import { Progress } from '@/components/ui/progress';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { analysePhotos, analysisToDraft, type Analysis } from '@/vinted/analysis';
-import { validateDraft } from '@/vinted/validate';
+import { allowedConditions, validateForApproval } from '@/vinted/validate';
+import { Textarea } from '@/components/ui/textarea';
 import { closeVinted, exec, goToNew, hideVinted, resizeVinted, showVinted, type DockSize, injectAndRun, listen, openVinted, pluginVersion, PROBE_SCRIPT, VINTED_SCRIPT } from '@/vinted/browser';
 
 type Probe = { url: string; userAgent: string; width: number; hasTitleField: boolean; botCheck: boolean; loginWall: boolean; openInApp: boolean };
@@ -47,6 +48,12 @@ export default function VintedDiagnostics() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [aiPrice, setAiPrice] = useState('');
   const [aiImagesCount, setAiImagesCount] = useState(0);
+  const [notes, setNotes] = useState('');
+  const [hints, setHints] = useState('');
+  const [analysedNotes, setAnalysedNotes] = useState('');
+  const [condition, setCondition] = useState<number | null>(null);
+  const [priceConfirmed, setPriceConfirmed] = useState(false);
+  const [edited, setEdited] = useState({ condition: false, price: false });
 
   const add = (text: string) => setLog((l) => [...l, { at: new Date().toLocaleTimeString('en-GB'), text }]);
 
@@ -128,22 +135,32 @@ export default function VintedDiagnostics() {
     }
   };
 
-  const runAnalysis = async () => {
+  /** overwrite=false keeps fields the user edited by hand (condition, price). */
+  const runAnalysis = async (overwrite = true) => {
     if (!files.length) { toast('Pick photos first'); return; }
-    setAiBusy(true); setAnalysis(null);
+    setAiBusy(true);
     try {
       const images = await Promise.all(files.slice(0, 5).map((f, i) => resizeForVinted(f, i)));
       setAiImagesCount(images.length);
       const t = performance.now();
-      const a = await analysePhotos(images);
+      const a = await analysePhotos(images, { notes, hints });
       add(`AI analysis in ${Math.round(performance.now() - t)} ms: ${JSON.stringify(a)}`);
       setAnalysis(a);
+      setAnalysedNotes(notes);
+      if (overwrite || !edited.condition) { setCondition(a.conditionId); setEdited((e) => ({ ...e, condition: false })); }
+      if (overwrite || !edited.price) { setAiPrice(a.suggestedPrice != null ? String(a.suggestedPrice) : ''); setPriceConfirmed(false); setEdited((e) => ({ ...e, price: false })); }
     } catch (e: any) { add(`AI analysis failed: ${e?.message || e}`); toast(`Analysis failed: ${e?.message || e}`); }
     finally { setAiBusy(false); }
   };
-  const aiErrors = analysis
-    ? validateDraft(analysisToDraft(analysis, 'preview', Array.from({ length: aiImagesCount }, (_, i) => ({ name: `p${i}.jpg`, type: 'image/jpeg', base64: 'x' })), aiPrice ? Number(aiPrice) : null))
-    : [];
+  const aiDraft = analysis
+    ? { ...analysisToDraft(analysis, 'preview', Array.from({ length: aiImagesCount }, (_, i) => ({ name: `p${i}.jpg`, type: 'image/jpeg', base64: 'x' })), aiPrice ? Number(aiPrice) : null), conditionId: condition ?? undefined }
+    : null;
+  const aiErrors = aiDraft ? validateForApproval(aiDraft, { priceConfirmed, flags: analysis!.flags }) : [];
+  const confirmPrice = () => {
+    setPriceConfirmed(true);
+    add(`Price log: AI suggested £${analysis?.suggestedPrice ?? '–'}, final £${aiPrice || '–'}`);
+  };
+  const condOptions = analysis?.categoryLeafId != null ? allowedConditions(analysis.categoryLeafId) : {};
 
   const copyLog = async () => {
     const text = [
@@ -264,13 +281,43 @@ export default function VintedDiagnostics() {
           <Card>
             <CardHeader className="p-3 pb-1"><CardTitle className="text-base">AI analysis test</CardTitle></CardHeader>
             <CardContent className="p-3 pt-0 space-y-2 text-sm">
-              <p className="text-muted-foreground">Reads the photos above and suggests a listing. Nothing is sent to Vinted.</p>
-              <Button className="h-11 w-full" variant="outline" disabled={files.length === 0 || aiBusy} onClick={runAnalysis}>{aiBusy ? 'Analysing…' : 'Analyse photos'}</Button>
+              <p className="text-muted-foreground">Reads the photos above and your notes, and suggests a listing. Nothing is sent to Vinted.</p>
+              <Textarea placeholder='Notes (optional), e.g. "slight mark on the front", "worn twice"' value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+              <Input className="h-11" placeholder='Hints (optional), e.g. "girls", "age 2"' value={hints} onChange={(e) => setHints(e.target.value)} />
+              <Button className="h-11 w-full" variant="outline" disabled={files.length === 0 || aiBusy} onClick={() => runAnalysis(true)}>{aiBusy ? 'Analysing…' : 'Analyse photos'}</Button>
+              {analysis && notes !== analysedNotes && (
+                <div className="rounded border p-2 space-y-2">
+                  <p>Notes changed since the analysis.</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button className="h-11" variant="outline" disabled={aiBusy} onClick={() => runAnalysis(false)}>Re-run, keep my edits</Button>
+                    <Button className="h-11" variant="outline" disabled={aiBusy} onClick={() => runAnalysis(true)}>Re-run, overwrite all</Button>
+                  </div>
+                </div>
+              )}
               {analysis && (
                 <div className="space-y-2">
-                  <Input className="h-11" inputMode="decimal" placeholder="Price £ (you set this)" value={aiPrice} onChange={(e) => setAiPrice(e.target.value)} />
-                  {analysis.flags.length > 0 && <div className="flex flex-wrap gap-1">{analysis.flags.map((f) => <Badge key={f} variant="secondary">{f}</Badge>)}</div>}
-                  <div className={aiErrors.length ? 'text-destructive' : ''}>{aiErrors.length ? `Blocked: ${aiErrors.join('; ')}` : 'Passes all checks'}</div>
+                  <div className="font-medium">{analysis.title}</div>
+                  <div className="whitespace-pre-line rounded bg-muted p-2">{analysis.description}</div>
+                  {analysis.notesUsed.length > 0 && <div className="text-xs text-muted-foreground">Notes used: {analysis.notesUsed.join('; ')}</div>}
+
+                  <label className="block text-xs text-muted-foreground">Condition</label>
+                  <select className="h-11 w-full rounded-md border border-input bg-background px-2" value={condition ?? ''} onChange={(e) => { setCondition(Number(e.target.value)); setEdited((x) => ({ ...x, condition: true })); }}>
+                    {Object.entries(condOptions).map(([id, n]) => <option key={id} value={id}>{n}</option>)}
+                  </select>
+                  {analysis.conditionReason && <p className="text-xs text-muted-foreground">{analysis.conditionReason}</p>}
+
+                  <label className="block text-xs text-muted-foreground">Price £</label>
+                  <div className="flex items-center gap-2">
+                    <Input className="h-11 flex-1" inputMode="decimal" value={aiPrice} onChange={(e) => { setAiPrice(e.target.value); setEdited((x) => ({ ...x, price: true })); setPriceConfirmed(!!e.target.value); }} />
+                    {analysis.suggestedPrice != null && <Badge variant="outline">Suggested £{analysis.suggestedPrice.toFixed(2)} · {analysis.priceConfidence}</Badge>}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{analysis.priceRationale}</p>
+                  {priceConfirmed
+                    ? <p className="text-xs">Price confirmed. AI suggested £{analysis.suggestedPrice?.toFixed(2) ?? '–'}, final £{aiPrice || '–'}.</p>
+                    : <Button className="h-11 w-full" disabled={!aiPrice} onClick={confirmPrice}>Confirm price</Button>}
+
+                  {analysis.flags.length > 0 && <div className="flex flex-wrap gap-1">{analysis.flags.map((f) => <Badge key={f} variant={f === 'cannot_list_underwear' ? 'destructive' : 'secondary'}>{f}</Badge>)}</div>}
+                  <div className={aiErrors.length ? 'text-destructive' : ''}>{aiErrors.length ? `Blocked: ${aiErrors.join('; ')}` : 'Ready: passes all checks'}</div>
                   <pre className="text-xs bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap">{JSON.stringify(analysis, null, 2)}</pre>
                 </div>
               )}
