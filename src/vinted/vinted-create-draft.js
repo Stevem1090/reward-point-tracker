@@ -427,15 +427,41 @@
     rowId: (r) => r.getAttribute('data-testid').replace('material-', ''),
   });
 
+  // Parcel size. Vinted marks ONE option "Recommended" and the recommendation depends on the category (verified live:
+  // Small for most kids clothing, Medium for wellington boots). The option that is pre-selected does NOT always follow
+  // the recommendation (wellington boots recommend Medium but Small stays pre-selected), and the recommendation arrives
+  // about a second after a category change, so it is read once it has settled.
+  // item.packageId: 1, 2 or 3 forces that size. Left out (or 'recommended'), the script follows Vinted's recommendation.
+  const recommendedPackage = () => {
+    const ids = $$('[data-testid^="package-size-suggestion-badge-id-"]')
+      .map((e) => e.getAttribute('data-testid').replace('package-size-suggestion-badge-id-', ''))
+      .filter((t) => /^[123]$/.test(t));
+    return ids.length ? Number(ids[0]) : null;
+  };
+
+  // Resolves with { id, source } where source is 'explicit', 'vinted' or 'fallback' (no recommendation was shown).
   async function setPackage(packageId) {
-    const radio = await waitFor(() => document.getElementById(`package_type_selector_${packageId}`), { label: `package ${packageId}` });
+    let id = [1, 2, 3].includes(Number(packageId)) ? Number(packageId) : null;
+    let source = id ? 'explicit' : null;
+    if (!id) {
+      let last = null;
+      let since = Date.now();
+      const start = Date.now();
+      while (Date.now() - start < 8000) {
+        const rec = recommendedPackage();
+        if (rec !== last) { last = rec; since = Date.now(); }
+        else if (rec !== null && Date.now() - since >= 1500) break; // stable for 1.5s
+        await sleep(250);
+      }
+      id = last || 1;
+      source = last ? 'vinted' : 'fallback';
+    }
+    const radio = await waitFor(() => document.getElementById(`package_type_selector_${id}`), { label: `package ${id}` });
     if (!radio.checked) radio.click();
     await sleep(400);
+    return { id, source };
   }
 
-  // Vinted's price field only updates its real form state from genuine typing. Setting the text with
-  // the native setter makes the box DISPLAY the price but the draft saves with no price at all
-  // (verified on the live page). Typing via execCommand fixes that.
   async function typeText(selector, value) {
     const el = await waitFor(() => $(selector), { label: selector });
     el.focus();
@@ -564,7 +590,10 @@
       { name: 'colours',   apply: async () => { state.colourNames = await setColours(item.colourIds || []); }, ok: () => sameNames(valueOf('#color'), state.colourNames || []) },
       { name: 'material',  apply: async () => { state.materialNames = await setMaterials(item.materialIds || []); }, ok: () => sameNames(valueOf('#material'), state.materialNames || []) },
       { name: 'price',     apply: () => typeText('#price', item.price),            ok: () => parseFloat(valueOf('#price').replace(/[^\d.]/g, '')) === Number(item.price) },
-      { name: 'package',   apply: () => setPackage(item.packageId || 1),           ok: () => !!document.getElementById(`package_type_selector_${item.packageId || 1}`)?.checked },
+      { name: 'package',   apply: async () => { state.parcel = await setPackage(item.packageId); },
+        ok: () => !!state.parcel && !!document.getElementById(`package_type_selector_${state.parcel.id}`)?.checked
+          // when following Vinted, the recommendation may have changed since (it can update late): re-apply if so
+          && (state.parcel.source !== 'vinted' || recommendedPackage() === null || recommendedPackage() === state.parcel.id) },
     ];
 
     // Progress events let a host app show how far along the run is.
@@ -604,9 +633,15 @@
       category: valueOf('#category'), title: valueOf('#title'), brand: valueOf('#brand'),
       size: valueOf('#size'), condition: valueOf('#condition'), colours: valueOf('#color'),
       material: valueOf('#material'), price: valueOf('#price'),
+      parcel: state.parcel ? `${{ 1: 'Small', 2: 'Medium', 3: 'Large' }[state.parcel.id]} (${state.parcel.source})` : '',
     };
 
     // 5. Save as draft only when explicitly asked and nothing failed.
+    if (state.parcel) {
+      const names = { 1: 'Small', 2: 'Medium', 3: 'Large' };
+      report.parcel = { id: state.parcel.id, name: names[state.parcel.id], source: state.parcel.source };
+      if (state.parcel.source === 'fallback') report.warnings.push('Vinted showed no recommended parcel size; Small was used');
+    }
     if (report.errors.length) report.diagnostics = pageSnapshot();
     notifyHost('vinted:report', { warnings: report.warnings, errors: report.errors, steps: report.steps, finalValues: report.finalValues, willSave: !!(opts.saveDraft && !report.errors.length), diagnostics: report.diagnostics });
     if (opts.saveDraft && !report.errors.length) {
@@ -641,7 +676,7 @@ window.__VINTED_ITEM__ = {
   colourIds: [26, 15],                // Light blue, Multi
   materialIds: [44, 45],              // Cotton, Polyester
   price: 6,
-  packageId: 1                        // Small
+  // packageId: 1                  // optional: 1 Small, 2 Medium, 3 Large. Leave out to follow Vinted's recommendation
 };
 window.__VINTED_OPTIONS__ = { saveDraft: false };
 */
