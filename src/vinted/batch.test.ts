@@ -1,3 +1,5 @@
+// @ts-nocheck -- run with `bun test`
+import './testSetup';
 import { describe, expect, it } from 'bun:test';
 import { acceptAllPrices, blockerFor, canAdd, MAX_ITEMS, newItem, recoverAfterRestart, type BatchItem } from './batch';
 
