@@ -8,7 +8,11 @@ const good = (): DraftItem => buildTestItem('t1', img) as DraftItem;
 
 describe('validateDraft', () => {
   it('accepts the built-in test item', () => expect(validateDraft(good())).toEqual([]));
-  it('blocks a zero price', () => expect(validateDraft({ ...good(), price: 0 })).toContain('Price must be more than £0'));
+  it('blocks a zero custom price', () => expect(validateDraft({ ...good(), price: 0 })).toContain('A custom price must be more than £0'));
+  it('allows no price at all (Vinted Optimal + uplift is used at drafting time)', () => {
+    const { price, ...rest } = good();
+    expect(validateDraft(rest)).toEqual([]);
+  });
   it('blocks more than two colours', () => expect(validateDraft({ ...good(), colourIds: [1, 3, 12] })).toContain('At most 2 colours'));
   it('blocks a brand outside the list', () => expect(validateDraft({ ...good(), brandId: 999999 })).toContain('Brand is missing or not in the brand list'));
   it('blocks a mismatched brand name', () => expect(validateDraft({ ...good(), brandName: 'TU' })).toContain('Brand name does not match the brand'));
