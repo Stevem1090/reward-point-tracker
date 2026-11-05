@@ -6,8 +6,17 @@ import { validateForApproval, type DraftItem } from './validate';
 
 export const MAX_ITEMS = 25;
 export const MAX_PARALLEL_ANALYSIS = 2;
-export const PAUSE_BETWEEN_MS = 30_000;
+export const PAUSE_BETWEEN_MS = 15_000;
 export const SAVE_TIMEOUT_MS = 120_000;
+
+/** £ added to Vinted's "Optimal" price when no custom price is typed. */
+export const DEFAULT_PRICE_UPLIFT = 0.5;
+const UPLIFT_KEY = 'vinted-price-uplift-v1';
+export function loadPriceUplift(): number {
+  const v = Number(localStorage.getItem(UPLIFT_KEY));
+  return Number.isFinite(v) && v >= 0 ? v : DEFAULT_PRICE_UPLIFT;
+}
+export const savePriceUplift = (v: number) => localStorage.setItem(UPLIFT_KEY, String(v));
 
 export type BatchStatus =
   | 'queued' | 'analysing' | 'analysis_failed' | 'needs_review' | 'approved'
@@ -33,8 +42,10 @@ export type BatchItem = {
   packageId?: 1 | 2 | 3;
   /** Parcel the script actually used, from its report. */
   parcel?: { id: number; name: string; source: string };
+  /** Custom price typed in review. Empty = Vinted's Optimal price plus the uplift, set at drafting time. */
   price: string;
-  priceConfirmed: boolean;
+  /** Price the script actually used, from its report (also filled by dry runs). */
+  priceResult?: { value: number; source: string; optimal?: number; uplift?: number };
   error?: string;
   dryRun?: 'ok' | 'failed';
   draftId?: string | number;
@@ -47,17 +58,16 @@ export function newItem(images: VintedImage[], notes: string, hints: string): Ba
   return {
     id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     createdAt: Date.now(), images, notes, hints, status: 'queued',
-    title: '', description: '', conditionId: null, price: '', priceConfirmed: false,
+    title: '', description: '', conditionId: null, price: '',
   };
 }
 
-/** Fill editable fields from a fresh analysis. Price always needs confirming again. */
+/** Fill editable fields from a fresh analysis. A custom price typed by hand is kept. */
 export function applyAnalysis(it: BatchItem, a: Analysis): BatchItem {
   return {
     ...it, analysis: a, status: 'needs_review', error: undefined,
     title: a.title, description: a.description, conditionId: a.conditionId,
     brandId: a.brandId, brandName: a.brandId != null ? (ref.brands.main as Record<string, string>)[String(a.brandId)] : '', noBrand: false,
-    price: a.suggestedPrice != null ? String(a.suggestedPrice) : '', priceConfirmed: false,
   };
 }
 
@@ -85,13 +95,18 @@ function brandFields(it: BatchItem): Partial<DraftItem> {
 const PARCEL_SOURCE: Record<string, string> = { vinted: 'Vinted recommended', explicit: 'chosen by you', fallback: 'no recommendation shown' };
 export const parcelLabel = (p?: { name: string; source: string }) => p ? `Parcel: ${p.name} (${PARCEL_SOURCE[p.source] ?? p.source})` : '';
 
-export function toDraft(it: BatchItem): Partial<DraftItem> {
+/** "£4.50 (Vinted Optimal + £0.50)" or "£6.00 (your price)". */
+export const priceLabel = (p?: { value: number; source: string; uplift?: number }) =>
+  !p ? '' : p.source === 'custom' ? `£${p.value.toFixed(2)} (your price)` : `£${p.value.toFixed(2)} (Vinted Optimal + £${(p.uplift ?? DEFAULT_PRICE_UPLIFT).toFixed(2)})`;
+
+export function toDraft(it: BatchItem, uplift = loadPriceUplift()): Partial<DraftItem> {
   if (!it.analysis) return {};
   return {
     ...analysisToDraft(it.analysis, it.id, it.images, it.price ? Number(it.price) : null),
     title: cleanTitle(it.title), description: cleanDescription(it.description), conditionId: it.conditionId ?? undefined,
     ...brandFields(it),
     packageId: it.packageId ?? undefined,
+    priceUplift: uplift !== DEFAULT_PRICE_UPLIFT ? uplift : undefined,
   };
 }
 
@@ -128,15 +143,7 @@ export function describeReportErrors(report: { errors?: unknown[]; steps?: unkno
 }
 
 export const approvalErrors = (it: BatchItem) =>
-  it.analysis ? validateForApproval(toDraft(it), { priceConfirmed: it.priceConfirmed, flags: it.analysis.flags }) : ['Not analysed yet'];
-
-/** "Accept all suggested prices": only items awaiting review with an unconfirmed AI price. */
-export function acceptAllPrices(items: BatchItem[]): BatchItem[] {
-  return items.map((it) =>
-    it.status === 'needs_review' && !it.priceConfirmed && it.analysis?.suggestedPrice != null
-      ? { ...it, price: String(it.analysis.suggestedPrice), priceConfirmed: true }
-      : it);
-}
+  it.analysis ? validateForApproval(toDraft(it), { flags: it.analysis.flags }) : ['Not analysed yet'];
 
 /**
  * After reopening the app: an item that was mid-save may or may not exist on Vinted, so it
