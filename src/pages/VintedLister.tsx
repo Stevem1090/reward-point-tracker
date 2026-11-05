@@ -30,7 +30,7 @@ const STATUS: Record<BatchItem['status'], string> = {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 type Outcome = { kind: 'saved'; draftId: any } | { kind: 'notSaved'; reason: string } | { kind: 'dryOk' } | { kind: 'fatal'; reason: string } | { kind: 'timeout' };
 
-export default function VintedBatch() {
+export default function VintedLister() {
   const native = isNativeApp();
   const [items, setItems] = useState<BatchItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -226,12 +226,12 @@ export default function VintedBatch() {
   return (
     <div className="container mx-auto max-w-2xl px-3 py-4 space-y-3" style={browserOpen && !hidden ? { paddingBottom: `${dock === 'large' ? 62 : 45}vh` } : undefined}>
       <div className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" className="h-11 w-11"><Link to="/profile" aria-label="Back"><ArrowLeft /></Link></Button>
-        <h1 className="text-xl font-bold flex-1">Vinted drafts</h1>
+        <Button asChild variant="ghost" size="icon" className="h-11 w-11"><Link to="/" aria-label="Back"><ArrowLeft /></Link></Button>
+        <h1 className="text-xl font-bold flex-1">Vinted lister</h1>
         <span className="text-sm text-muted-foreground">{items.length}/{MAX_ITEMS}</span>
       </div>
 
-      {!native && <Card><CardContent className="p-3 text-sm text-muted-foreground">You can add and review items here, but sending to Vinted only works in the Family Hub Android app.</CardContent></Card>}
+      {!native && <Card><CardContent className="p-3 text-sm text-muted-foreground">You can photograph, add and review items here. Sending them to Vinted runs in the Family Hub Android app, where Vinted opens in a panel at the bottom of this screen.</CardContent></Card>}
 
       {running && (
         <Card className="sticky top-0 z-10">
