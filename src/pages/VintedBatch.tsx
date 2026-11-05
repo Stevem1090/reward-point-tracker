@@ -145,10 +145,10 @@ export default function VintedBatch() {
     toast('Item added – the AI is analysing it');
   };
   const remove = async (id: string) => { await deleteItem(id); setItems((p) => p.filter((x) => x.id !== id)); setReviewId(null); };
-  const acceptPrices = () => {
-    const next = acceptAllPrices(itemsRef.current);
-    next.forEach((n, i) => n !== itemsRef.current[i] && save(n));
-    toast('Suggested prices accepted');
+  const changeUplift = (v: string) => {
+    setUplift(v);
+    const n = Number(v);
+    if (v.trim() && Number.isFinite(n) && n >= 0) savePriceUplift(n);
   };
   const clearFinished = async () => {
     for (const it of itemsRef.current.filter((i) => i.status === 'drafted')) await deleteItem(it.id);
@@ -194,8 +194,9 @@ export default function VintedBatch() {
         catch (e: any) { waiter.current?.({ kind: 'fatal', reason: e?.message || String(e) }); }
         const o = await outcome; waiter.current = null; currentId.current = null;
         const cur = itemsRef.current.find((x) => x.id === it.id)!;
-        if (o.kind === 'saved') { const s = { ...cur, status: 'drafted' as const, draftId: o.draftId, parcel: lastParcel.current?.id === it.id ? lastParcel.current.parcel : cur.parcel, draftedAt: Date.now(), error: undefined }; save(s); done.push(s); }
-        else if (o.kind === 'dryOk') { const s = { ...cur, dryRun: 'ok' as const, error: undefined }; save(s); done.push(s); }
+        const priceResult = lastPrice.current?.id === it.id ? lastPrice.current.price : cur.priceResult;
+        if (o.kind === 'saved') { const s = { ...cur, status: 'drafted' as const, draftId: o.draftId, parcel: lastParcel.current?.id === it.id ? lastParcel.current.parcel : cur.parcel, priceResult, draftedAt: Date.now(), error: undefined }; save(s); done.push(s); }
+        else if (o.kind === 'dryOk') { const s = { ...cur, dryRun: 'ok' as const, priceResult, error: undefined }; save(s); done.push(s); }
         else if (o.kind === 'timeout') {
           const s = { ...cur, status: dry ? cur.status : 'unknown' as const, dryRun: dry ? 'failed' as const : cur.dryRun, error: 'No answer from Vinted within 2 minutes. Check your Vinted drafts before retrying.' };
           save(s); failed.push(s); stopped = 'No answer from Vinted – result unknown'; break;
@@ -218,7 +219,6 @@ export default function VintedBatch() {
 
   const review = items.find((i) => i.id === reviewId) ?? null;
   const approved = runnable(items).length;
-  const unconfirmed = items.filter((i) => i.status === 'needs_review' && !i.priceConfirmed && i.analysis?.suggestedPrice != null).length;
   const analysing = items.filter((i) => i.status === 'queued' || i.status === 'analysing').length;
   const last = steps[steps.length - 1];
   const pct = last?.total ? Math.round((last.done / last.total) * 100) : 0;
