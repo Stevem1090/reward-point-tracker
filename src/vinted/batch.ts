@@ -13,8 +13,9 @@ export const SAVE_TIMEOUT_MS = 120_000;
 export const DEFAULT_PRICE_UPLIFT = 0.5;
 const UPLIFT_KEY = 'vinted-price-uplift-v1';
 export function loadPriceUplift(): number {
-  const v = Number(localStorage.getItem(UPLIFT_KEY));
-  return Number.isFinite(v) && v >= 0 ? v : DEFAULT_PRICE_UPLIFT;
+  const raw = localStorage.getItem(UPLIFT_KEY);
+  const v = Number(raw);
+  return raw != null && raw.trim() !== '' && Number.isFinite(v) && v >= 0 ? v : DEFAULT_PRICE_UPLIFT;
 }
 export const savePriceUplift = (v: number) => localStorage.setItem(UPLIFT_KEY, String(v));
 
