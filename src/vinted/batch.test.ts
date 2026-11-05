@@ -1,7 +1,7 @@
 // @ts-nocheck -- run with `bun test`
 import './testSetup';
 import { describe, expect, it } from 'bun:test';
-import { acceptAllPrices, blockerFor, canAdd, MAX_ITEMS, newItem, recoverAfterRestart, type BatchItem } from './batch';
+import { blockerFor, canAdd, MAX_ITEMS, newItem, PAUSE_BETWEEN_MS, recoverAfterRestart, type BatchItem } from './batch';
 
 const base = (o: Partial<BatchItem>): BatchItem => ({ ...newItem([], '', ''), ...o });
 
@@ -12,14 +12,8 @@ describe('batch rules', () => {
     expect(canAdd(Array.from({ length: 25 }, () => base({})))).toBe(false);
   });
 
-  it('accept all prices only confirms unconfirmed items awaiting review', () => {
-    const a = { suggestedPrice: 4 } as any;
-    const out = acceptAllPrices([
-      base({ status: 'needs_review', analysis: a, price: '9' }),
-      base({ status: 'drafted', analysis: a, price: '9' }),
-    ]);
-    expect(out[0]).toMatchObject({ price: '4', priceConfirmed: true });
-    expect(out[1]).toMatchObject({ price: '9', priceConfirmed: false });
+  it('pauses 15 seconds between items', () => {
+    expect(PAUSE_BETWEEN_MS).toBe(15_000);
   });
 
   it('an item mid-save when the app closed becomes unknown, never re-run automatically', () => {
@@ -53,11 +47,31 @@ it('drifting error names the field that kept changing', () => {
   expect(msg).toContain('Primark Kids');
 });
 
-import { toDraft as _toDraft, newItem as _newItem } from './batch';
+import { toDraft as _toDraft, newItem as _newItem, priceLabel } from './batch';
 describe('parcel size', () => {
   const base = () => ({ ..._newItem([], '', ''), analysis: { flags: [], categoryLeafId: undefined } as any });
   it('leaves packageId out unless overridden', () => {
     expect(_toDraft(base()).packageId).toBeUndefined();
     expect(_toDraft({ ...base(), packageId: 2 }).packageId).toBe(2);
+  });
+});
+
+describe('price', () => {
+  const base = () => ({ ..._newItem([], '', ''), analysis: { flags: [], categoryLeafId: undefined } as any });
+  it('sends no price and no uplift by default (Vinted Optimal + £0.50 at drafting time)', () => {
+    const d = _toDraft(base());
+    expect(d.price).toBeUndefined();
+    expect(d.priceUplift).toBeUndefined();
+  });
+  it('sends a typed custom price', () => {
+    expect(_toDraft({ ...base(), price: '6.50' }).price).toBe(6.5);
+  });
+  it('sends priceUplift only when it differs from 0.50', () => {
+    expect(_toDraft(base(), 0.5).priceUplift).toBeUndefined();
+    expect(_toDraft(base(), 1).priceUplift).toBe(1);
+  });
+  it('labels the final price by source', () => {
+    expect(priceLabel({ value: 4.5, source: 'vinted_optimal_plus_uplift', uplift: 0.5 })).toBe('£4.50 (Vinted Optimal + £0.50)');
+    expect(priceLabel({ value: 6, source: 'custom' })).toBe('£6.00 (your price)');
   });
 });

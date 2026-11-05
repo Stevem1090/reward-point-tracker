@@ -6,9 +6,9 @@ import { approvalErrors, newItem, toDraft } from './batch';
 const analysis = (brandStatus, brandId = null) => ({
   title: 'Black puffer jacket', description: 'x', categoryLeafId: null, brandNameRead: null, brandId, brandStatus,
   sizeId: null, sizeEvidence: '', conditionId: 2, conditionReason: '', notesUsed: [], colourIds: [], materialIds: [],
-  suggestedPrice: 3, priceRationale: '', priceConfidence: 'low', confidence: {}, flags: [],
+  confidence: {}, flags: [],
 });
-const item = (o) => ({ ...newItem([], '', ''), status: 'needs_review', price: '3', priceConfirmed: true, ...o });
+const item = (o) => ({ ...newItem([], '', ''), status: 'needs_review', price: '3', ...o });
 const brandErr = (it) => approvalErrors(it).filter((e) => /brand/i.test(e));
 
 describe('brand rules', () => {
