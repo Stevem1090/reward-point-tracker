@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -40,7 +39,7 @@ export default function VintedLister() {
   const [newHints, setNewHints] = useState('');
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [confirmRun, setConfirmRun] = useState(false);
-  const [dryRun, setDryRun] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'review' | 'ready' | 'saved'>('all');
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [status, setStatus] = useState('');
@@ -165,7 +164,7 @@ export default function VintedLister() {
     setConfirmRun(false);
     const queue = runnable(itemsRef.current);
     if (!queue.length) return;
-    const dry = dryRun;
+    const dry = false;
     (window as any).__batchDry = dry;
     stopRef.current = false; pausedRef.current = false; setPaused(false);
     setRunning(true); setStopReason(null); setSummary(null);
@@ -339,13 +338,12 @@ export default function VintedLister() {
           <AlertDialogHeader>
             <AlertDialogTitle>Run {approved} item{approved > 1 ? 's' : ''}?</AlertDialogTitle>
             <AlertDialogDescription>
-              {dryRun ? 'Dry run: the Vinted form is filled in but nothing is saved.' : 'This saves real drafts in your Vinted account. Nothing is published, and nothing is ever deleted automatically.'} There is a {PAUSE_BETWEEN_MS / 1000} second pause between items, so {approved} item{approved > 1 ? 's' : ''} take{approved > 1 ? '' : 's'} roughly {Math.max(1, Math.round((approved * (SAVE_TIMEOUT_MS / 4 + PAUSE_BETWEEN_MS)) / 60000))} minute{approved > 1 ? 's' : ''}. Keep this screen open.
+              This saves real drafts in your Vinted account. Nothing is published, and nothing is ever deleted automatically. There is a {PAUSE_BETWEEN_MS / 1000} second pause between items, so {approved} item{approved > 1 ? 's' : ''} take{approved > 1 ? '' : 's'} roughly {Math.max(1, Math.round((approved * (SAVE_TIMEOUT_MS / 4 + PAUSE_BETWEEN_MS)) / 60000))} minute{approved > 1 ? 's' : ''}. Keep this screen open.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="flex items-center gap-2 py-2"><Switch id="dry" checked={dryRun} onCheckedChange={setDryRun} /><Label htmlFor="dry">Dry run (don't save)</Label></div>
           <AlertDialogFooter>
             <AlertDialogCancel className="h-11">Cancel</AlertDialogCancel>
-            <AlertDialogAction className="h-11" onClick={runBatch}>{dryRun ? 'Start dry run' : 'Save drafts'}</AlertDialogAction>
+            <AlertDialogAction className="h-11" onClick={runBatch}>Save drafts</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
