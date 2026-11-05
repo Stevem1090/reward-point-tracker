@@ -372,6 +372,9 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
           <Button variant="outline" className="h-11" onClick={() => onChange({ ...it, status: 'approved', error: undefined })}>Not there – retry</Button>
         </div>
       )}
+      {it.status === 'failed' && /no price recommendation/i.test(it.error ?? '') && (
+        <p className="text-xs text-muted-foreground">Vinted showed no price recommendation for this item. Enter a custom price below, then retry – nothing was saved, so retrying is safe.</p>
+      )}
       {it.status === 'failed' && <Button variant="outline" className="h-11 w-full" onClick={() => onChange({ ...it, status: 'approved', error: undefined })}>Try again in next batch</Button>}
       {(it.status === 'analysis_failed' || (a && !done)) && <Button variant="outline" className="h-11 w-full" onClick={() => onChange({ ...it, status: 'queued', error: undefined })}>Analyse again</Button>}
 
@@ -415,11 +418,8 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
           </select>
           <p className="text-xs text-muted-foreground">{a.conditionReason}</p>
           <Label>Price (£)</Label>
-          <div className="flex gap-2">
-            <Input inputMode="decimal" value={it.price} onChange={(e) => set({ price: e.target.value, priceConfirmed: false })} />
-            <Button className="h-11 shrink-0" variant={it.priceConfirmed ? 'secondary' : 'default'} onClick={() => set({ priceConfirmed: true })} disabled={it.priceConfirmed}>{it.priceConfirmed ? 'Confirmed' : 'Confirm'}</Button>
-          </div>
-          <p className="text-xs text-muted-foreground">Suggested £{a.suggestedPrice ?? '–'} ({a.priceConfidence} confidence). {a.priceRationale}</p>
+          <Input inputMode="decimal" placeholder="Leave empty" value={it.price} onChange={(e) => set({ price: e.target.value })} />
+          <p className="text-xs text-muted-foreground">{it.price ? 'Your custom price will be used.' : `Vinted Optimal + £${loadPriceUplift().toFixed(2)} (set when drafting)`}</p>
           {errors.length > 0 && <ul className="text-destructive text-xs list-disc pl-4">{errors.map((e) => <li key={e}>{e}</li>)}</ul>}
           <Button className="h-11 w-full" disabled={errors.length > 0 || it.status === 'approved'} onClick={() => { onChange({ ...it, status: 'approved' }); onClose(); }}>
             {it.status === 'approved' ? 'Approved' : 'Approve'}
