@@ -2,7 +2,6 @@ import aiReference from './vinted-reference-kids-for-ai.txt?raw';
 import { VINTED_REFERENCE as ref, findLeaf } from './reference';
 import type { DraftItem } from './validate';
 import { supabase } from '@/integrations/supabase/client';
-import { applyPricing, loadRules, rulesForAI, type PricingRule } from './pricing';
 
 type Confidence = 'low' | 'medium' | 'high';
 export type BrandStatus = 'identified' | 'none_visible' | 'not_in_list';
@@ -22,9 +21,6 @@ export type Analysis = {
   notesUsed: string[];
   colourIds: number[];
   materialIds: number[];
-  suggestedPrice: number | null;
-  priceRationale: string;
-  priceConfidence: Confidence;
   confidence: Record<string, Confidence>;
   flags: string[];
 };
@@ -41,7 +37,7 @@ export function analysisSchema() {
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['title', 'description', 'categoryLeafId', 'brandNameRead', 'brandId', 'brandStatus', 'sizeId', 'sizeEvidence', 'conditionId', 'conditionReason', 'notesUsed', 'colourIds', 'materialIds', 'suggestedPrice', 'priceRationale', 'priceConfidence', 'confidence', 'flags'],
+    required: ['title', 'description', 'categoryLeafId', 'brandNameRead', 'brandId', 'brandStatus', 'sizeId', 'sizeEvidence', 'conditionId', 'conditionReason', 'notesUsed', 'colourIds', 'materialIds', 'confidence', 'flags'],
     properties: {
       title: { type: 'string' },
       description: { type: 'string' },
@@ -56,9 +52,6 @@ export function analysisSchema() {
       notesUsed: { type: 'array', items: { type: 'string' } },
       colourIds: { type: 'array', maxItems: 2, items: { type: 'string', enum: Object.keys(ref.colours.options) } },
       materialIds: { type: 'array', items: { type: 'string', enum: Object.keys(ref.materials.options) } },
-      suggestedPrice: { type: 'number' },
-      priceRationale: { type: 'string' },
-      priceConfidence: conf,
       confidence: { type: 'object', additionalProperties: false, required: fields, properties: Object.fromEntries(fields.map((f) => [f, conf])) },
       flags: { type: 'array', items: { type: 'string' } },
     },
@@ -88,8 +81,6 @@ CONDITION (IDs: 6 New with tags, 1 New without tags, 2 Very good, 3 Good, 4 Sati
 - If the notes and photos disagree, add flag "notes_photos_disagree" and choose the lower condition.
 - Underwear (leaves 1602 and 1759) only allows 6. If the notes or photos show any wear or flaw on underwear, still return 6 but add flag "cannot_list_underwear".
 - conditionReason: one short sentence, e.g. "Downgraded to Good because the notes mention a mark on the front."
-
-PRICE (GBP): suggestedPrice in whole pounds or 50p steps. If one of the seller's PRICING RULES matches the category type and brand, use it and say so in priceRationale; you may move it by at most £1 up or down for condition. With no matching rule (only the fallback), suggest a sensible second-hand price and set priceConfidence "low". You have no live market data, so priceConfidence is normally "low" unless a rule matches. priceRationale: one short sentence.
 
 TITLE: short, sentence case, e.g. "Navy cotton skirt age 4". Never write any word of 3+ letters in ALL CAPITALS (write "Next", not "NEXT").
 
