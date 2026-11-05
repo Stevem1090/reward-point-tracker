@@ -263,9 +263,14 @@ export default function VintedBatch() {
           <CardContent className="p-3 space-y-2 text-sm">
             <div className="font-medium">{summary.dry ? 'Dry run finished' : 'Batch finished'}{summary.stopped ? ` – stopped: ${summary.stopped}` : ''}</div>
             <div>{summary.done.length} {summary.dry ? 'filled in fine' : 'drafts saved'} · {summary.failed.length} problems</div>
-            {!summary.dry && summary.done.map((d) => (
-              <a key={d.id} href={draftLink(d.draftId!)} target="_blank" rel="noreferrer" className="block text-primary underline truncate">{d.title}</a>
-            ))}
+            {summary.dry
+              ? summary.done.map((d) => <div key={d.id} className="truncate">{d.title}{d.priceResult ? ` – ${priceLabel(d.priceResult)}` : ''}</div>)
+              : summary.done.map((d) => (
+                <div key={d.id} className="min-w-0">
+                  <a href={draftLink(d.draftId!)} target="_blank" rel="noreferrer" className="text-primary underline truncate">{d.title}</a>
+                  {d.priceResult && <span className="text-muted-foreground"> – {priceLabel(d.priceResult)}</span>}
+                </div>
+              ))}
             {summary.failed.map((f) => <div key={f.id} className="text-destructive">{f.title}: {f.error}</div>)}
             {stopReason && /logged out|bot check|open its app/.test(stopReason) && <p className="text-muted-foreground">Sort this out in the Vinted panel below, then tap Run batch again.</p>}
             <Button variant="ghost" className="h-11" onClick={() => setSummary(null)}>Close</Button>
@@ -277,8 +282,13 @@ export default function VintedBatch() {
         <Button className="h-11" onClick={() => setAdding(true)} disabled={!canAdd(items) || running}><Plus className="mr-1 h-4 w-4" />Add item</Button>
         <Button className="h-11" variant="secondary" disabled={!approved || running || !native} onClick={() => setConfirmRun(true)}><Play className="mr-1 h-4 w-4" />Run batch ({approved})</Button>
       </div>
-      {unconfirmed > 0 && <Button variant="outline" className="h-11 w-full" onClick={acceptPrices}>Accept all suggested prices ({unconfirmed})</Button>}
       {analysing > 0 && <p className="text-xs text-muted-foreground">AI is analysing {analysing} item{analysing > 1 ? 's' : ''} (two at a time). Keep this screen open.</p>}
+
+      <Card><CardContent className="p-3 flex items-center gap-3 text-sm">
+        <Label htmlFor="uplift" className="flex-1">Price uplift – added to Vinted's "Optimal" price when you haven't typed one</Label>
+        <span>£</span>
+        <Input id="uplift" className="w-20 h-11" inputMode="decimal" value={uplift} onChange={(e) => changeUplift(e.target.value)} />
+      </CardContent></Card>
 
       {loaded && !items.length && <Card><CardContent className="p-4 text-sm text-muted-foreground">No items yet. Tap Add item, pick up to 5 photos and add any notes about flaws.</CardContent></Card>}
 
@@ -290,7 +300,7 @@ export default function VintedBatch() {
                 <img src={`data:image/jpeg;base64,${it.images[0]?.base64}`} alt="" className="h-14 w-14 rounded object-cover shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="font-medium truncate">{it.title || it.notes || 'New item'}</div>
-                  <div className="text-xs text-muted-foreground">{it.price ? `£${it.price}${it.priceConfirmed ? '' : ' (not confirmed)'}` : '–'}{it.dryRun ? ` · dry run ${it.dryRun === 'ok' ? 'OK' : 'failed'}` : ''}</div>
+                  <div className="text-xs text-muted-foreground">{it.priceResult ? priceLabel(it.priceResult) : it.price ? `£${it.price} (your price)` : `Vinted Optimal + £${Number(uplift || DEFAULT_PRICE_UPLIFT).toFixed(2)}`}{it.dryRun ? ` · dry run ${it.dryRun === 'ok' ? 'OK' : 'failed'}` : ''}</div>
                   {it.error && <div className="text-xs text-destructive truncate">{it.error}</div>}
                 </div>
                 <Badge variant={it.status === 'drafted' || it.status === 'approved' ? 'default' : it.status === 'failed' || it.status === 'unknown' || it.status === 'analysis_failed' ? 'destructive' : 'secondary'} className="shrink-0">
@@ -329,7 +339,7 @@ export default function VintedBatch() {
           <AlertDialogHeader>
             <AlertDialogTitle>Run {approved} item{approved > 1 ? 's' : ''}?</AlertDialogTitle>
             <AlertDialogDescription>
-              {dryRun ? 'Dry run: the Vinted form is filled in but nothing is saved.' : 'This saves real drafts in your Vinted account. Nothing is published, and nothing is ever deleted automatically.'} There is a 30 second pause between items. Keep this screen open.
+              {dryRun ? 'Dry run: the Vinted form is filled in but nothing is saved.' : 'This saves real drafts in your Vinted account. Nothing is published, and nothing is ever deleted automatically.'} There is a {PAUSE_BETWEEN_MS / 1000} second pause between items, so {approved} item{approved > 1 ? 's' : ''} take{approved > 1 ? '' : 's'} roughly {Math.max(1, Math.round((approved * (SAVE_TIMEOUT_MS / 4 + PAUSE_BETWEEN_MS)) / 60000))} minute{approved > 1 ? 's' : ''}. Keep this screen open.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex items-center gap-2 py-2"><Switch id="dry" checked={dryRun} onCheckedChange={setDryRun} /><Label htmlFor="dry">Dry run (don't save)</Label></div>
