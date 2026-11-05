@@ -72,6 +72,11 @@ export function applyAnalysis(it: BatchItem, a: Analysis): BatchItem {
   };
 }
 
+/** Apply description regeneration to the latest item, never overwrite any other edits. */
+export function applyDescription(it: BatchItem, description: string): BatchItem {
+  return { ...it, description, status: it.status === 'approved' ? 'needs_review' : it.status };
+}
+
 /** Title as Vinted stores it: single spaces, no leading/trailing space. */
 export const cleanTitle = (s: string) => String(s ?? '').replace(/\s+/g, ' ').trim();
 

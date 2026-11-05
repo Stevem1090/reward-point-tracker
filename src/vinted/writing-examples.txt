@@ -1,0 +1,49 @@
+REFERENCE EXAMPLES (real seller listings; match voice, not verbatim wording). Use them as few-shot examples inside the AI prompt.
+Format: category | brand | size shown on Vinted | condition  ->  title  ||  description
+
+1. Two-piece pyjamas | H&M | 5 years | Very good
+   -> 2 pairs of Marvel pyjamas - Age 5
+   || Groot pair - Age 5
+      Marvel from H&M. Age 4-6years
+2. Hook-and-loop trainers | Converse | 11 child | Good
+   -> High top converse - black and red - size 11
+   || Well worn. Scuffs on the front, might come off with a good clean/whitener. Still have life in them though
+3. Wellington boots | Trespass | 11 child | Satisfactory
+   -> Boy's wellies - Size 11
+   || Really worn cosmetically but structurally sound. Great for spare school pair or just garden wellies.
+4. Hoodies & sweatshirts | Dunnes Stores | 7 years | Very good
+   || Really soft and cosy.
+      Great condition
+5. Jumpers | Primark | 12-18 months | Good
+   -> Primark Jumper 12/18 months
+   || Well worn, but great for a nursery jumper.
+      Small pink mark on the back by the shoulder - see picture.
+6. Fleece jackets | Jurassic World | 4 years | Very good
+   || Great condition, really fab fleece!
+7. Zip-up jumpers | Next | 12-18 months | Very good
+   || Lovely hoody, fab condition.
+8. Hoodies & sweatshirts | Next | 12-18 months | Very good
+   || Great hoody. Great condition.
+9. Other jumpers & hoodies | H&M | 18-24 months | Very good
+   || Lovely little cardigan. Great condition
+10. Long-sleeved tops | C&A | 12-18 months | Very good
+   || Fabulous t-shirt. Great condition
+11. Bathrobes | George | 18-24 months | Very good
+   || Really fab dressing gown. Hardly worn.
+12. Puffer jackets | Primark | 9-12 months | Very good
+   || Lovely coat. Detachable mittens. Great for the upcoming winter weather.
+13. Hook-and-loop trainers | George | 4 baby | Good
+   -> Multi coloured velcro trainers - size 4
+   || Good, used condition.
+14. Leggings | Matalan | 18-24 months | Very good
+   -> Fun girl's leggings 18/24 months
+   || Really great leggings.
+15. Sleep sacks & wearable blankets | John Lewis | 12-18 months | Very good
+   -> 0.5 tog sleeping bag. 6-18 months
+   || Great sleeping bag. 0.5tog from John Lewis.
+      Great condition
+16. Long dresses | TU | 18-24 months | Very good
+   || Lovely soft fabric, great neck detail - makes the dress feel much smarter. Ideal for events/ parties. Great condition.
+17. Jumpers | Next | 6 years | Very good
+   -> Navy jumper - Next - Age 6
+
