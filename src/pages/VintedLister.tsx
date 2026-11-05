@@ -221,6 +221,13 @@ export default function VintedLister() {
   const analysing = items.filter((i) => i.status === 'queued' || i.status === 'analysing').length;
   const last = steps[steps.length - 1];
   const pct = last?.total ? Math.round((last.done / last.total) * 100) : 0;
+  const FILTERS: { id: typeof filter; label: string; match: (s: BatchItem['status']) => boolean }[] = [
+    { id: 'all', label: 'All', match: () => true },
+    { id: 'review', label: 'Needs review', match: (s) => s === 'needs_review' || s === 'analysis_failed' || s === 'failed' || s === 'unknown' },
+    { id: 'ready', label: 'Ready to send', match: (s) => s === 'approved' || s === 'queued' || s === 'analysing' },
+    { id: 'saved', label: 'Saved', match: (s) => s === 'drafted' },
+  ];
+  const visible = items.filter((i) => FILTERS.find((f) => f.id === filter)!.match(i.status));
 
   return (
     <div className="container mx-auto max-w-2xl px-3 py-4 space-y-3" style={browserOpen && !hidden ? { paddingBottom: `${dock === 'large' ? 62 : 45}vh` } : undefined}>
@@ -291,8 +298,18 @@ export default function VintedLister() {
 
       {loaded && !items.length && <Card><CardContent className="p-4 text-sm text-muted-foreground">No items yet. Tap Add item, pick up to 5 photos and add any notes about flaws.</CardContent></Card>}
 
+      {items.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {FILTERS.map((f) => (
+            <Button key={f.id} size="sm" className="h-11 shrink-0" variant={filter === f.id ? 'default' : 'outline'} onClick={() => setFilter(f.id)}>
+              {f.label} ({items.filter((i) => f.match(i.status)).length})
+            </Button>
+          ))}
+        </div>
+      )}
+
       <ul className="space-y-2">
-        {items.map((it) => (
+        {visible.map((it) => (
           <li key={it.id}>
             <button className="w-full text-left" onClick={() => setReviewId(it.id)} disabled={running}>
               <Card><CardContent className="p-2 flex gap-3 items-center min-w-0">
