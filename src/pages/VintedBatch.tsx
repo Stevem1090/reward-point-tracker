@@ -19,8 +19,8 @@ import { allowedConditions } from '@/vinted/validate';
 import { VINTED_REFERENCE } from '@/vinted/reference';
 import { exec, goToNew, hideVinted, injectAndRun, listen, openVinted, PROBE_SCRIPT, resizeVinted, showVinted, type DockSize } from '@/vinted/browser';
 import {
-  acceptAllPrices, applyAnalysis, approvalErrors, blockerFor, canAdd, deleteItem, draftLink, loadItems, MAX_ITEMS,
-  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, toDraft, describeReportErrors, parcelLabel, type BatchItem,
+  applyAnalysis, approvalErrors, blockerFor, canAdd, DEFAULT_PRICE_UPLIFT, deleteItem, draftLink, loadItems, loadPriceUplift, MAX_ITEMS,
+  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, priceLabel, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, savePriceUplift, toDraft, describeReportErrors, parcelLabel, type BatchItem,
 } from '@/vinted/batch';
 
 const STATUS: Record<BatchItem['status'], string> = {
@@ -51,6 +51,7 @@ export default function VintedBatch() {
   const [dock, setDock] = useState<DockSize>('small');
   const [hidden, setHidden] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
+  const [uplift, setUplift] = useState(() => String(loadPriceUplift()));
 
   const itemsRef = useRef(items); itemsRef.current = items;
   const analysingIds = useRef(new Set<string>());
@@ -58,6 +59,7 @@ export default function VintedBatch() {
   const stopRef = useRef(false);
   const currentId = useRef<string | null>(null);
   const lastParcel = useRef<{ id: string; parcel: any } | null>(null);
+  const lastPrice = useRef<{ id: string; price: any } | null>(null);
   const waiter = useRef<((o: Outcome) => void) | null>(null);
   const probeWaiter = useRef<((p: any) => void) | null>(null);
   const wakeLock = useRef<any>(null);
@@ -108,6 +110,7 @@ export default function VintedBatch() {
         if (d.type === 'vinted:fatal') waiter.current?.({ kind: 'fatal', reason: String(d.error ?? d.message ?? 'Form filling failed') });
         if (d.type === 'vinted:report') {
           if (d.parcel && currentId.current) lastParcel.current = { id: currentId.current, parcel: d.parcel };
+          if (d.price && currentId.current) lastPrice.current = { id: currentId.current, price: d.price };
           const errs = Array.isArray(d.errors) ? d.errors : [];
           const cur = itemsRef.current.find((x) => x.id === currentId.current);
           const problems = errs.length ? `Field problems: ${describeReportErrors(d, cur ? toDraft(cur) : undefined)}` : '';
@@ -142,10 +145,10 @@ export default function VintedBatch() {
     toast('Item added – the AI is analysing it');
   };
   const remove = async (id: string) => { await deleteItem(id); setItems((p) => p.filter((x) => x.id !== id)); setReviewId(null); };
-  const acceptPrices = () => {
-    const next = acceptAllPrices(itemsRef.current);
-    next.forEach((n, i) => n !== itemsRef.current[i] && save(n));
-    toast('Suggested prices accepted');
+  const changeUplift = (v: string) => {
+    setUplift(v);
+    const n = Number(v);
+    if (v.trim() && Number.isFinite(n) && n >= 0) savePriceUplift(n);
   };
   const clearFinished = async () => {
     for (const it of itemsRef.current.filter((i) => i.status === 'drafted')) await deleteItem(it.id);
@@ -191,8 +194,9 @@ export default function VintedBatch() {
         catch (e: any) { waiter.current?.({ kind: 'fatal', reason: e?.message || String(e) }); }
         const o = await outcome; waiter.current = null; currentId.current = null;
         const cur = itemsRef.current.find((x) => x.id === it.id)!;
-        if (o.kind === 'saved') { const s = { ...cur, status: 'drafted' as const, draftId: o.draftId, parcel: lastParcel.current?.id === it.id ? lastParcel.current.parcel : cur.parcel, draftedAt: Date.now(), error: undefined }; save(s); done.push(s); }
-        else if (o.kind === 'dryOk') { const s = { ...cur, dryRun: 'ok' as const, error: undefined }; save(s); done.push(s); }
+        const priceResult = lastPrice.current?.id === it.id ? lastPrice.current.price : cur.priceResult;
+        if (o.kind === 'saved') { const s = { ...cur, status: 'drafted' as const, draftId: o.draftId, parcel: lastParcel.current?.id === it.id ? lastParcel.current.parcel : cur.parcel, priceResult, draftedAt: Date.now(), error: undefined }; save(s); done.push(s); }
+        else if (o.kind === 'dryOk') { const s = { ...cur, dryRun: 'ok' as const, priceResult, error: undefined }; save(s); done.push(s); }
         else if (o.kind === 'timeout') {
           const s = { ...cur, status: dry ? cur.status : 'unknown' as const, dryRun: dry ? 'failed' as const : cur.dryRun, error: 'No answer from Vinted within 2 minutes. Check your Vinted drafts before retrying.' };
           save(s); failed.push(s); stopped = 'No answer from Vinted – result unknown'; break;
@@ -215,7 +219,6 @@ export default function VintedBatch() {
 
   const review = items.find((i) => i.id === reviewId) ?? null;
   const approved = runnable(items).length;
-  const unconfirmed = items.filter((i) => i.status === 'needs_review' && !i.priceConfirmed && i.analysis?.suggestedPrice != null).length;
   const analysing = items.filter((i) => i.status === 'queued' || i.status === 'analysing').length;
   const last = steps[steps.length - 1];
   const pct = last?.total ? Math.round((last.done / last.total) * 100) : 0;
@@ -260,9 +263,14 @@ export default function VintedBatch() {
           <CardContent className="p-3 space-y-2 text-sm">
             <div className="font-medium">{summary.dry ? 'Dry run finished' : 'Batch finished'}{summary.stopped ? ` – stopped: ${summary.stopped}` : ''}</div>
             <div>{summary.done.length} {summary.dry ? 'filled in fine' : 'drafts saved'} · {summary.failed.length} problems</div>
-            {!summary.dry && summary.done.map((d) => (
-              <a key={d.id} href={draftLink(d.draftId!)} target="_blank" rel="noreferrer" className="block text-primary underline truncate">{d.title}</a>
-            ))}
+            {summary.dry
+              ? summary.done.map((d) => <div key={d.id} className="truncate">{d.title}{d.priceResult ? ` – ${priceLabel(d.priceResult)}` : ''}</div>)
+              : summary.done.map((d) => (
+                <div key={d.id} className="min-w-0">
+                  <a href={draftLink(d.draftId!)} target="_blank" rel="noreferrer" className="text-primary underline truncate">{d.title}</a>
+                  {d.priceResult && <span className="text-muted-foreground"> – {priceLabel(d.priceResult)}</span>}
+                </div>
+              ))}
             {summary.failed.map((f) => <div key={f.id} className="text-destructive">{f.title}: {f.error}</div>)}
             {stopReason && /logged out|bot check|open its app/.test(stopReason) && <p className="text-muted-foreground">Sort this out in the Vinted panel below, then tap Run batch again.</p>}
             <Button variant="ghost" className="h-11" onClick={() => setSummary(null)}>Close</Button>
@@ -274,8 +282,13 @@ export default function VintedBatch() {
         <Button className="h-11" onClick={() => setAdding(true)} disabled={!canAdd(items) || running}><Plus className="mr-1 h-4 w-4" />Add item</Button>
         <Button className="h-11" variant="secondary" disabled={!approved || running || !native} onClick={() => setConfirmRun(true)}><Play className="mr-1 h-4 w-4" />Run batch ({approved})</Button>
       </div>
-      {unconfirmed > 0 && <Button variant="outline" className="h-11 w-full" onClick={acceptPrices}>Accept all suggested prices ({unconfirmed})</Button>}
       {analysing > 0 && <p className="text-xs text-muted-foreground">AI is analysing {analysing} item{analysing > 1 ? 's' : ''} (two at a time). Keep this screen open.</p>}
+
+      <Card><CardContent className="p-3 flex items-center gap-3 text-sm">
+        <Label htmlFor="uplift" className="flex-1">Price uplift – added to Vinted's "Optimal" price when you haven't typed one</Label>
+        <span>£</span>
+        <Input id="uplift" className="w-20 h-11" inputMode="decimal" value={uplift} onChange={(e) => changeUplift(e.target.value)} />
+      </CardContent></Card>
 
       {loaded && !items.length && <Card><CardContent className="p-4 text-sm text-muted-foreground">No items yet. Tap Add item, pick up to 5 photos and add any notes about flaws.</CardContent></Card>}
 
@@ -287,7 +300,7 @@ export default function VintedBatch() {
                 <img src={`data:image/jpeg;base64,${it.images[0]?.base64}`} alt="" className="h-14 w-14 rounded object-cover shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="font-medium truncate">{it.title || it.notes || 'New item'}</div>
-                  <div className="text-xs text-muted-foreground">{it.price ? `£${it.price}${it.priceConfirmed ? '' : ' (not confirmed)'}` : '–'}{it.dryRun ? ` · dry run ${it.dryRun === 'ok' ? 'OK' : 'failed'}` : ''}</div>
+                  <div className="text-xs text-muted-foreground">{it.priceResult ? priceLabel(it.priceResult) : it.price ? `£${it.price} (your price)` : `Vinted Optimal + £${Number(uplift || DEFAULT_PRICE_UPLIFT).toFixed(2)}`}{it.dryRun ? ` · dry run ${it.dryRun === 'ok' ? 'OK' : 'failed'}` : ''}</div>
                   {it.error && <div className="text-xs text-destructive truncate">{it.error}</div>}
                 </div>
                 <Badge variant={it.status === 'drafted' || it.status === 'approved' ? 'default' : it.status === 'failed' || it.status === 'unknown' || it.status === 'analysis_failed' ? 'destructive' : 'secondary'} className="shrink-0">
@@ -326,7 +339,7 @@ export default function VintedBatch() {
           <AlertDialogHeader>
             <AlertDialogTitle>Run {approved} item{approved > 1 ? 's' : ''}?</AlertDialogTitle>
             <AlertDialogDescription>
-              {dryRun ? 'Dry run: the Vinted form is filled in but nothing is saved.' : 'This saves real drafts in your Vinted account. Nothing is published, and nothing is ever deleted automatically.'} There is a 30 second pause between items. Keep this screen open.
+              {dryRun ? 'Dry run: the Vinted form is filled in but nothing is saved.' : 'This saves real drafts in your Vinted account. Nothing is published, and nothing is ever deleted automatically.'} There is a {PAUSE_BETWEEN_MS / 1000} second pause between items, so {approved} item{approved > 1 ? 's' : ''} take{approved > 1 ? '' : 's'} roughly {Math.max(1, Math.round((approved * (SAVE_TIMEOUT_MS / 4 + PAUSE_BETWEEN_MS)) / 60000))} minute{approved > 1 ? 's' : ''}. Keep this screen open.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex items-center gap-2 py-2"><Switch id="dry" checked={dryRun} onCheckedChange={setDryRun} /><Label htmlFor="dry">Dry run (don't save)</Label></div>
@@ -353,11 +366,15 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
       {it.error && <p className="text-destructive">{it.error}</p>}
       {done && it.draftId && <a className="text-primary underline" href={draftLink(it.draftId)} target="_blank" rel="noreferrer">Open draft on Vinted</a>}
       {it.parcel && <p className="text-xs text-muted-foreground">{parcelLabel(it.parcel)}</p>}
+      {it.priceResult && <p className="text-xs text-muted-foreground">Price: {priceLabel(it.priceResult)}</p>}
       {it.status === 'unknown' && (
         <div className="grid grid-cols-2 gap-2">
           <Button variant="outline" className="h-11" onClick={() => onChange({ ...it, status: 'drafted', error: undefined })}>It's in my drafts</Button>
           <Button variant="outline" className="h-11" onClick={() => onChange({ ...it, status: 'approved', error: undefined })}>Not there – retry</Button>
         </div>
+      )}
+      {it.status === 'failed' && /no price recommendation/i.test(it.error ?? '') && (
+        <p className="text-xs text-muted-foreground">Vinted showed no price recommendation for this item. Enter a custom price below, then retry – nothing was saved, so retrying is safe.</p>
       )}
       {it.status === 'failed' && <Button variant="outline" className="h-11 w-full" onClick={() => onChange({ ...it, status: 'approved', error: undefined })}>Try again in next batch</Button>}
       {(it.status === 'analysis_failed' || (a && !done)) && <Button variant="outline" className="h-11 w-full" onClick={() => onChange({ ...it, status: 'queued', error: undefined })}>Analyse again</Button>}
@@ -402,11 +419,8 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
           </select>
           <p className="text-xs text-muted-foreground">{a.conditionReason}</p>
           <Label>Price (£)</Label>
-          <div className="flex gap-2">
-            <Input inputMode="decimal" value={it.price} onChange={(e) => set({ price: e.target.value, priceConfirmed: false })} />
-            <Button className="h-11 shrink-0" variant={it.priceConfirmed ? 'secondary' : 'default'} onClick={() => set({ priceConfirmed: true })} disabled={it.priceConfirmed}>{it.priceConfirmed ? 'Confirmed' : 'Confirm'}</Button>
-          </div>
-          <p className="text-xs text-muted-foreground">Suggested £{a.suggestedPrice ?? '–'} ({a.priceConfidence} confidence). {a.priceRationale}</p>
+          <Input inputMode="decimal" placeholder="Leave empty" value={it.price} onChange={(e) => set({ price: e.target.value })} />
+          <p className="text-xs text-muted-foreground">{it.price ? 'Your custom price will be used.' : `Vinted Optimal + £${loadPriceUplift().toFixed(2)} (set when drafting)`}</p>
           {errors.length > 0 && <ul className="text-destructive text-xs list-disc pl-4">{errors.map((e) => <li key={e}>{e}</li>)}</ul>}
           <Button className="h-11 w-full" disabled={errors.length > 0 || it.status === 'approved'} onClick={() => { onChange({ ...it, status: 'approved' }); onClose(); }}>
             {it.status === 'approved' ? 'Approved' : 'Approve'}

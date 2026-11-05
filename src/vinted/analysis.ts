@@ -2,7 +2,6 @@ import aiReference from './vinted-reference-kids-for-ai.txt?raw';
 import { VINTED_REFERENCE as ref, findLeaf } from './reference';
 import type { DraftItem } from './validate';
 import { supabase } from '@/integrations/supabase/client';
-import { applyPricing, loadRules, rulesForAI, type PricingRule } from './pricing';
 
 type Confidence = 'low' | 'medium' | 'high';
 export type BrandStatus = 'identified' | 'none_visible' | 'not_in_list';
@@ -22,9 +21,6 @@ export type Analysis = {
   notesUsed: string[];
   colourIds: number[];
   materialIds: number[];
-  suggestedPrice: number | null;
-  priceRationale: string;
-  priceConfidence: Confidence;
   confidence: Record<string, Confidence>;
   flags: string[];
 };
@@ -41,7 +37,7 @@ export function analysisSchema() {
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['title', 'description', 'categoryLeafId', 'brandNameRead', 'brandId', 'brandStatus', 'sizeId', 'sizeEvidence', 'conditionId', 'conditionReason', 'notesUsed', 'colourIds', 'materialIds', 'suggestedPrice', 'priceRationale', 'priceConfidence', 'confidence', 'flags'],
+    required: ['title', 'description', 'categoryLeafId', 'brandNameRead', 'brandId', 'brandStatus', 'sizeId', 'sizeEvidence', 'conditionId', 'conditionReason', 'notesUsed', 'colourIds', 'materialIds', 'confidence', 'flags'],
     properties: {
       title: { type: 'string' },
       description: { type: 'string' },
@@ -56,9 +52,6 @@ export function analysisSchema() {
       notesUsed: { type: 'array', items: { type: 'string' } },
       colourIds: { type: 'array', maxItems: 2, items: { type: 'string', enum: Object.keys(ref.colours.options) } },
       materialIds: { type: 'array', items: { type: 'string', enum: Object.keys(ref.materials.options) } },
-      suggestedPrice: { type: 'number' },
-      priceRationale: { type: 'string' },
-      priceConfidence: conf,
       confidence: { type: 'object', additionalProperties: false, required: fields, properties: Object.fromEntries(fields.map((f) => [f, conf])) },
       flags: { type: 'array', items: { type: 'string' } },
     },
@@ -89,8 +82,6 @@ CONDITION (IDs: 6 New with tags, 1 New without tags, 2 Very good, 3 Good, 4 Sati
 - Underwear (leaves 1602 and 1759) only allows 6. If the notes or photos show any wear or flaw on underwear, still return 6 but add flag "cannot_list_underwear".
 - conditionReason: one short sentence, e.g. "Downgraded to Good because the notes mention a mark on the front."
 
-PRICE (GBP): suggestedPrice in whole pounds or 50p steps. If one of the seller's PRICING RULES matches the category type and brand, use it and say so in priceRationale; you may move it by at most £1 up or down for condition. With no matching rule (only the fallback), suggest a sensible second-hand price and set priceConfidence "low". You have no live market data, so priceConfidence is normally "low" unless a rule matches. priceRationale: one short sentence.
-
 TITLE: short, sentence case, e.g. "Navy cotton skirt age 4". Never write any word of 3+ letters in ALL CAPITALS (write "Next", not "NEXT").
 
 DESCRIPTION: plain text, 2 to 4 short lines separated by line breaks, about 25 to 60 words in total. No markdown, emojis, hashtags or all-caps. No invented details. No measurements unless on the label.
@@ -103,10 +94,9 @@ confidence: low/medium/high per field. flags: short codes for anything a human m
 
 const num = (v: unknown) => (v == null || v === '' ? null : Number(v));
 
-export type AnalyseInput = { notes?: string; hints?: string; rules?: PricingRule[] };
+export type AnalyseInput = { notes?: string; hints?: string };
 
 export async function analysePhotos(images: { base64: string }[], input: AnalyseInput = {}): Promise<Analysis> {
-  const rules = input.rules ?? loadRules();
   const { data, error } = await supabase.functions.invoke('vinted-analyse', {
     body: {
       images: images.map((i) => i.base64),
@@ -115,16 +105,15 @@ export async function analysePhotos(images: { base64: string }[], input: Analyse
       reference: aiReference,
       notes: (input.notes ?? '').slice(0, 1000),
       hints: (input.hints ?? '').slice(0, 300),
-      pricingRules: rulesForAI(rules),
     },
   });
   if (error) throw new Error(error.message);
   if (data?.error) throw new Error(data.error);
-  return normaliseAnalysis(data.result, rules);
+  return normaliseAnalysis(data.result);
 }
 
-/** Convert raw AI output (string IDs) into typed values and apply the seller's pricing rules. */
-export function normaliseAnalysis(r: any, rules: PricingRule[]): Analysis {
+/** Convert raw AI output (string IDs) into typed values. */
+export function normaliseAnalysis(r: any): Analysis {
   const leafId = num(r.categoryLeafId);
   const brandId = num(r.brandId);
   const brandStatus: BrandStatus = brandId != null ? 'identified'
@@ -136,11 +125,6 @@ export function normaliseAnalysis(r: any, rules: PricingRule[]): Analysis {
     flags.add('cannot_list_underwear');
     conditionId = 6;
   }
-  const price = applyPricing(rules, leafId, brandId, {
-    suggestedPrice: typeof r.suggestedPrice === 'number' ? r.suggestedPrice : null,
-    priceRationale: r.priceRationale ?? '',
-    priceConfidence: r.priceConfidence ?? 'low',
-  });
   return {
     title: r.title ?? '',
     description: r.description ?? '',
@@ -155,15 +139,12 @@ export function normaliseAnalysis(r: any, rules: PricingRule[]): Analysis {
     notesUsed: r.notesUsed ?? [],
     colourIds: (r.colourIds ?? []).map(Number).slice(0, 2),
     materialIds: (r.materialIds ?? []).map(Number),
-    suggestedPrice: price.suggestedPrice,
-    priceRationale: price.priceRationale,
-    priceConfidence: price.priceConfidence,
     confidence: r.confidence ?? {},
     flags: [...flags],
   };
 }
 
-/** Turn an AI analysis into a draft payload. Price comes from the human. */
+/** Turn an AI analysis into a draft payload. Price is optional: only a custom price typed by the human is sent. */
 export function analysisToDraft(a: Analysis, itemId: string, images: DraftItem['images'], price: number | null): Partial<DraftItem> {
   const leaf = a.categoryLeafId != null ? findLeaf(a.categoryLeafId) : null;
   const main = ref.brands.main as Record<string, string>;

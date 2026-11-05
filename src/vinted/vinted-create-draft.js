@@ -427,6 +427,51 @@
     rowId: (r) => r.getAttribute('data-testid').replace('material-', ''),
   });
 
+  // Price. Vinted shows a "Price recommendation" with three levels: Bargain, Optimal and Premium
+  // (data-testid pricing-strategy-item-min / -mid / -max). It does NOT appear straight away: in testing it did not
+  // show after the category, brand or size, only once the condition had been set. Default rule: price = Vinted's
+  // Optimal + 0.50 (item.priceUplift changes the 0.50). A custom item.price, when given, always wins.
+  // Tapping the Optimal chip would fill the Optimal amount exactly, so the total is typed instead.
+  const optimalPrice = () => {
+    const el = $('[data-testid="pricing-strategy-item-mid"]');
+    if (!el) return null;
+    const m = (el.innerText || '').match(/£\s*([\d,]+(?:\.\d+)?)/);
+    return m ? Number(m[1].replace(/,/g, '')) : null;
+  };
+  const roundPence = (n) => Math.round(n * 100) / 100;
+
+  // Waits for the Optimal amount to appear and stay the same for 1.5s. Resolves null if it never appears.
+  async function waitForOptimalPrice(timeoutMs = 15000) {
+    let last = null;
+    let since = Date.now();
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const v = optimalPrice();
+      if (v !== last) { last = v; since = Date.now(); }
+      else if (v !== null && Date.now() - since >= 1500) return v;
+      await sleep(250);
+    }
+    return last;
+  }
+
+  // Resolves with { value, source, optimal?, uplift? }. source is 'custom' or 'vinted_optimal_plus_uplift'.
+  async function setPrice(item) {
+    const hasCustom = item.price != null && String(item.price).trim() !== '' && Number(item.price) > 0;
+    if (hasCustom) {
+      const value = roundPence(Number(item.price));
+      await typeText('#price', value.toFixed(2));
+      return { value, source: 'custom' };
+    }
+    const optimal = await waitForOptimalPrice();
+    if (optimal === null) {
+      throw new Error('no custom price was supplied and Vinted showed no price recommendation (it needs the condition and other fields to be set first)');
+    }
+    const uplift = item.priceUplift != null && !Number.isNaN(Number(item.priceUplift)) ? Number(item.priceUplift) : 0.5;
+    const value = roundPence(optimal + uplift);
+    await typeText('#price', value.toFixed(2));
+    return { value, source: 'vinted_optimal_plus_uplift', optimal, uplift };
+  }
+
   // Parcel size. Vinted marks ONE option "Recommended" and the recommendation depends on the category (verified live:
   // Small for most kids clothing, Medium for wellington boots). The option that is pre-selected does NOT always follow
   // the recommendation (wellington boots recommend Medium but Small stays pre-selected), and the recommendation arrives
@@ -541,7 +586,7 @@
     const result = {
       ok, status: last ? last.status : null, draftId: last ? last.draftId || null : null,
       alerts: rec.alerts.slice(), sentPrice: last ? last.price : null,
-      priceSaved: !!last && last.price != null && Number(last.price) === Number(item.price),
+      priceSaved: !!last && last.price != null && Number(last.price) === Number(report.price ? report.price.value : item.price),
     };
     if (!last) result.problem = 'no draft request was seen within 15s';
     else if (!ok) result.problem = `Vinted rejected the draft (HTTP ${last.status})${rec.alerts.length ? ': ' + rec.alerts.join(' | ') : ''}`;
@@ -589,7 +634,10 @@
       { name: 'condition', apply: () => setCondition(item.conditionId),            ok: () => !!valueOf('#condition') },
       { name: 'colours',   apply: async () => { state.colourNames = await setColours(item.colourIds || []); }, ok: () => sameNames(valueOf('#color'), state.colourNames || []) },
       { name: 'material',  apply: async () => { state.materialNames = await setMaterials(item.materialIds || []); }, ok: () => sameNames(valueOf('#material'), state.materialNames || []) },
-      { name: 'price',     apply: () => typeText('#price', item.price),            ok: () => parseFloat(valueOf('#price').replace(/[^\d.]/g, '')) === Number(item.price) },
+      { name: 'price',     apply: async () => { state.price = await setPrice(item); },
+        ok: () => !!state.price && parseFloat(valueOf('#price').replace(/[^\d.]/g, '')) === state.price.value
+          // when following Vinted, re-apply if the Optimal amount has changed since (it can change as fields are filled)
+          && (state.price.source === 'custom' || optimalPrice() === null || roundPence(optimalPrice() + state.price.uplift) === state.price.value) },
       { name: 'package',   apply: async () => { state.parcel = await setPackage(item.packageId); },
         ok: () => !!state.parcel && !!document.getElementById(`package_type_selector_${state.parcel.id}`)?.checked
           // when following Vinted, the recommendation may have changed since (it can update late): re-apply if so
@@ -637,6 +685,10 @@
     };
 
     // 5. Save as draft only when explicitly asked and nothing failed.
+    if (state.price) {
+      report.price = { ...state.price };
+      if (state.price.source !== 'custom') report.warnings.push(`price set from Vinted's Optimal (${state.price.optimal}) plus ${state.price.uplift}`);
+    }
     if (state.parcel) {
       const names = { 1: 'Small', 2: 'Medium', 3: 'Large' };
       report.parcel = { id: state.parcel.id, name: names[state.parcel.id], source: state.parcel.source };
@@ -675,7 +727,8 @@ window.__VINTED_ITEM__ = {
   conditionId: 2,                     // Very good
   colourIds: [26, 15],                // Light blue, Multi
   materialIds: [44, 45],              // Cotton, Polyester
-  price: 6,
+  // price: 6,                     // optional custom price in GBP. Leave out to use Vinted's Optimal price plus 0.50
+  // priceUplift: 0.5,               // optional: changes the 0.50 added to Vinted's Optimal price
   // packageId: 1                  // optional: 1 Small, 2 Medium, 3 Large. Leave out to follow Vinted's recommendation
 };
 window.__VINTED_OPTIONS__ = { saveDraft: false };

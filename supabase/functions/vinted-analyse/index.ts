@@ -16,9 +16,9 @@ Deno.serve(async (req) => {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const { images, schema, rules, reference, notes, hints, pricingRules } = await req.json();
+    const { images, schema, rules, reference, notes, hints } = await req.json();
     const clip = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n).trim() : "");
-    const sellerNotes = clip(notes, 1000), sellerHints = clip(hints, 300), priceRules = clip(pricingRules, 4000);
+    const sellerNotes = clip(notes, 1000), sellerHints = clip(hints, 300);
     if (!Array.isArray(images) || images.length === 0 || images.length > 10) return json({ error: "Send 1-10 photos" }, 400);
     if (!schema || typeof rules !== "string" || typeof reference !== "string") return json({ error: "Bad request" }, 400);
 
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
         stream: true,
         store: false,
         reasoning: { effort: "low" },
-        instructions: `${rules}\n\nPRICING RULES:\n${priceRules || "- Fallback: £3.00"}\n\nREFERENCE:\n${reference}`,
+        instructions: `${rules}\n\nREFERENCE:\n${reference}`,
         input: [{
           role: "user",
           content: [

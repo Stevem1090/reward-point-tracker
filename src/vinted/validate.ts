@@ -15,7 +15,10 @@ export type DraftItem = {
   conditionId: number;
   colourIds: number[];
   materialIds: number[];
-  price: number;
+  /** Optional: only sent when a custom price was typed. Otherwise the script uses Vinted's Optimal price plus the uplift. */
+  price?: number;
+  /** Optional: £ added to Vinted's Optimal price when no custom price is sent. Only sent when it differs from 0.50. */
+  priceUplift?: number;
   /** Optional: leave out to use Vinted's recommended parcel size. Only send when manually overridden. */
   packageId?: 1 | 2 | 3;
 };
@@ -65,7 +68,7 @@ export function validateDraft(item: Partial<DraftItem>): string[] {
   if (colours.some((c) => !has(ref.colours.options, c))) e.push('Unknown colour');
   if ((item.materialIds ?? []).some((m) => !has(ref.materials.options, m))) e.push('Unknown material');
 
-  if (!(typeof item.price === 'number' && Number.isFinite(item.price) && item.price > 0)) e.push('Price must be more than £0');
+  if (item.price != null && !(typeof item.price === 'number' && Number.isFinite(item.price) && item.price > 0)) e.push('A custom price must be more than £0');
   if (!item.images?.length) e.push('At least one photo is needed');
   if (item.packageId != null && ![1, 2, 3].includes(item.packageId as number)) e.push('Package size must be Small, Medium or Large');
 
@@ -77,12 +80,10 @@ export function validateDraft(item: Partial<DraftItem>): string[] {
 }
 
 /**
- * Approval gate: hard validation plus human checks. Nothing is sent with an unconfirmed price,
- * and worn or flawed underwear can never be listed.
+ * Approval gate: hard validation plus human checks. Worn or flawed underwear can never be listed.
  */
-export function validateForApproval(item: Partial<DraftItem>, opts: { priceConfirmed: boolean; flags?: string[] }): string[] {
+export function validateForApproval(item: Partial<DraftItem>, opts: { flags?: string[] } = {}): string[] {
   const e = validateDraft(item);
-  if (!opts.priceConfirmed) e.push('Price must be confirmed');
   if (opts.flags?.includes('cannot_list_underwear')) e.push('Underwear with wear or flaws cannot be listed');
   return e;
 }
