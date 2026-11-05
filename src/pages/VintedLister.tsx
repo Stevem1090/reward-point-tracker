@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Pause, Play, Plus, Square, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Pause, Play, Plus, RefreshCw, Square, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,11 +14,12 @@ import { isNativeApp } from '@/lib/native/platform';
 import { toast } from '@/lib/toast';
 import { resizeForVinted } from '@/vinted/imageResize';
 import { analysePhotos } from '@/vinted/analysis';
+import { writingWarnings } from '@/vinted/writing';
 import { allowedConditions } from '@/vinted/validate';
 import { VINTED_REFERENCE } from '@/vinted/reference';
 import { exec, goToNew, hideVinted, injectAndRun, listen, openVinted, PROBE_SCRIPT, resizeVinted, showVinted, type DockSize } from '@/vinted/browser';
 import {
-  applyAnalysis, approvalErrors, blockerFor, canAdd, DEFAULT_PRICE_UPLIFT, deleteItem, draftLink, loadItems, loadPriceUplift, MAX_ITEMS,
+  applyAnalysis, applyDescription, approvalErrors, blockerFor, canAdd, DEFAULT_PRICE_UPLIFT, deleteItem, draftLink, loadItems, loadPriceUplift, MAX_ITEMS,
   MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, priceLabel, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, savePriceUplift, toDraft, describeReportErrors, parcelLabel, type BatchItem,
 } from '@/vinted/batch';
 
@@ -88,7 +89,7 @@ export default function VintedLister() {
     items.filter((i) => i.status === 'queued' && !analysingIds.current.has(i.id)).slice(0, Math.max(0, free)).forEach((it) => {
       analysingIds.current.add(it.id);
       save({ ...it, status: 'analysing' });
-      analysePhotos(it.images, { notes: it.notes, hints: it.hints })
+      analysePhotos(it.images, { notes: it.notes, hints: it.hints, recentOpeners: itemsRef.current.filter((x) => x.id !== it.id && x.description).map((x) => x.description.split('\n')[0]) })
         .then((a) => { const cur = itemsRef.current.find((x) => x.id === it.id); if (cur) save(applyAnalysis(cur, a)); })
         .catch((e) => { const cur = itemsRef.current.find((x) => x.id === it.id); if (cur) save({ ...cur, status: 'analysis_failed', error: e?.message || String(e) }); })
         .finally(() => { analysingIds.current.delete(it.id); setItems((p) => [...p]); });
@@ -346,7 +347,7 @@ export default function VintedLister() {
       {/* Review */}
       <Dialog open={!!review} onOpenChange={(o) => !o && setReviewId(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
-          {review && <ReviewForm it={review} onChange={save} onDelete={() => remove(review.id)} onClose={() => setReviewId(null)} />}
+          {review && <ReviewForm key={review.id} it={review} onChange={save} onDelete={() => remove(review.id)} onClose={() => setReviewId(null)} />}
         </DialogContent>
       </Dialog>
 
@@ -369,11 +370,27 @@ export default function VintedLister() {
 }
 
 function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChange: (i: BatchItem) => void; onDelete: () => void; onClose: () => void }) {
+  const [regenerating, setRegenerating] = useState(false);
+  const latest = useRef(it); latest.current = it;
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const a = it.analysis;
   const set = (o: Partial<BatchItem>) => onChange({ ...it, ...o, status: it.status === 'approved' ? 'needs_review' : it.status });
   const errors = approvalErrors(it);
   const conds = a?.categoryLeafId != null ? allowedConditions(a.categoryLeafId) : {};
   const done = it.status === 'drafted';
+  const warnings = writingWarnings(it.description, it.conditionId, it.notes);
+  const regenerate = async () => {
+    setRegenerating(true);
+    const originalDescription = it.description;
+    try {
+      const result = await analysePhotos(it.images, { notes: it.notes, hints: it.hints, descriptionOnly: { title: it.title, description: it.description, conditionId: it.conditionId } });
+      if (!mounted.current) return;
+      if (latest.current.description !== originalDescription) { toast('Your description changed while waiting. Kept your edits – tap regenerate again if needed.'); return; }
+      onChange(applyDescription(latest.current, result.description));
+    } catch (e) { if (mounted.current) toast(e instanceof Error ? e.message : 'Could not regenerate description'); }
+    finally { if (mounted.current) setRegenerating(false); }
+  };
   return (
     <div className="space-y-3 text-sm">
       <DialogHeader><DialogTitle>{STATUS[it.status]}</DialogTitle></DialogHeader>
@@ -397,10 +414,16 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
       {a && !done && (
         <>
           {a.flags.filter((f) => f !== 'confirm_condition').length > 0 && <div className="flex flex-wrap gap-1">{a.flags.filter((f) => f !== 'confirm_condition').map((f) => <Badge key={f} variant="outline">{f.replace(/_/g, ' ')}</Badge>)}</div>}
-          <Label>Title</Label>
-          <Input value={it.title} onChange={(e) => set({ title: e.target.value })} />
-          <Label>Description</Label>
-          <Textarea rows={5} value={it.description} onChange={(e) => set({ description: e.target.value })} />
+          <Label htmlFor="vinted-title">Title</Label>
+          <Input id="vinted-title" value={it.title} onChange={(e) => set({ title: e.target.value })} />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label htmlFor="vinted-description">Description</Label>
+            <Button variant="outline" className="h-11" disabled={regenerating} onClick={regenerate}>
+              {regenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Regenerate description
+            </Button>
+          </div>
+          <Textarea id="vinted-description" rows={4} value={it.description} onChange={(e) => set({ description: e.target.value })} />
+          {warnings.length > 0 && <div className="space-y-1 text-xs text-muted-foreground" role="status"><p className="font-medium">Writing checks · optional review</p><ul className="list-disc pl-4">{warnings.map((w) => <li key={w}>{w}</li>)}</ul></div>}
           <Label>Brand</Label>
           {a.brandNameRead && <p className="text-xs text-muted-foreground">Label reads: {a.brandNameRead}</p>}
           {it.brandId == null && (it.noBrand || a.brandStatus === 'none_visible') && <Badge variant="secondary">No brand</Badge>}

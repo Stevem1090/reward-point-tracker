@@ -2,6 +2,8 @@ import aiReference from './vinted-reference-kids-for-ai.txt?raw';
 import { VINTED_REFERENCE as ref, findLeaf } from './reference';
 import type { DraftItem } from './validate';
 import { supabase } from '@/integrations/supabase/client';
+import { WRITING_RULES } from './writing';
+import writingExamples from './writing-examples.txt?raw';
 
 type Confidence = 'low' | 'medium' | 'high';
 export type BrandStatus = 'identified' | 'none_visible' | 'not_in_list';
@@ -82,19 +84,15 @@ CONDITION (IDs: 6 New with tags, 1 New without tags, 2 Very good, 3 Good, 4 Sati
 - Underwear (leaves 1602 and 1759) only allows 6. If the notes or photos show any wear or flaw on underwear, still return 6 but add flag "cannot_list_underwear".
 - conditionReason: one short sentence, e.g. "Downgraded to Good because the notes mention a mark on the front."
 
-TITLE: short, sentence case, e.g. "Navy cotton skirt age 4". Never write any word of 3+ letters in ALL CAPITALS (write "Next", not "NEXT").
+${WRITING_RULES}
 
-DESCRIPTION: plain text, 2 to 4 short lines separated by line breaks, about 25 to 60 words in total. No markdown, emojis, hashtags or all-caps. No invented details. No measurements unless on the label.
-- Line 1: what it is (item type, brand, size as printed on the label), e.g. "Next girls floral zip-up hoodie, 12-18 months."
-- Line 2: only features a buyer cares about (hood, zip, pockets, pattern). No fabric descriptions or marketing language.
-- Line 3: composition if the label is readable, e.g. "85% cotton, 15% polyester." Leave this line out if not readable.
-- Final line: condition and any flaws (from the notes or clearly visible in the photos).
+${writingExamples}
 
 confidence: low/medium/high per field. flags: short codes for anything a human must check.`;
 
 const num = (v: unknown) => (v == null || v === '' ? null : Number(v));
 
-export type AnalyseInput = { notes?: string; hints?: string };
+export type AnalyseInput = { notes?: string; hints?: string; descriptionOnly?: { title: string; description: string; conditionId: number | null }; recentOpeners?: string[] };
 
 export async function analysePhotos(images: { base64: string }[], input: AnalyseInput = {}): Promise<Analysis> {
   const { data, error } = await supabase.functions.invoke('vinted-analyse', {
@@ -105,6 +103,8 @@ export async function analysePhotos(images: { base64: string }[], input: Analyse
       reference: aiReference,
       notes: (input.notes ?? '').slice(0, 1000),
       hints: (input.hints ?? '').slice(0, 300),
+      descriptionOnly: input.descriptionOnly,
+      recentOpeners: input.recentOpeners?.slice(-10),
     },
   });
   if (error) throw new Error(error.message);
