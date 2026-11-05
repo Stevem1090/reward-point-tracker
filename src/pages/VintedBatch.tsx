@@ -366,6 +366,7 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
       {it.error && <p className="text-destructive">{it.error}</p>}
       {done && it.draftId && <a className="text-primary underline" href={draftLink(it.draftId)} target="_blank" rel="noreferrer">Open draft on Vinted</a>}
       {it.parcel && <p className="text-xs text-muted-foreground">{parcelLabel(it.parcel)}</p>}
+      {it.priceResult && <p className="text-xs text-muted-foreground">Price: {priceLabel(it.priceResult)}</p>}
       {it.status === 'unknown' && (
         <div className="grid grid-cols-2 gap-2">
           <Button variant="outline" className="h-11" onClick={() => onChange({ ...it, status: 'drafted', error: undefined })}>It's in my drafts</Button>
