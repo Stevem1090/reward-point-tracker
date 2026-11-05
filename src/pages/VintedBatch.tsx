@@ -19,8 +19,8 @@ import { allowedConditions } from '@/vinted/validate';
 import { VINTED_REFERENCE } from '@/vinted/reference';
 import { exec, goToNew, hideVinted, injectAndRun, listen, openVinted, PROBE_SCRIPT, resizeVinted, showVinted, type DockSize } from '@/vinted/browser';
 import {
-  acceptAllPrices, applyAnalysis, approvalErrors, blockerFor, canAdd, deleteItem, draftLink, loadItems, MAX_ITEMS,
-  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, toDraft, describeReportErrors, parcelLabel, type BatchItem,
+  applyAnalysis, approvalErrors, blockerFor, canAdd, DEFAULT_PRICE_UPLIFT, deleteItem, draftLink, loadItems, loadPriceUplift, MAX_ITEMS,
+  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, priceLabel, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, savePriceUplift, toDraft, describeReportErrors, parcelLabel, type BatchItem,
 } from '@/vinted/batch';
 
 const STATUS: Record<BatchItem['status'], string> = {
@@ -51,6 +51,7 @@ export default function VintedBatch() {
   const [dock, setDock] = useState<DockSize>('small');
   const [hidden, setHidden] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
+  const [uplift, setUplift] = useState(() => String(loadPriceUplift()));
 
   const itemsRef = useRef(items); itemsRef.current = items;
   const analysingIds = useRef(new Set<string>());
@@ -58,6 +59,7 @@ export default function VintedBatch() {
   const stopRef = useRef(false);
   const currentId = useRef<string | null>(null);
   const lastParcel = useRef<{ id: string; parcel: any } | null>(null);
+  const lastPrice = useRef<{ id: string; price: any } | null>(null);
   const waiter = useRef<((o: Outcome) => void) | null>(null);
   const probeWaiter = useRef<((p: any) => void) | null>(null);
   const wakeLock = useRef<any>(null);
@@ -108,6 +110,7 @@ export default function VintedBatch() {
         if (d.type === 'vinted:fatal') waiter.current?.({ kind: 'fatal', reason: String(d.error ?? d.message ?? 'Form filling failed') });
         if (d.type === 'vinted:report') {
           if (d.parcel && currentId.current) lastParcel.current = { id: currentId.current, parcel: d.parcel };
+          if (d.price && currentId.current) lastPrice.current = { id: currentId.current, price: d.price };
           const errs = Array.isArray(d.errors) ? d.errors : [];
           const cur = itemsRef.current.find((x) => x.id === currentId.current);
           const problems = errs.length ? `Field problems: ${describeReportErrors(d, cur ? toDraft(cur) : undefined)}` : '';
