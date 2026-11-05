@@ -94,10 +94,9 @@ confidence: low/medium/high per field. flags: short codes for anything a human m
 
 const num = (v: unknown) => (v == null || v === '' ? null : Number(v));
 
-export type AnalyseInput = { notes?: string; hints?: string; rules?: PricingRule[] };
+export type AnalyseInput = { notes?: string; hints?: string };
 
 export async function analysePhotos(images: { base64: string }[], input: AnalyseInput = {}): Promise<Analysis> {
-  const rules = input.rules ?? loadRules();
   const { data, error } = await supabase.functions.invoke('vinted-analyse', {
     body: {
       images: images.map((i) => i.base64),
@@ -106,16 +105,15 @@ export async function analysePhotos(images: { base64: string }[], input: Analyse
       reference: aiReference,
       notes: (input.notes ?? '').slice(0, 1000),
       hints: (input.hints ?? '').slice(0, 300),
-      pricingRules: rulesForAI(rules),
     },
   });
   if (error) throw new Error(error.message);
   if (data?.error) throw new Error(data.error);
-  return normaliseAnalysis(data.result, rules);
+  return normaliseAnalysis(data.result);
 }
 
-/** Convert raw AI output (string IDs) into typed values and apply the seller's pricing rules. */
-export function normaliseAnalysis(r: any, rules: PricingRule[]): Analysis {
+/** Convert raw AI output (string IDs) into typed values. */
+export function normaliseAnalysis(r: any): Analysis {
   const leafId = num(r.categoryLeafId);
   const brandId = num(r.brandId);
   const brandStatus: BrandStatus = brandId != null ? 'identified'
@@ -127,11 +125,6 @@ export function normaliseAnalysis(r: any, rules: PricingRule[]): Analysis {
     flags.add('cannot_list_underwear');
     conditionId = 6;
   }
-  const price = applyPricing(rules, leafId, brandId, {
-    suggestedPrice: typeof r.suggestedPrice === 'number' ? r.suggestedPrice : null,
-    priceRationale: r.priceRationale ?? '',
-    priceConfidence: r.priceConfidence ?? 'low',
-  });
   return {
     title: r.title ?? '',
     description: r.description ?? '',
@@ -146,15 +139,12 @@ export function normaliseAnalysis(r: any, rules: PricingRule[]): Analysis {
     notesUsed: r.notesUsed ?? [],
     colourIds: (r.colourIds ?? []).map(Number).slice(0, 2),
     materialIds: (r.materialIds ?? []).map(Number),
-    suggestedPrice: price.suggestedPrice,
-    priceRationale: price.priceRationale,
-    priceConfidence: price.priceConfidence,
     confidence: r.confidence ?? {},
     flags: [...flags],
   };
 }
 
-/** Turn an AI analysis into a draft payload. Price comes from the human. */
+/** Turn an AI analysis into a draft payload. Price is optional: only a custom price typed by the human is sent. */
 export function analysisToDraft(a: Analysis, itemId: string, images: DraftItem['images'], price: number | null): Partial<DraftItem> {
   const leaf = a.categoryLeafId != null ? findLeaf(a.categoryLeafId) : null;
   const main = ref.brands.main as Record<string, string>;
