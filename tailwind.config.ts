@@ -73,15 +73,17 @@ export default {
 				'kid-orange': '#F97316',
 				'kid-blue': '#0EA5E9',
 				'kid-green': '#10B981',
-				'kid-yellow': '#FBBF24',
-				// Soft pastel variants
+			'kid-yellow': '#FBBF24',
+			'kid-teal': '#0D9488',
+			// Soft pastel variants
 				'soft-green': '#F2FCE2',
 				'soft-yellow': '#FEF7CD',
 				'soft-orange': '#FEC6A1',
 				'soft-purple': '#E5DEFF',
 				'soft-pink': '#FFDEE2',
-				'soft-blue': '#D3E4FD',
-			},
+			'soft-blue': '#D3E4FD',
+			'soft-teal': '#CCFBF1',
+		},
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
