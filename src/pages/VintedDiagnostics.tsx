@@ -52,8 +52,7 @@ export default function VintedDiagnostics() {
   const [hints, setHints] = useState('');
   const [analysedNotes, setAnalysedNotes] = useState('');
   const [condition, setCondition] = useState<number | null>(null);
-  const [priceConfirmed, setPriceConfirmed] = useState(false);
-  const [edited, setEdited] = useState({ condition: false, price: false });
+  const [edited, setEdited] = useState({ condition: false });
 
   const add = (text: string) => setLog((l) => [...l, { at: new Date().toLocaleTimeString('en-GB'), text }]);
 
@@ -148,18 +147,14 @@ export default function VintedDiagnostics() {
       setAnalysis(a);
       setAnalysedNotes(notes);
       if (overwrite || !edited.condition) { setCondition(a.conditionId); setEdited((e) => ({ ...e, condition: false })); }
-      if (overwrite || !edited.price) { setAiPrice(a.suggestedPrice != null ? String(a.suggestedPrice) : ''); setPriceConfirmed(false); setEdited((e) => ({ ...e, price: false })); }
+      if (overwrite) setAiPrice('');
     } catch (e: any) { add(`AI analysis failed: ${e?.message || e}`); toast(`Analysis failed: ${e?.message || e}`); }
     finally { setAiBusy(false); }
   };
   const aiDraft = analysis
     ? { ...analysisToDraft(analysis, 'preview', Array.from({ length: aiImagesCount }, (_, i) => ({ name: `p${i}.jpg`, type: 'image/jpeg', base64: 'x' })), aiPrice ? Number(aiPrice) : null), conditionId: condition ?? undefined }
     : null;
-  const aiErrors = aiDraft ? validateForApproval(aiDraft, { priceConfirmed, flags: analysis!.flags }) : [];
-  const confirmPrice = () => {
-    setPriceConfirmed(true);
-    add(`Price log: AI suggested £${analysis?.suggestedPrice ?? '–'}, final £${aiPrice || '–'}`);
-  };
+  const aiErrors = aiDraft ? validateForApproval(aiDraft, { flags: analysis!.flags }) : [];
   const condOptions = analysis?.categoryLeafId != null ? allowedConditions(analysis.categoryLeafId) : {};
 
   const copyLog = async () => {
@@ -307,14 +302,8 @@ export default function VintedDiagnostics() {
                   {analysis.conditionReason && <p className="text-xs text-muted-foreground">{analysis.conditionReason}</p>}
 
                   <label className="block text-xs text-muted-foreground">Price £</label>
-                  <div className="flex items-center gap-2">
-                    <Input className="h-11 flex-1" inputMode="decimal" value={aiPrice} onChange={(e) => { setAiPrice(e.target.value); setEdited((x) => ({ ...x, price: true })); setPriceConfirmed(!!e.target.value); }} />
-                    {analysis.suggestedPrice != null && <Badge variant="outline">Suggested £{analysis.suggestedPrice.toFixed(2)} · {analysis.priceConfidence}</Badge>}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{analysis.priceRationale}</p>
-                  {priceConfirmed
-                    ? <p className="text-xs">Price confirmed. AI suggested £{analysis.suggestedPrice?.toFixed(2) ?? '–'}, final £{aiPrice || '–'}.</p>
-                    : <Button className="h-11 w-full" disabled={!aiPrice} onClick={confirmPrice}>Confirm price</Button>}
+                  <Input className="h-11" inputMode="decimal" placeholder="Leave empty" value={aiPrice} onChange={(e) => setAiPrice(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">{aiPrice ? 'Your custom price will be used.' : 'Vinted Optimal + £0.50 (set when drafting)'}</p>
 
                   {analysis.flags.length > 0 && <div className="flex flex-wrap gap-1">{analysis.flags.map((f) => <Badge key={f} variant={f === 'cannot_list_underwear' ? 'destructive' : 'secondary'}>{f}</Badge>)}</div>}
                   <div className={aiErrors.length ? 'text-destructive' : ''}>{aiErrors.length ? `Blocked: ${aiErrors.join('; ')}` : 'Ready: passes all checks'}</div>
