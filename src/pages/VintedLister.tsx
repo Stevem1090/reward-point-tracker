@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -30,7 +29,7 @@ const STATUS: Record<BatchItem['status'], string> = {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 type Outcome = { kind: 'saved'; draftId: any } | { kind: 'notSaved'; reason: string } | { kind: 'dryOk' } | { kind: 'fatal'; reason: string } | { kind: 'timeout' };
 
-export default function VintedBatch() {
+export default function VintedLister() {
   const native = isNativeApp();
   const [items, setItems] = useState<BatchItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -40,7 +39,7 @@ export default function VintedBatch() {
   const [newHints, setNewHints] = useState('');
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [confirmRun, setConfirmRun] = useState(false);
-  const [dryRun, setDryRun] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'review' | 'ready' | 'saved'>('all');
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [status, setStatus] = useState('');
@@ -165,7 +164,7 @@ export default function VintedBatch() {
     setConfirmRun(false);
     const queue = runnable(itemsRef.current);
     if (!queue.length) return;
-    const dry = dryRun;
+    const dry = false;
     (window as any).__batchDry = dry;
     stopRef.current = false; pausedRef.current = false; setPaused(false);
     setRunning(true); setStopReason(null); setSummary(null);
@@ -222,16 +221,23 @@ export default function VintedBatch() {
   const analysing = items.filter((i) => i.status === 'queued' || i.status === 'analysing').length;
   const last = steps[steps.length - 1];
   const pct = last?.total ? Math.round((last.done / last.total) * 100) : 0;
+  const FILTERS: { id: typeof filter; label: string; match: (s: BatchItem['status']) => boolean }[] = [
+    { id: 'all', label: 'All', match: () => true },
+    { id: 'review', label: 'Needs review', match: (s) => s === 'needs_review' || s === 'analysis_failed' || s === 'failed' || s === 'unknown' },
+    { id: 'ready', label: 'Ready to send', match: (s) => s === 'approved' || s === 'queued' || s === 'analysing' },
+    { id: 'saved', label: 'Saved', match: (s) => s === 'drafted' },
+  ];
+  const visible = items.filter((i) => FILTERS.find((f) => f.id === filter)!.match(i.status));
 
   return (
     <div className="container mx-auto max-w-2xl px-3 py-4 space-y-3" style={browserOpen && !hidden ? { paddingBottom: `${dock === 'large' ? 62 : 45}vh` } : undefined}>
       <div className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" className="h-11 w-11"><Link to="/profile" aria-label="Back"><ArrowLeft /></Link></Button>
-        <h1 className="text-xl font-bold flex-1">Vinted drafts</h1>
+        <Button asChild variant="ghost" size="icon" className="h-11 w-11"><Link to="/" aria-label="Back"><ArrowLeft /></Link></Button>
+        <h1 className="text-xl font-bold flex-1">Vinted lister</h1>
         <span className="text-sm text-muted-foreground">{items.length}/{MAX_ITEMS}</span>
       </div>
 
-      {!native && <Card><CardContent className="p-3 text-sm text-muted-foreground">You can add and review items here, but sending to Vinted only works in the Family Hub Android app.</CardContent></Card>}
+      {!native && <Card><CardContent className="p-3 text-sm text-muted-foreground">You can photograph, add and review items here. Sending them to Vinted runs in the Family Hub Android app, where Vinted opens in a panel at the bottom of this screen.</CardContent></Card>}
 
       {running && (
         <Card className="sticky top-0 z-10">
@@ -292,8 +298,18 @@ export default function VintedBatch() {
 
       {loaded && !items.length && <Card><CardContent className="p-4 text-sm text-muted-foreground">No items yet. Tap Add item, pick up to 5 photos and add any notes about flaws.</CardContent></Card>}
 
+      {items.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {FILTERS.map((f) => (
+            <Button key={f.id} size="sm" className="h-11 shrink-0" variant={filter === f.id ? 'default' : 'outline'} onClick={() => setFilter(f.id)}>
+              {f.label} ({items.filter((i) => f.match(i.status)).length})
+            </Button>
+          ))}
+        </div>
+      )}
+
       <ul className="space-y-2">
-        {items.map((it) => (
+        {visible.map((it) => (
           <li key={it.id}>
             <button className="w-full text-left" onClick={() => setReviewId(it.id)} disabled={running}>
               <Card><CardContent className="p-2 flex gap-3 items-center min-w-0">
@@ -339,13 +355,12 @@ export default function VintedBatch() {
           <AlertDialogHeader>
             <AlertDialogTitle>Run {approved} item{approved > 1 ? 's' : ''}?</AlertDialogTitle>
             <AlertDialogDescription>
-              {dryRun ? 'Dry run: the Vinted form is filled in but nothing is saved.' : 'This saves real drafts in your Vinted account. Nothing is published, and nothing is ever deleted automatically.'} There is a {PAUSE_BETWEEN_MS / 1000} second pause between items, so {approved} item{approved > 1 ? 's' : ''} take{approved > 1 ? '' : 's'} roughly {Math.max(1, Math.round((approved * (SAVE_TIMEOUT_MS / 4 + PAUSE_BETWEEN_MS)) / 60000))} minute{approved > 1 ? 's' : ''}. Keep this screen open.
+              This saves real drafts in your Vinted account. Nothing is published, and nothing is ever deleted automatically. There is a {PAUSE_BETWEEN_MS / 1000} second pause between items, so {approved} item{approved > 1 ? 's' : ''} take{approved > 1 ? '' : 's'} roughly {Math.max(1, Math.round((approved * (SAVE_TIMEOUT_MS / 4 + PAUSE_BETWEEN_MS)) / 60000))} minute{approved > 1 ? 's' : ''}. Keep this screen open.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="flex items-center gap-2 py-2"><Switch id="dry" checked={dryRun} onCheckedChange={setDryRun} /><Label htmlFor="dry">Dry run (don't save)</Label></div>
           <AlertDialogFooter>
             <AlertDialogCancel className="h-11">Cancel</AlertDialogCancel>
-            <AlertDialogAction className="h-11" onClick={runBatch}>{dryRun ? 'Start dry run' : 'Save drafts'}</AlertDialogAction>
+            <AlertDialogAction className="h-11" onClick={runBatch}>Save drafts</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

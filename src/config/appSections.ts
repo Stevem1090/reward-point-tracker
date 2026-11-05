@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Award, CheckSquare, ListChecks, Receipt, Scale, UserCircle, UtensilsCrossed } from 'lucide-react';
+import { Award, CheckSquare, ListChecks, Receipt, Scale, Tag, UserCircle, UtensilsCrossed } from 'lucide-react';
 
 export type AppSection = {
   name: string;
@@ -18,5 +18,6 @@ export const appSections: AppSection[] = [
   { name: 'Meals', shortName: 'Meals', description: 'Plan meals, recipes and shopping', path: '/meals', icon: UtensilsCrossed, surfaceClass: 'bg-soft-orange', iconClass: 'text-kid-orange' },
   { name: 'Chores', shortName: 'Chores', description: 'Share and manage family chores', path: '/chores', icon: ListChecks, surfaceClass: 'bg-soft-green', iconClass: 'text-kid-green' },
   { name: 'Slimming World', shortName: 'Slimming World', description: 'Log food and follow your progress', path: '/slimming-world', icon: Scale, surfaceClass: 'bg-soft-purple', iconClass: 'text-kid-purple' },
+  { name: 'Vinted', shortName: 'Vinted', description: 'Turn kids clothes into Vinted drafts', path: '/vinted', icon: Tag, surfaceClass: 'bg-soft-teal', iconClass: 'text-kid-teal' },
   { name: 'Profile & notifications', shortName: 'Profile', description: 'Manage your family and notifications', path: '/profile', icon: UserCircle, surfaceClass: 'bg-muted', iconClass: 'text-muted-foreground' },
 ];

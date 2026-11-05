@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from "@/components/ui/button";
@@ -171,12 +170,6 @@ const ProfilePage = () => {
         <UserCircle className="h-8 w-8" />
         Profile Settings
       </h1>
-      <Button asChild variant="outline" className="mb-4 h-11 w-full">
-        <Link to="/profile/diagnostics/vinted">Diagnostics: Vinted browser</Link>
-      </Button>
-      <Button asChild className="mb-4 h-11 w-full">
-        <Link to="/profile/vinted/batch">Vinted drafts (batch)</Link>
-      </Button>
       {error && (
         <Alert variant="destructive" className="mb-4">
           <AlertDescription>
