@@ -20,7 +20,7 @@ import { VINTED_REFERENCE } from '@/vinted/reference';
 import { exec, goToNew, hideVinted, injectAndRun, listen, openVinted, PAGE_PROBE, resizeVinted, showVinted, type DockSize } from '@/vinted/browser';
 import {
   applyAnalysis, applyDescription, approvalErrors, canAdd, AUTO_RETRY_AFTER_MS, jitter, LADDER_WAITS_MS, MAX_ITEM_RETRIES, pageAction, pauseBetween, PROBE_TIMEOUT_MS, shouldRetryItem, DEFAULT_PRICE_UPLIFT, deleteItem, draftLink, loadItems, loadPriceUplift, MAX_ITEMS,
-  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, priceLabel, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, savePriceUplift, toDraft, describeReportErrors, parcelLabel, type BatchItem,
+  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, priceLabel, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, savePriceUplift, toDraft, finalImages, arrangement, setPhotos, resetPhotos, replanPhotos, describeReportErrors, parcelLabel, type BatchItem,
 } from '@/vinted/batch';
 
 const STATUS: Record<BatchItem['status'], string> = {
@@ -254,7 +254,7 @@ export default function VintedLister() {
             setTimeout(() => res({ kind: 'timeout' }), SAVE_TIMEOUT_MS);
           });
           const fresh = itemsRef.current.find((x) => x.id === it.id) ?? it;
-          try { await injectAndRun(toDraft(fresh) as any, !dry, () => {}); }
+          try { await injectAndRun({ ...toDraft(fresh), images: await finalImages(fresh) } as any, !dry, () => {}); }
           catch (e: any) { waiter.current?.({ kind: 'fatal', reason: e?.message || String(e) }); }
           o = await outcome; waiter.current = null; currentId.current = null;
           if (o.kind !== 'fatal' || savingReached.current) break;

@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
           role: "user",
           content: [
             { type: "input_text", text: `These ${images.length} photos show ONE item. Analyse them and return the listing as JSON.\n\nSELLER NOTES: ${sellerNotes || "(none)"}\nSELLER HINTS: ${sellerHints || "(none)"}\n${writingContext}\nRecent batch openers (vary yours): ${openers || "(none yet)"}` },
-            ...images.map((b64: string) => ({ type: "input_image", image_url: `data:image/jpeg;base64,${b64}` })),
+            ...images.flatMap((b64: string, i: number) => [{ type: "input_text", text: `Photo ${i + 1}` }, { type: "input_image", image_url: `data:image/jpeg;base64,${b64}` }]),
           ],
         }],
         text: { format: { type: "json_schema", name: "listing", schema, strict: true } },
