@@ -331,6 +331,7 @@ export default function VintedLister() {
               <Button variant="destructive" className="h-11" onClick={() => { stopRef.current = true; setStatus('Stopping after this item…'); }}><Square className="mr-1 h-4 w-4" />Stop</Button>
             </div>
             <p className="text-xs text-muted-foreground">Pause and Stop take effect after the current item finishes. Keep this screen open.</p>
+            {log.length > 0 && <BatchLog log={log} />}
           </CardContent>
         </Card>
       )}
@@ -357,6 +358,8 @@ export default function VintedLister() {
                 </div>
               ))}
             {summary.failed.map((f) => <div key={f.id} className="text-destructive">{f.title}: {f.error}</div>)}
+            <div>Vinted errors recovered: {summary.recovered}</div>
+            {log.length > 0 && <BatchLog log={log} />}
             {stopReason && /logged out|bot check|open its app/.test(stopReason) && <p className="text-muted-foreground">Sort this out in the Vinted panel below, then tap Run batch again.</p>}
             <Button variant="ghost" className="h-11" onClick={() => setSummary(null)}>Close</Button>
           </CardContent>
@@ -545,5 +548,16 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
       )}
       <Button variant="ghost" className="h-11 w-full text-destructive" onClick={onDelete}><Trash2 className="mr-1 h-4 w-4" />Remove from batch</Button>
     </div>
+  );
+}
+
+function BatchLog({ log }: { log: string[] }) {
+  return (
+    <details className="text-xs">
+      <summary className="cursor-pointer py-2 text-muted-foreground">Batch log ({log.length})</summary>
+      <div className="max-h-48 overflow-y-auto space-y-0.5 font-mono break-words">
+        {log.map((l, i) => <div key={i}>{l}</div>)}
+      </div>
+    </details>
   );
 }
