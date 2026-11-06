@@ -2,9 +2,12 @@ import { InAppBrowser } from '@capgo/inappbrowser';
 import type { PluginListenerHandle } from '@capacitor/core';
 import pluginPkg from '@capgo/inappbrowser/package.json';
 import scriptText from './vinted-create-draft.js?raw';
+import probeText from './vinted-page-probe.js?raw';
 
 export const VINTED_NEW_URL = 'https://www.vinted.co.uk/items/new';
 export const VINTED_SCRIPT = scriptText;
+/** Standalone page probe (black-box asset): defines vintedCheckPage / vintedReloadPage. Lost on every navigation. */
+export const PAGE_PROBE = probeText;
 /** Desktop Chrome UA: the script was only tested on Vinted's desktop layout. */
 export const DESKTOP_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -70,22 +73,6 @@ export async function listen(h: Handlers): Promise<() => void> {
   ]);
   return () => subs.forEach((s) => s.remove());
 }
-
-/** Read-only page probe. Reports back as a diag:probe message (executeScript returns nothing). */
-export const PROBE_SCRIPT = `(() => {
-  const t = (document.body && document.body.innerText || '').toLowerCase();
-  const detail = {
-    type: 'diag:probe',
-    url: location.href,
-    userAgent: navigator.userAgent,
-    width: window.innerWidth,
-    hasTitleField: !!document.querySelector('#title') || !!document.querySelector('input[type="file"]') || /\\/items\\/new/.test(location.pathname),
-    botCheck: !!document.querySelector('iframe[src*="captcha"], iframe[src*="datadome"], #cmsg, .g-recaptcha, [data-hcaptcha-widget-id]') || /verify you are (a )?human|are you a robot|unusual activity/.test(t),
-    loginWall: /\\/(member\\/signup|signup|login|session)/.test(location.pathname),
-    openInApp: /open (in|the) (vinted )?app|get the app|continue in app/.test(t),
-  };
-  try { window.mobileApp.postMessage({ detail }); } catch (e) {}
-})();`;
 
 const CHUNK = 200_000;
 
