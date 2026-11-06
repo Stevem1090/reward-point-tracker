@@ -433,7 +433,7 @@ export default function VintedLister() {
 
       {/* Review */}
       <Dialog open={!!review} onOpenChange={(o) => !o && setReviewId(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100%-2rem)] min-w-0 max-h-[90dvh] grid-cols-[minmax(0,1fr)] overflow-x-hidden overflow-y-auto p-4 sm:p-6">
           {review && <ReviewForm key={review.id} it={review} onChange={save} onDelete={() => remove(review.id)} onClose={() => setReviewId(null)} />}
         </DialogContent>
       </Dialog>
@@ -479,7 +479,7 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
     finally { if (mounted.current) setRegenerating(false); }
   };
   return (
-    <div className="space-y-3 text-sm">
+    <div className="min-w-0 max-w-full space-y-3 break-words text-sm">
       <DialogHeader><DialogTitle>{STATUS[it.status]}</DialogTitle></DialogHeader>
       <PhotoStrip it={it} onChange={(n) => onChange({ ...n, status: it.status === 'approved' ? 'needs_review' : it.status })} readOnly={done} />
       {it.error && <p className="text-destructive">{it.error}</p>}
@@ -505,7 +505,7 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
           <Input id="vinted-title" value={it.title} onChange={(e) => set({ title: e.target.value })} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Label htmlFor="vinted-description">Description</Label>
-            <Button variant="outline" className="h-11" disabled={regenerating} onClick={regenerate}>
+            <Button variant="outline" className="min-h-11 h-auto max-w-full whitespace-normal py-2" disabled={regenerating} onClick={regenerate}>
               {regenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Regenerate description
             </Button>
           </div>
@@ -626,10 +626,10 @@ function PhotoStrip({ it, onChange, readOnly }: { it: BatchItem; onChange: (i: B
   };
   const changed = it.photosLocked || photos.length !== it.images.length || photos.some((p, i) => p.src !== i || p.rotate);
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 max-w-full space-y-2">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1">
             {photos.map((p, i) => (
               <SortablePhoto key={ids[i]} id={ids[i]} p={p} it={it} index={i} total={photos.length} readOnly={readOnly}
                 onRotate={(d) => update(photos.map((x, j) => (j === i ? rotateBy(x, d) : x)))}
@@ -640,8 +640,8 @@ function PhotoStrip({ it, onChange, readOnly }: { it: BatchItem; onChange: (i: B
       </DndContext>
       {!readOnly && (
         <div className="flex flex-wrap gap-2">
-          {changed && <Button type="button" variant="outline" className="h-11" onClick={() => onChange(resetPhotos(it))}>Reset to original order and rotation</Button>}
-          {it.photosLocked && it.analysis?.photos && <Button type="button" variant="outline" className="h-11" onClick={() => onChange(replanPhotos(it))}>Re-order photos again</Button>}
+          {changed && <Button type="button" variant="outline" className="min-h-11 h-auto max-w-full whitespace-normal py-2" onClick={() => onChange(resetPhotos(it))}>Reset to original order and rotation</Button>}
+          {it.photosLocked && it.analysis?.photos && <Button type="button" variant="outline" className="min-h-11 h-auto max-w-full whitespace-normal py-2" onClick={() => onChange(replanPhotos(it))}>Re-order photos again</Button>}
         </div>
       )}
       {!readOnly && photos.length > 1 && <p className="text-xs text-muted-foreground">Hold and drag a photo to move it. The first photo is the cover.</p>}
