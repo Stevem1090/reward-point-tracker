@@ -1,3 +1,4 @@
+// @ts-nocheck -- run with `bun test`
 import { describe, expect, it } from 'bun:test';
 import { arrangeFromPlan, validatePlan } from './photos';
 import { applyAnalysis, arrangement, newItem, orderedImages, replanPhotos, resetPhotos, setPhotos } from './batch';
