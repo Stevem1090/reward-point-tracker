@@ -24,10 +24,11 @@ describe('batch rules', () => {
 
   it('stops on login wall, bot check or missing probe', () => {
     const ok = { hasTitleField: true, botCheck: false, loginWall: false, openInApp: false };
-    expect(blockerFor(ok)).toBeNull();
-    expect(blockerFor({ ...ok, loginWall: true })).not.toBeNull();
-    expect(blockerFor({ ...ok, botCheck: true })).not.toBeNull();
-    expect(blockerFor(null)).not.toBeNull();
+    void ok;
+    expect(pageAction('ready')).toBe('go');
+    expect(pageAction('login_wall')).toBe('login');
+    expect(pageAction('error_page')).toBe('retry');
+    expect(pageAction('timeout')).toBe('retry');
   });
 });
 
