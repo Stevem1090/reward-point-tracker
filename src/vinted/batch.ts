@@ -1,6 +1,7 @@
 import type { Analysis } from './analysis';
 import { analysisToDraft } from './analysis';
-import type { VintedImage } from './imageResize';
+import { rotateImage, type VintedImage } from './imageResize';
+import { arrangeFromPlan, originalArrangement, type ArrangedPhoto } from './photos';
 import { VINTED_REFERENCE as ref } from './reference';
 import { validateForApproval, type DraftItem } from './validate';
 
@@ -26,7 +27,12 @@ export type BatchStatus =
 export type BatchItem = {
   id: string;
   createdAt: number;
+  /** Original photos in the order added (EXIF orientation baked in). Never rotated in place, so undo is always possible. */
   images: VintedImage[];
+  /** Final photo order and rotation (unset = original order, no rotation). */
+  photos?: ArrangedPhoto[];
+  /** Seller changed order/rotation by hand: re-analysis must not touch it. */
+  photosLocked?: boolean;
   notes: string;
   hints: string;
   status: BatchStatus;
@@ -69,8 +75,30 @@ export function applyAnalysis(it: BatchItem, a: Analysis): BatchItem {
     ...it, analysis: a, status: 'needs_review', error: undefined,
     title: a.title, description: a.description, conditionId: a.conditionId,
     brandId: a.brandId, brandName: a.brandId != null ? (ref.brands.main as Record<string, string>)[String(a.brandId)] : '', noBrand: false,
+    photos: it.photosLocked ? it.photos : arrangeFromPlan(a.photos, arrangement(it).map((p) => p.src)),
   };
 }
+
+/** Current photo arrangement. */
+export const arrangement = (it: BatchItem): ArrangedPhoto[] => it.photos ?? originalArrangement(it.images.length);
+
+/** Seller's own change: lock it so re-analysis keeps it. */
+export const setPhotos = (it: BatchItem, photos: ArrangedPhoto[]): BatchItem => ({ ...it, photos, photosLocked: true });
+
+/** Back to the original photos, order and rotation (locked, so re-analysis keeps it). */
+export const resetPhotos = (it: BatchItem): BatchItem => ({ ...it, photos: originalArrangement(it.images.length), photosLocked: true });
+
+/** "Re-order photos again": apply the AI plan to the photos currently kept. */
+export const replanPhotos = (it: BatchItem): BatchItem =>
+  ({ ...it, photosLocked: false, photos: arrangeFromPlan(it.analysis?.photos ?? null, arrangement(it).map((p) => p.src)) });
+
+/** Photos in final order (unrotated originals). Used for counts and validation. */
+export const orderedImages = (it: BatchItem): VintedImage[] =>
+  arrangement(it).map((p, i) => ({ ...it.images[p.src], name: `photo-${i + 1}.jpg` }));
+
+/** Payload images: final order, each rotated from its ORIGINAL copy. First = cover. */
+export const finalImages = (it: BatchItem): Promise<VintedImage[]> =>
+  Promise.all(arrangement(it).map((p, i) => rotateImage(it.images[p.src], p.rotate, `photo-${i + 1}.jpg`)));
 
 /** Apply description regeneration to the latest item, never overwrite any other edits. */
 export function applyDescription(it: BatchItem, description: string): BatchItem {
@@ -108,7 +136,7 @@ export const priceLabel = (p?: { value: number; source: string; uplift?: number 
 export function toDraft(it: BatchItem, uplift = loadPriceUplift()): Partial<DraftItem> {
   if (!it.analysis) return {};
   return {
-    ...analysisToDraft(it.analysis, it.id, it.images, it.price ? Number(it.price) : null),
+    ...analysisToDraft(it.analysis, it.id, orderedImages(it), it.price ? Number(it.price) : null),
     title: cleanTitle(it.title), description: cleanDescription(it.description), conditionId: it.conditionId ?? undefined,
     ...brandFields(it),
     packageId: it.packageId ?? undefined,

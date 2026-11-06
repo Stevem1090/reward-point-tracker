@@ -4,6 +4,7 @@ import type { DraftItem } from './validate';
 import { supabase } from '@/integrations/supabase/client';
 import { WRITING_RULES } from './writing';
 import writingExamples from './writing-examples.txt?raw';
+import { validatePlan, type PhotoPlanEntry } from './photos';
 
 type Confidence = 'low' | 'medium' | 'high';
 export type BrandStatus = 'identified' | 'none_visible' | 'not_in_list';
@@ -25,6 +26,8 @@ export type Analysis = {
   materialIds: number[];
   confidence: Record<string, Confidence>;
   flags: string[];
+  /** Validated photo order/rotation plan, or null if the AI's plan was invalid. */
+  photos: PhotoPlanEntry[] | null;
 };
 
 const leafIds = (ref.categories as { leaves: Record<string, string> }[]).flatMap((g) => Object.keys(g.leaves));
@@ -39,7 +42,7 @@ export function analysisSchema() {
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['title', 'description', 'categoryLeafId', 'brandNameRead', 'brandId', 'brandStatus', 'sizeId', 'sizeEvidence', 'conditionId', 'conditionReason', 'notesUsed', 'colourIds', 'materialIds', 'confidence', 'flags'],
+    required: ['title', 'description', 'categoryLeafId', 'brandNameRead', 'brandId', 'brandStatus', 'sizeId', 'sizeEvidence', 'conditionId', 'conditionReason', 'notesUsed', 'colourIds', 'materialIds', 'confidence', 'flags', 'photos'],
     properties: {
       title: { type: 'string' },
       description: { type: 'string' },
@@ -56,6 +59,20 @@ export function analysisSchema() {
       materialIds: { type: 'array', items: { type: 'string', enum: Object.keys(ref.materials.options) } },
       confidence: { type: 'object', additionalProperties: false, required: fields, properties: Object.fromEntries(fields.map((f) => [f, conf])) },
       flags: { type: 'array', items: { type: 'string' } },
+      photos: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['photoId', 'role', 'rotateClockwiseDegrees', 'rotationConfidence', 'note'],
+          properties: {
+            photoId: { type: 'integer' },
+            role: { type: 'string', enum: ['full_flat_lay', 'full_other', 'detail', 'flaw', 'label', 'other'] },
+            rotateClockwiseDegrees: { type: 'integer', enum: [0, 90, 180, 270] },
+            rotationConfidence: conf,
+            note: { type: 'string' },
+          },
+        },
+      },
     },
   };
 }
@@ -88,7 +105,26 @@ ${WRITING_RULES}
 
 ${writingExamples}
 
-confidence: low/medium/high per field. flags: short codes for anything a human must check.`;
+PHOTOS: the photos are labelled "Photo 1", "Photo 2", ... in the order the seller added them. Return "photos": one entry per photo, listed IN THE ORDER they should be uploaded (the first entry becomes the Vinted cover photo). photoId = that photo's number. note: 12 words or fewer.
+Order the photos like this:
+ a. FIRST: a flat lay showing the WHOLE item. If the listing is several items (for example 2 pairs of pyjamas, a bundle, a pair of shoes), the first photo is the one showing ALL of them together. Choose the clearest, best lit, fully in frame photo as the cover.
+ b. If there are two full views (for example front and back), front first, then back.
+ c. THEN detail shots (print, pocket, hood, buttons, zip, texture, a feature mentioned in the notes).
+ d. THEN any photo showing a flaw, so a buyer sees it before the label. If the notes mention a flaw and a photo shows it, mark that photo role "flaw".
+ e. LAST: the label (brand, size or care label).
+ f. Shoes: whole pair first (side or top view), then sole and detail shots, then the size marking last.
+ g. If there is no true full-item photo, use the best overall view first and flag "no_full_item_photo".
+ Example: photos that arrive as [label, close-up, full item] must come back as [full item, close-up, label].
+ Never drop, add or duplicate a photo. Every photoId appears exactly once. If two photos are near duplicates, keep both and flag "possible_duplicate_photo". If a photo shows a person, especially a child, flag "person_visible" (do not remove it). If a photo is blurry or obstructed, flag "photo_quality". If there is only one photo, there is nothing to order.
+Rotation: each photo should be shown the way up it would be seen if the garment were laid out or worn the right way up: top of the garment at the TOP of the image.
+ - T-shirts, tops, jumpers, hoodies, jackets, dresses: neckline or hood at the top, hem at the bottom.
+ - Trousers, leggings, shorts, skirts: waistband at the top.
+ - Shoes and boots: the right way up (sole at the bottom), never upside down. A sole-only shot is fine in any direction.
+ - Labels and tags: rotate so the text reads horizontally, left to right.
+ - Detail shots where the direction is genuinely unclear (a patch of fabric): leave at 0.
+ rotateClockwiseDegrees is 0, 90, 180 or 270: the clockwise rotation needed to correct the photo as it is currently shown. Rotation only: never mirror, flip or crop. If you are not confident, return 0 with rotationConfidence "low" and flag "rotation_uncertain".
+
+confidence: low/medium/high per field. flags: short codes for anything a human must check.`
 
 const num = (v: unknown) => (v == null || v === '' ? null : Number(v));
 
@@ -109,11 +145,11 @@ export async function analysePhotos(images: { base64: string }[], input: Analyse
   });
   if (error) throw new Error(error.message);
   if (data?.error) throw new Error(data.error);
-  return normaliseAnalysis(data.result);
+  return normaliseAnalysis(data.result, images.length);
 }
 
 /** Convert raw AI output (string IDs) into typed values. */
-export function normaliseAnalysis(r: any): Analysis {
+export function normaliseAnalysis(r: any, photoCount = Array.isArray(r?.photos) ? r.photos.length : 0): Analysis {
   const leafId = num(r.categoryLeafId);
   const brandId = num(r.brandId);
   const brandStatus: BrandStatus = brandId != null ? 'identified'
@@ -125,7 +161,10 @@ export function normaliseAnalysis(r: any): Analysis {
     flags.add('cannot_list_underwear');
     conditionId = 6;
   }
+  const photos = photoCount ? validatePlan(r.photos, photoCount) : null;
+  if (photoCount > 1 && !photos) flags.add('photo_plan_invalid');
   return {
+    photos,
     title: r.title ?? '',
     description: r.description ?? '',
     categoryLeafId: leafId,

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { DndContext, closestCenter, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, horizontalListSortingStrategy, useSortable, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { RotateCcw, RotateCw, X } from 'lucide-react';
+import { movePhoto, PHOTO_FLAGS, ROLE_LABEL, rotateBy, type ArrangedPhoto } from '@/vinted/photos';
 import { ArrowLeft, Loader2, Pause, Play, Plus, RefreshCw, Square, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,7 +25,7 @@ import { VINTED_REFERENCE } from '@/vinted/reference';
 import { exec, goToNew, hideVinted, injectAndRun, listen, openVinted, PAGE_PROBE, resizeVinted, showVinted, type DockSize } from '@/vinted/browser';
 import {
   applyAnalysis, applyDescription, approvalErrors, canAdd, AUTO_RETRY_AFTER_MS, jitter, LADDER_WAITS_MS, MAX_ITEM_RETRIES, pageAction, pauseBetween, PROBE_TIMEOUT_MS, shouldRetryItem, DEFAULT_PRICE_UPLIFT, deleteItem, draftLink, loadItems, loadPriceUplift, MAX_ITEMS,
-  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, priceLabel, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, savePriceUplift, toDraft, describeReportErrors, parcelLabel, type BatchItem,
+  MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, priceLabel, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, savePriceUplift, toDraft, finalImages, arrangement, setPhotos, resetPhotos, replanPhotos, describeReportErrors, parcelLabel, type BatchItem,
 } from '@/vinted/batch';
 
 const STATUS: Record<BatchItem['status'], string> = {
@@ -254,7 +259,7 @@ export default function VintedLister() {
             setTimeout(() => res({ kind: 'timeout' }), SAVE_TIMEOUT_MS);
           });
           const fresh = itemsRef.current.find((x) => x.id === it.id) ?? it;
-          try { await injectAndRun(toDraft(fresh) as any, !dry, () => {}); }
+          try { await injectAndRun({ ...toDraft(fresh), images: await finalImages(fresh) } as any, !dry, () => {}); }
           catch (e: any) { waiter.current?.({ kind: 'fatal', reason: e?.message || String(e) }); }
           o = await outcome; waiter.current = null; currentId.current = null;
           if (o.kind !== 'fatal' || savingReached.current) break;
@@ -395,11 +400,12 @@ export default function VintedLister() {
           <li key={it.id}>
             <button className="w-full text-left" onClick={() => setReviewId(it.id)} disabled={running}>
               <Card><CardContent className="p-2 flex gap-3 items-center min-w-0">
-                <img src={`data:image/jpeg;base64,${it.images[0]?.base64}`} alt="" className="h-14 w-14 rounded object-cover shrink-0" />
+                <CoverThumb it={it} />
                 <div className="min-w-0 flex-1">
                   <div className="font-medium truncate">{it.title || it.notes || 'New item'}</div>
                   <div className="text-xs text-muted-foreground">{it.priceResult ? priceLabel(it.priceResult) : it.price ? `£${it.price} (your price)` : `Vinted Optimal + £${Number(uplift || DEFAULT_PRICE_UPLIFT).toFixed(2)}`}{it.dryRun ? ` · dry run ${it.dryRun === 'ok' ? 'OK' : 'failed'}` : ''}</div>
                   {it.error && <div className="text-xs text-destructive truncate">{it.error}</div>}
+                  {photoFlags(it).length > 0 && <div className="flex flex-wrap gap-1 pt-1">{photoFlags(it).map((f) => <Badge key={f} variant="outline" className="text-[10px]">{FLAG_LABEL[f] ?? f}</Badge>)}</div>}
                 </div>
                 <Badge variant={it.status === 'drafted' || it.status === 'approved' ? 'default' : it.status === 'failed' || it.status === 'unknown' || it.status === 'analysis_failed' ? 'destructive' : 'secondary'} className="shrink-0">
                   {it.status === 'analysing' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}{STATUS[it.status]}
@@ -475,7 +481,7 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
   return (
     <div className="space-y-3 text-sm">
       <DialogHeader><DialogTitle>{STATUS[it.status]}</DialogTitle></DialogHeader>
-      <div className="flex gap-2 overflow-x-auto">{it.images.map((im, i) => <img key={i} src={`data:image/jpeg;base64,${im.base64}`} alt="" className="h-20 w-20 rounded object-cover shrink-0" />)}</div>
+      <PhotoStrip it={it} onChange={(n) => onChange({ ...n, status: it.status === 'approved' ? 'needs_review' : it.status })} readOnly={done} />
       {it.error && <p className="text-destructive">{it.error}</p>}
       {done && it.draftId && <a className="text-primary underline" href={draftLink(it.draftId)} target="_blank" rel="noreferrer">Open draft on Vinted</a>}
       {it.parcel && <p className="text-xs text-muted-foreground">{parcelLabel(it.parcel)}</p>}
@@ -559,5 +565,86 @@ function BatchLog({ log }: { log: string[] }) {
         {log.map((l, i) => <div key={i}>{l}</div>)}
       </div>
     </details>
+  );
+}
+
+const FLAG_LABEL: Record<string, string> = {
+  no_full_item_photo: 'No full-item photo', person_visible: 'Person in photo', possible_duplicate_photo: 'Possible duplicate photo',
+  photo_quality: 'Blurry or blocked photo', rotation_uncertain: 'Rotation unsure', photo_plan_invalid: 'Photo order not applied',
+};
+const photoFlags = (it: BatchItem) => (it.analysis?.flags ?? []).filter((f) => PHOTO_FLAGS.includes(f));
+
+function CoverThumb({ it }: { it: BatchItem }) {
+  const p = arrangement(it)[0];
+  const im = p ? it.images[p.src] : it.images[0];
+  return (
+    <div className="h-14 w-14 rounded overflow-hidden shrink-0">
+      <img src={`data:image/jpeg;base64,${im?.base64}`} alt="" className="h-full w-full object-cover" style={{ transform: `rotate(${p?.rotate ?? 0}deg)` }} />
+    </div>
+  );
+}
+
+function SortablePhoto({ id, p, it, index, total, readOnly, onRotate, onDelete }: {
+  id: string; p: ArrangedPhoto; it: BatchItem; index: number; total: number; readOnly: boolean;
+  onRotate: (d: 90 | -90) => void; onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled: readOnly });
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`w-36 shrink-0 space-y-1 ${isDragging ? 'opacity-70' : ''}`}>
+      <div {...attributes} {...listeners} className="relative h-36 w-36 overflow-hidden rounded border border-border bg-muted touch-none" aria-label={`Photo ${index + 1} of ${total}, drag to reorder`}>
+        <img src={`data:image/jpeg;base64,${it.images[p.src]?.base64}`} alt="" className="h-full w-full object-contain transition-transform" style={{ transform: `rotate(${p.rotate}deg)` }} />
+        {index === 0 && <Badge className="absolute left-1 top-1">Cover</Badge>}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {p.role && <Badge variant="secondary" className="text-[10px]">{ROLE_LABEL[p.role]}</Badge>}
+        {p.autoDeg ? <Badge variant="outline" className="text-[10px]">Auto-rotated {p.autoDeg}°</Badge> : null}
+        {p.checkRotation && <Badge variant="destructive" className="text-[10px]">Check rotation</Badge>}
+      </div>
+      {!readOnly && (
+        <div className="flex">
+          <Button type="button" size="icon" variant="ghost" className="h-11 w-11" aria-label="Rotate left" onClick={() => onRotate(-90)}><RotateCcw className="h-4 w-4" /></Button>
+          <Button type="button" size="icon" variant="ghost" className="h-11 w-11" aria-label="Rotate right" onClick={() => onRotate(90)}><RotateCw className="h-4 w-4" /></Button>
+          <Button type="button" size="icon" variant="ghost" className="h-11 w-11" aria-label="Remove photo" disabled={total <= 1} onClick={onDelete}><X className="h-4 w-4" /></Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PhotoStrip({ it, onChange, readOnly }: { it: BatchItem; onChange: (i: BatchItem) => void; readOnly: boolean }) {
+  const photos = arrangement(it);
+  const ids = photos.map((p) => `p${p.src}`);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const update = (next: ArrangedPhoto[]) => onChange(setPhotos(it, next));
+  const onDragEnd = (e: DragEndEvent) => {
+    if (!e.over || e.active.id === e.over.id) return;
+    update(movePhoto(photos, ids.indexOf(String(e.active.id)), ids.indexOf(String(e.over.id))));
+  };
+  const changed = it.photosLocked || photos.length !== it.images.length || photos.some((p, i) => p.src !== i || p.rotate);
+  return (
+    <div className="space-y-2">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {photos.map((p, i) => (
+              <SortablePhoto key={ids[i]} id={ids[i]} p={p} it={it} index={i} total={photos.length} readOnly={readOnly}
+                onRotate={(d) => update(photos.map((x, j) => (j === i ? rotateBy(x, d) : x)))}
+                onDelete={() => update(photos.filter((_, j) => j !== i))} />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+      {!readOnly && (
+        <div className="flex flex-wrap gap-2">
+          {changed && <Button type="button" variant="outline" className="h-11" onClick={() => onChange(resetPhotos(it))}>Reset to original order and rotation</Button>}
+          {it.photosLocked && it.analysis?.photos && <Button type="button" variant="outline" className="h-11" onClick={() => onChange(replanPhotos(it))}>Re-order photos again</Button>}
+        </div>
+      )}
+      {!readOnly && photos.length > 1 && <p className="text-xs text-muted-foreground">Hold and drag a photo to move it. The first photo is the cover.</p>}
+    </div>
   );
 }
