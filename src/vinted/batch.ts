@@ -164,15 +164,38 @@ export function recoverAfterRestart(items: BatchItem[]): BatchItem[] {
 export const canAdd = (items: BatchItem[]) => items.length < MAX_ITEMS;
 export const runnable = (items: BatchItem[]) => items.filter((i) => i.status === 'approved');
 
-/** Should the batch stop? Unknown saves, login walls and bot checks always stop it. */
-export function blockerFor(probe: { hasTitleField: boolean; botCheck: boolean; loginWall: boolean; openInApp: boolean } | null): string | null {
-  if (!probe) return 'Could not check the Vinted page';
-  if (probe.botCheck) return 'Vinted is showing a bot check';
-  if (probe.loginWall) return 'You are logged out of Vinted';
-  if (probe.openInApp) return 'Vinted is asking to open its app';
-  if (!probe.hasTitleField) return 'The Vinted listing form did not load';
-  return null;
-}
+// ---------- Vinted error-page recovery ----------
+export type PageState = 'ready' | 'error_page' | 'login_wall' | 'timeout';
+export const PROBE_TIMEOUT_MS = 15_000;
+/** Waits before each reload in the recovery ladder: reload now, then 10s, 30s, 60s, 120s. */
+export const LADDER_WAITS_MS = [0, 10_000, 30_000, 60_000, 120_000];
+/** After the whole ladder fails, the batch pauses and tries the ladder once more on its own after this. */
+export const AUTO_RETRY_AFTER_MS = 5 * 60_000;
+/** Same item may be reloaded and retried this many times if it broke before saving. */
+export const MAX_ITEM_RETRIES = 2;
+export const RECOVERY_PAUSE_MS = 30_000;
+export const CLEAN_ITEMS_TO_RELAX = 3;
+
+/** About ±20% random jitter. */
+export const jitter = (ms: number, rnd = Math.random()) => Math.round(ms * (0.8 + 0.4 * rnd));
+
+/** What to do after a page check. */
+export const pageAction = (state: PageState | string): 'go' | 'retry' | 'login' =>
+  state === 'ready' ? 'go' : state === 'login_wall' ? 'login' : 'retry';
+
+/** Pause before the next item: at least 30s after a recovery, until 3 clean items have gone through. */
+export const pauseBetween = (configuredMs: number, cleanSinceRecovery: number | null) =>
+  cleanSinceRecovery != null && cleanSinceRecovery < CLEAN_ITEMS_TO_RELAX ? Math.max(configuredMs, RECOVERY_PAUSE_MS) : configuredMs;
+
+/** Diagnostics from the script show none of the form fields exist. */
+export const noFormFields = (diag: any) => !!diag?.fields && Object.values(diag.fields).every((v) => !v);
+
+/**
+ * An item that broke BEFORE the saving step can be safely reloaded and retried when Vinted was
+ * showing an error page or the form never appeared. Never once saving has started.
+ */
+export const shouldRetryItem = (o: { savingReached: boolean; pageState?: string; diagnostics?: any; retries: number }) =>
+  !o.savingReached && o.retries < MAX_ITEM_RETRIES && (o.pageState === 'error_page' || noFormFields(o.diagnostics));
 
 // ---------- Local storage on this phone (IndexedDB: photos are too big for localStorage) ----------
 const DB = 'vinted-batch-v1';

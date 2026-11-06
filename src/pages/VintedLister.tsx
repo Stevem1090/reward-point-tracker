@@ -17,9 +17,9 @@ import { analysePhotos } from '@/vinted/analysis';
 import { writingWarnings } from '@/vinted/writing';
 import { allowedConditions } from '@/vinted/validate';
 import { VINTED_REFERENCE } from '@/vinted/reference';
-import { exec, goToNew, hideVinted, injectAndRun, listen, openVinted, PROBE_SCRIPT, resizeVinted, showVinted, type DockSize } from '@/vinted/browser';
+import { exec, goToNew, hideVinted, injectAndRun, listen, openVinted, PAGE_PROBE, resizeVinted, showVinted, type DockSize } from '@/vinted/browser';
 import {
-  applyAnalysis, applyDescription, approvalErrors, blockerFor, canAdd, DEFAULT_PRICE_UPLIFT, deleteItem, draftLink, loadItems, loadPriceUplift, MAX_ITEMS,
+  applyAnalysis, applyDescription, approvalErrors, canAdd, AUTO_RETRY_AFTER_MS, jitter, LADDER_WAITS_MS, MAX_ITEM_RETRIES, pageAction, pauseBetween, PROBE_TIMEOUT_MS, shouldRetryItem, DEFAULT_PRICE_UPLIFT, deleteItem, draftLink, loadItems, loadPriceUplift, MAX_ITEMS,
   MAX_PARALLEL_ANALYSIS, newItem, PAUSE_BETWEEN_MS, priceLabel, putItem, recoverAfterRestart, runnable, SAVE_TIMEOUT_MS, savePriceUplift, toDraft, describeReportErrors, parcelLabel, type BatchItem,
 } from '@/vinted/batch';
 
@@ -28,7 +28,7 @@ const STATUS: Record<BatchItem['status'], string> = {
   approved: 'Approved', running: 'Sending…', drafted: 'Draft saved', failed: 'Failed', unknown: 'Unknown – check Vinted',
 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-type Outcome = { kind: 'saved'; draftId: any } | { kind: 'notSaved'; reason: string } | { kind: 'dryOk' } | { kind: 'fatal'; reason: string } | { kind: 'timeout' };
+type Outcome = { kind: 'saved'; draftId: any } | { kind: 'notSaved'; reason: string } | { kind: 'dryOk' } | { kind: 'fatal'; reason: string; diagnostics?: any } | { kind: 'timeout' };
 
 export default function VintedLister() {
   const native = isNativeApp();
@@ -47,7 +47,8 @@ export default function VintedLister() {
   const [steps, setSteps] = useState<{ step: string; ok?: boolean; done: number; total: number }[]>([]);
   const [countdown, setCountdown] = useState(0);
   const [stopReason, setStopReason] = useState<string | null>(null);
-  const [summary, setSummary] = useState<{ dry: boolean; done: BatchItem[]; failed: BatchItem[]; stopped: string | null } | null>(null);
+  const [summary, setSummary] = useState<{ dry: boolean; done: BatchItem[]; failed: BatchItem[]; stopped: string | null; recovered: number } | null>(null);
+  const [log, setLog] = useState<string[]>([]);
   const [dock, setDock] = useState<DockSize>('small');
   const [hidden, setHidden] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
@@ -61,7 +62,12 @@ export default function VintedLister() {
   const lastParcel = useRef<{ id: string; parcel: any } | null>(null);
   const lastPrice = useRef<{ id: string; price: any } | null>(null);
   const waiter = useRef<((o: Outcome) => void) | null>(null);
-  const probeWaiter = useRef<((p: any) => void) | null>(null);
+  const pageWaiter = useRef<((p: any) => void) | null>(null);
+  const savingReached = useRef(false);
+  const recoveries = useRef(0);
+  /** Clean items since the last recovery (null = no recent recovery, normal pause). */
+  const cleanSince = useRef<number | null>(null);
+  const recoveredThisItem = useRef(false);
   const wakeLock = useRef<any>(null);
 
   const save = useCallback((it: BatchItem) => {
@@ -102,12 +108,13 @@ export default function VintedLister() {
     let off: (() => void) | undefined;
     listen({
       onMessage: (d) => {
-        if (d.type === 'diag:probe') { probeWaiter.current?.(d); return; }
+        if (d.type === 'vinted:pageStatus') { if (d.final) pageWaiter.current?.(d); return; }
         if (typeof d.type !== 'string' || !d.type.startsWith('vinted:')) return;
         if (d.itemId != null && String(d.itemId) !== currentId.current) return;
+        if (d.type === 'vinted:progress' && d.step === 'saving') savingReached.current = true;
         if (d.type === 'vinted:progress') setSteps((p) => [...p, { step: String(d.step), ok: d.ok, done: Number(d.done) || 0, total: Number(d.total) || 0 }]);
         if (d.type === 'vinted:saveResult') waiter.current?.(d.ok && d.draftId ? { kind: 'saved', draftId: d.draftId } : { kind: 'notSaved', reason: `Vinted refused the save (status ${d.status})` });
-        if (d.type === 'vinted:fatal') waiter.current?.({ kind: 'fatal', reason: String(d.error ?? d.message ?? 'Form filling failed') });
+        if (d.type === 'vinted:fatal') waiter.current?.({ kind: 'fatal', reason: String(d.error ?? d.message ?? 'Form filling failed'), diagnostics: d.diagnostics });
         if (d.type === 'vinted:report') {
           if (d.parcel && currentId.current) lastParcel.current = { id: currentId.current, parcel: d.parcel };
           if (d.price && currentId.current) lastPrice.current = { id: currentId.current, price: d.price };
@@ -115,7 +122,7 @@ export default function VintedLister() {
           const cur = itemsRef.current.find((x) => x.id === currentId.current);
           const problems = errs.length ? `Field problems: ${describeReportErrors(d, cur ? toDraft(cur) : undefined)}` : '';
           if ((window as any).__batchDry) waiter.current?.(errs.length ? { kind: 'fatal', reason: problems } : { kind: 'dryOk' });
-          else if (d.willSave === false || errs.length) waiter.current?.({ kind: 'fatal', reason: problems || 'Vinted form was not ready to save' });
+          else if (d.willSave === false || errs.length) waiter.current?.({ kind: 'fatal', reason: problems || 'Vinted form was not ready to save', diagnostics: d.diagnostics });
         }
       },
       onUrl: () => {}, onLoaded: () => {}, onConsole: () => {},
@@ -155,10 +162,62 @@ export default function VintedLister() {
     setItems((p) => p.filter((i) => i.status !== 'drafted'));
   };
 
-  const probe = async () => {
-    const p = new Promise<any>((res) => { probeWaiter.current = res; setTimeout(() => res(null), 8000); });
-    await exec(PROBE_SCRIPT).catch(() => {});
-    const r = await p; probeWaiter.current = null; return r;
+  const addLog = (m: string) => setLog((p) => [...p, `${new Date().toLocaleTimeString('en-GB')} ${m}`]);
+
+  /** Inject the page probe and wait for its single final vinted:pageStatus event. */
+  const checkPage = async (): Promise<{ state: string; diagnostics?: any }> => {
+    const p = new Promise<any>((res) => { pageWaiter.current = res; setTimeout(() => res(null), PROBE_TIMEOUT_MS + 5000); });
+    await exec(PAGE_PROBE).catch(() => {});
+    await exec(`window.vintedCheckPage && window.vintedCheckPage({ timeoutMs: ${PROBE_TIMEOUT_MS} })`).catch(() => {});
+    const r = await p; pageWaiter.current = null;
+    const state = r?.state ?? 'timeout';
+    addLog(`Page check: ${state}${r?.reason ? ` (${r.reason})` : r ? '' : ' (no answer from the page)'}${r?.headline ? ` – "${r.headline}"` : ''}`);
+    return { state };
+  };
+  const reloadAndCheck = async () => { await goToNew(); await sleep(3000); return checkPage(); };
+  const countdownWait = async (ms: number, label: (s: number) => string) => {
+    for (let t = Math.ceil(ms / 1000); t > 0 && !stopRef.current; t--) { setCountdown(t); setStatus(label(t)); await sleep(1000); }
+    setCountdown(0);
+  };
+
+  /** Recovery ladder: reload now, then after ~10s, 30s, 60s, 120s. Nothing is saved yet, so retrying is safe. */
+  const runLadder = async (): Promise<'ready' | 'login' | 'stopped' | 'failed'> => {
+    const total = LADDER_WAITS_MS.length;
+    for (let i = 0; i < total; i++) {
+      const wait = jitter(LADDER_WAITS_MS[i]);
+      if (wait) await countdownWait(wait, () => `Vinted had a problem. Retrying (${i + 1} of ${total}) in`);
+      if (stopRef.current) return 'stopped';
+      setStatus(`Vinted had a problem. Retrying (${i + 1} of ${total}) now…`);
+      addLog(`Recovery attempt ${i + 1} of ${total}${wait ? ` after ${Math.round(wait / 1000)}s` : ''}: reloading`);
+      const r = await reloadAndCheck();
+      if (stopRef.current) return 'stopped';
+      const a = pageAction(r.state);
+      if (a === 'go') { recoveries.current++; cleanSince.current = 0; recoveredThisItem.current = true; addLog('Recovered – Vinted form is back'); return 'ready'; }
+      if (a === 'login') return 'login';
+    }
+    return 'failed';
+  };
+
+  /** Preflight before every item: open the form, check it, recover if Vinted shows an error. */
+  const ensureReady = async (): Promise<'ready' | 'login' | 'stopped'> => {
+    const first = pageAction((await reloadAndCheck()).state);
+    if (first === 'go') return 'ready';
+    if (first === 'login') return 'login';
+    let res = await runLadder();
+    let autoUsed = false;
+    while (res === 'failed') {
+      addLog('All retries failed – batch paused, items stay queued');
+      pausedRef.current = true; setPaused(true);
+      const msg = 'Vinted keeps showing an error. Check Vinted, then tap Resume';
+      setStatus(msg);
+      const start = Date.now();
+      while (pausedRef.current && !stopRef.current && (autoUsed || Date.now() - start < AUTO_RETRY_AFTER_MS)) { setStatus(msg); await sleep(500); }
+      if (stopRef.current) return 'stopped';
+      if (pausedRef.current) { autoUsed = true; pausedRef.current = false; setPaused(false); addLog('Trying again on its own after 5 minutes'); }
+      else addLog('Resumed by you');
+      res = await runLadder();
+    }
+    return res;
   };
 
   const runBatch = async () => {
@@ -168,7 +227,8 @@ export default function VintedLister() {
     const dry = false;
     (window as any).__batchDry = dry;
     stopRef.current = false; pausedRef.current = false; setPaused(false);
-    setRunning(true); setStopReason(null); setSummary(null);
+    setRunning(true); setStopReason(null); setSummary(null); setLog([]);
+    recoveries.current = 0; cleanSince.current = null;
     const done: BatchItem[] = [], failed: BatchItem[] = [];
     let stopped: string | null = null;
     try {
@@ -180,19 +240,37 @@ export default function VintedLister() {
         const it = itemsRef.current.find((x) => x.id === queue[n].id);
         if (!it || it.status !== 'approved') continue;
         setStatus(`Item ${n + 1} of ${queue.length}: ${it.title}`); setSteps([]);
-        await goToNew(); await sleep(4000);
-        const block = blockerFor(await probe());
-        if (block) { stopped = block; break; }
-
-        currentId.current = it.id;
-        if (!dry) patch(it.id, { status: 'running' });
-        const outcome = new Promise<Outcome>((res) => {
-          waiter.current = res;
-          setTimeout(() => res({ kind: 'timeout' }), SAVE_TIMEOUT_MS);
-        });
-        try { await injectAndRun(toDraft(it) as any, !dry, () => {}); }
-        catch (e: any) { waiter.current?.({ kind: 'fatal', reason: e?.message || String(e) }); }
-        const o = await outcome; waiter.current = null; currentId.current = null;
+        recoveredThisItem.current = false;
+        let ready = await ensureReady();
+        let o: Outcome = { kind: 'timeout' };
+        let retries = 0;
+        for (;;) {
+          if (ready === 'stopped') break;
+          if (ready === 'login') break;
+          currentId.current = it.id; savingReached.current = false;
+          if (!dry) patch(it.id, { status: 'running' });
+          const outcome = new Promise<Outcome>((res) => {
+            waiter.current = res;
+            setTimeout(() => res({ kind: 'timeout' }), SAVE_TIMEOUT_MS);
+          });
+          const fresh = itemsRef.current.find((x) => x.id === it.id) ?? it;
+          try { await injectAndRun(toDraft(fresh) as any, !dry, () => {}); }
+          catch (e: any) { waiter.current?.({ kind: 'fatal', reason: e?.message || String(e) }); }
+          o = await outcome; waiter.current = null; currentId.current = null;
+          if (o.kind !== 'fatal' || savingReached.current) break;
+          const pc = await checkPage();
+          if (!shouldRetryItem({ savingReached: savingReached.current, pageState: pc.state, diagnostics: o.diagnostics, retries })) break;
+          retries++;
+          recoveredThisItem.current = true; cleanSince.current = 0;
+          addLog(`Item broke before saving – reloading and retrying the same item (${retries} of ${MAX_ITEM_RETRIES})`);
+          setStatus(`Vinted had a problem. Retrying this item (${retries} of ${MAX_ITEM_RETRIES})…`); setSteps([]);
+          ready = await ensureReady();
+        }
+        if (ready === 'stopped') { if (!dry) patch(it.id, { status: 'approved' }); stopped = 'Stopped by you'; break; }
+        if (ready === 'login') { if (!dry) patch(it.id, { status: 'approved' }); stopped = 'You are logged out of Vinted. Log in again'; break; }
+        if (o.kind === 'saved' && retries) { recoveries.current++; addLog('Item saved after retry'); }
+        if (o.kind === 'saved' && !recoveredThisItem.current && cleanSince.current != null) cleanSince.current++;
+        addLog(`${it.title}: ${o.kind === 'saved' ? 'saved' : o.kind === 'timeout' ? 'no answer (unknown)' : o.kind === 'dryOk' ? 'dry run ok' : 'failed'}`);
         const cur = itemsRef.current.find((x) => x.id === it.id)!;
         const priceResult = lastPrice.current?.id === it.id ? lastPrice.current.price : cur.priceResult;
         if (o.kind === 'saved') { const s = { ...cur, status: 'drafted' as const, draftId: o.draftId, parcel: lastParcel.current?.id === it.id ? lastParcel.current.parcel : cur.parcel, priceResult, draftedAt: Date.now(), error: undefined }; save(s); done.push(s); }
@@ -205,13 +283,13 @@ export default function VintedLister() {
           save(s); failed.push(s);
         }
         if (n < queue.length - 1 && !stopRef.current) {
-          for (let t = PAUSE_BETWEEN_MS / 1000; t > 0 && !stopRef.current; t--) { setCountdown(t); setStatus(`Waiting before the next item…`); await sleep(1000); }
-          setCountdown(0);
+          const wait = pauseBetween(PAUSE_BETWEEN_MS, cleanSince.current);
+          await countdownWait(wait, () => wait > PAUSE_BETWEEN_MS ? 'Waiting a bit longer after a Vinted problem…' : 'Waiting before the next item…');
         }
       }
     } catch (e: any) { stopped = `Something went wrong: ${e?.message || e}`; }
     setRunning(false); setStatus(''); setCountdown(0); setStopReason(stopped);
-    setSummary({ dry, done, failed, stopped });
+    setSummary({ dry, done, failed, stopped, recovered: recoveries.current });
   };
 
   const setSize = async (s: DockSize) => { setDock(s); await resizeVinted(s).catch(() => {}); };
@@ -253,6 +331,7 @@ export default function VintedLister() {
               <Button variant="destructive" className="h-11" onClick={() => { stopRef.current = true; setStatus('Stopping after this item…'); }}><Square className="mr-1 h-4 w-4" />Stop</Button>
             </div>
             <p className="text-xs text-muted-foreground">Pause and Stop take effect after the current item finishes. Keep this screen open.</p>
+            {log.length > 0 && <BatchLog log={log} />}
           </CardContent>
         </Card>
       )}
@@ -279,6 +358,8 @@ export default function VintedLister() {
                 </div>
               ))}
             {summary.failed.map((f) => <div key={f.id} className="text-destructive">{f.title}: {f.error}</div>)}
+            <div>Vinted errors recovered: {summary.recovered}</div>
+            {log.length > 0 && <BatchLog log={log} />}
             {stopReason && /logged out|bot check|open its app/.test(stopReason) && <p className="text-muted-foreground">Sort this out in the Vinted panel below, then tap Run batch again.</p>}
             <Button variant="ghost" className="h-11" onClick={() => setSummary(null)}>Close</Button>
           </CardContent>
@@ -467,5 +548,16 @@ function ReviewForm({ it, onChange, onDelete, onClose }: { it: BatchItem; onChan
       )}
       <Button variant="ghost" className="h-11 w-full text-destructive" onClick={onDelete}><Trash2 className="mr-1 h-4 w-4" />Remove from batch</Button>
     </div>
+  );
+}
+
+function BatchLog({ log }: { log: string[] }) {
+  return (
+    <details className="text-xs">
+      <summary className="cursor-pointer py-2 text-muted-foreground">Batch log ({log.length})</summary>
+      <div className="max-h-48 overflow-y-auto space-y-0.5 font-mono break-words">
+        {log.map((l, i) => <div key={i}>{l}</div>)}
+      </div>
+    </details>
   );
 }

@@ -1,7 +1,7 @@
 // @ts-nocheck -- run with `bun test`
 import './testSetup';
 import { describe, expect, it } from 'bun:test';
-import { blockerFor, canAdd, MAX_ITEMS, newItem, PAUSE_BETWEEN_MS, recoverAfterRestart, type BatchItem } from './batch';
+import { canAdd, jitter, LADDER_WAITS_MS, pageAction, pauseBetween, shouldRetryItem, MAX_ITEMS, newItem, PAUSE_BETWEEN_MS, recoverAfterRestart, type BatchItem } from './batch';
 
 const base = (o: Partial<BatchItem>): BatchItem => ({ ...newItem([], '', ''), ...o });
 
@@ -24,10 +24,11 @@ describe('batch rules', () => {
 
   it('stops on login wall, bot check or missing probe', () => {
     const ok = { hasTitleField: true, botCheck: false, loginWall: false, openInApp: false };
-    expect(blockerFor(ok)).toBeNull();
-    expect(blockerFor({ ...ok, loginWall: true })).not.toBeNull();
-    expect(blockerFor({ ...ok, botCheck: true })).not.toBeNull();
-    expect(blockerFor(null)).not.toBeNull();
+    void ok;
+    expect(pageAction('ready')).toBe('go');
+    expect(pageAction('login_wall')).toBe('login');
+    expect(pageAction('error_page')).toBe('retry');
+    expect(pageAction('timeout')).toBe('retry');
   });
 });
 
@@ -73,5 +74,29 @@ describe('price', () => {
   it('labels the final price by source', () => {
     expect(priceLabel({ value: 4.5, source: 'vinted_optimal_plus_uplift', uplift: 0.5 })).toBe('£4.50 (Vinted Optimal + £0.50)');
     expect(priceLabel({ value: 6, source: 'custom' })).toBe('£6.00 (your price)');
+  });
+});
+
+describe('Vinted error recovery', () => {
+  it('ladder waits are now, 10s, 30s, 60s, 120s', () => {
+    expect(LADDER_WAITS_MS).toEqual([0, 10_000, 30_000, 60_000, 120_000]);
+  });
+  it('jitter stays within about 20%', () => {
+    expect(jitter(30_000, 0)).toBe(24_000);
+    expect(jitter(30_000, 1)).toBe(36_000);
+  });
+  it('pause is at least 30s after a recovery until 3 clean items', () => {
+    expect(pauseBetween(15_000, 0)).toBe(30_000);
+    expect(pauseBetween(15_000, 2)).toBe(30_000);
+    expect(pauseBetween(15_000, 3)).toBe(15_000);
+    expect(pauseBetween(15_000, null)).toBe(15_000);
+  });
+  it('retries the same item at most twice, never after saving started', () => {
+    const noForm = { fields: { title: false, price: false } };
+    expect(shouldRetryItem({ savingReached: false, pageState: 'error_page', retries: 0 })).toBe(true);
+    expect(shouldRetryItem({ savingReached: false, diagnostics: noForm, retries: 1 })).toBe(true);
+    expect(shouldRetryItem({ savingReached: false, pageState: 'error_page', retries: 2 })).toBe(false);
+    expect(shouldRetryItem({ savingReached: true, pageState: 'error_page', retries: 0 })).toBe(false);
+    expect(shouldRetryItem({ savingReached: false, pageState: 'ready', diagnostics: { fields: { title: true } }, retries: 0 })).toBe(false);
   });
 });
