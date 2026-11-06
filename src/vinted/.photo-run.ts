@@ -1,4 +1,5 @@
 // @ts-nocheck
+import './testSetup';
 import { readFileSync, writeFileSync } from 'fs';
 import { analysisSchema, ANALYSIS_RULES, normaliseAnalysis } from './analysis';
 import { arrangeFromPlan } from './photos';
