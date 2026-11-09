@@ -1,3 +1,4 @@
+import { GEMINI_CHAT_URL, requireGeminiResponse, geminiErrorResponse } from "../_shared/gemini.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const cors = {
@@ -25,31 +26,27 @@ Deno.serve(async (req) => {
     if (!Array.isArray(images) || images.length === 0 || images.length > 10) return json({ error: "Send 1-10 photos" }, 400);
     if (!schema || typeof rules !== "string" || typeof reference !== "string") return json({ error: "Bad request" }, 400);
 
-    const key = Deno.env.get("LOVABLE_API_KEY");
-    if (!key) throw new Error("LOVABLE_API_KEY not configured");
+    const key = Deno.env.get("GEMINI_API_KEY");
+    if (!key) throw new Error("GEMINI_API_KEY not configured");
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
+    const res = await fetch(GEMINI_CHAT_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Lovable-API-Key": key, "X-Lovable-AIG-SDK": "fetch", "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-6-astra",
+        model: "gemini-2.5-flash",
         stream: true,
-        store: false,
-        reasoning: { effort: "low" },
-        instructions: `${rules}\n\nREFERENCE:\n${reference}`,
-        input: [{
+        messages: [{ role: "system", content: `${rules}\n\nREFERENCE:\n${reference}` }, {
           role: "user",
           content: [
-            { type: "input_text", text: `These ${images.length} photos show ONE item. Analyse them and return the listing as JSON.\n\nSELLER NOTES: ${sellerNotes || "(none)"}\nSELLER HINTS: ${sellerHints || "(none)"}\n${writingContext}\nRecent batch openers (vary yours): ${openers || "(none yet)"}` },
-            ...images.flatMap((b64: string, i: number) => [{ type: "input_text", text: `Photo ${i + 1}` }, { type: "input_image", image_url: `data:image/jpeg;base64,${b64}` }]),
+            { type: "text", text: `These ${images.length} photos show ONE item. Analyse them and return the listing as JSON.\n\nSELLER NOTES: ${sellerNotes || "(none)"}\nSELLER HINTS: ${sellerHints || "(none)"}\n${writingContext}\nRecent batch openers (vary yours): ${openers || "(none yet)"}` },
+            ...images.flatMap((b64: string, i: number) => [{ type: "text", text: `Photo ${i + 1}` }, { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } }]),
           ],
         }],
-        text: { format: { type: "json_schema", name: "listing", schema, strict: true } },
+        response_format: { type: "json_schema", json_schema: { name: "listing", schema, strict: true } },
       }),
     });
-    if (res.status === 429) return json({ error: "AI is busy, try again in a minute" }, 429);
-    if (res.status === 402) return json({ error: "AI credits have run out" }, 402);
-    if (!res.ok || !res.body) { console.error("gateway", res.status, await res.text()); return json({ error: `AI request failed (${res.status})` }, 500); }
+    await requireGeminiResponse(res);
+    if (!res.body) throw new Error("Google returned no analysis stream");
     let args = "", buf = "", failed = "";
     const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
     for (;;) {
@@ -64,7 +61,7 @@ Deno.serve(async (req) => {
         if (!d || d === "[DONE]") continue;
         try {
           const ev = JSON.parse(d);
-          if (ev.type === "response.output_text.delta") args += ev.delta ?? "";
+          args += ev.choices?.[0]?.delta?.content ?? "";
           if (ev.type === "response.failed" || ev.type === "error") failed = JSON.stringify(ev).slice(0, 300);
         } catch { /* partial */ }
       }
@@ -74,6 +71,6 @@ Deno.serve(async (req) => {
     return json({ result: JSON.parse(args) });
   } catch (e) {
     console.error(e);
-    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return geminiErrorResponse(e, cors);
   }
 });
