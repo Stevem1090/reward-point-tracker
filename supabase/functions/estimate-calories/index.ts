@@ -1,3 +1,4 @@
+import { GEMINI_CHAT_URL, requireGeminiResponse, geminiErrorResponse } from "../_shared/gemini.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
@@ -49,8 +50,8 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     const ingredientsList = (ingredients as Ingredient[])
       .map(i => `- ${i.quantity || ""} ${i.unit || ""} ${i.name}`.trim())
@@ -65,7 +66,7 @@ ${ingredientsList}
 Estimate the calories per single serving. Be a sensible UK home-cooking average. Round to the nearest 10.`;
 
     const aiRequestBody = JSON.stringify({
-      model: "google/gemini-2.5-flash-lite",
+      model: "gemini-2.5-flash-lite",
       messages: [
         {
           role: "system",
@@ -99,64 +100,23 @@ Estimate the calories per single serving. Be a sensible UK home-cooking average.
       tool_choice: { type: "function", function: { name: "estimate_calories" } },
     });
 
-    // Retry transient gateway failures (502/503/504, network errors).
-    // Do NOT retry 429 (rate limit) or 402 (credits) — those are terminal.
     const RETRY_DELAYS_MS = [500, 1500];
     let aiResp: Response | null = null;
-    let lastErr: unknown = null;
-
     for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-      try {
-        aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: aiRequestBody,
-        });
-
-        if (aiResp.ok) break;
-
-        // Terminal statuses — don't retry
-        if (aiResp.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        if (aiResp.status === 402) {
-          return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        // Retry only on 5xx
-        if (aiResp.status >= 500 && attempt < RETRY_DELAYS_MS.length) {
-          console.warn(`AI gateway ${aiResp.status} (attempt ${attempt + 1}), retrying in ${RETRY_DELAYS_MS[attempt]}ms`);
-          await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
-          continue;
-        }
-
-        // Non-retryable or out of attempts
-        const t = await aiResp.text();
-        console.error("AI gateway error:", aiResp.status, t.slice(0, 500));
-        throw new Error(`AI gateway error: ${aiResp.status}`);
-      } catch (err) {
-        lastErr = err;
-        if (attempt < RETRY_DELAYS_MS.length) {
-          console.warn(`AI gateway network error (attempt ${attempt + 1}), retrying:`, err);
-          await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
-          continue;
-        }
-        throw err;
+      aiResp = await fetch(GEMINI_CHAT_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${GEMINI_API_KEY}`, "Content-Type": "application/json" },
+        body: aiRequestBody,
+      });
+      if (aiResp.status >= 500 && attempt < RETRY_DELAYS_MS.length) {
+        await aiResp.body?.cancel();
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+        continue;
       }
+      await requireGeminiResponse(aiResp);
+      break;
     }
-
-    if (!aiResp || !aiResp.ok) {
-      throw lastErr ?? new Error("AI gateway failed after retries");
-    }
+    if (!aiResp) throw new Error("Google Gemini returned no response");
 
     const data = await aiResp.json();
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
@@ -186,9 +146,6 @@ Estimate the calories per single serving. Be a sensible UK home-cooking average.
     );
   } catch (error) {
     console.error("estimate-calories error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return geminiErrorResponse(error, corsHeaders);
   }
 });

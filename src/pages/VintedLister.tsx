@@ -93,7 +93,7 @@ export default function VintedLister() {
     });
   }, []);
 
-  // Background AI analysis, at most two at a time.
+  // Background AI analysis, one at a time; shared queue also spaces manual regenerations.
   useEffect(() => {
     if (!loaded) return;
     const free = MAX_PARALLEL_ANALYSIS - analysingIds.current.size;

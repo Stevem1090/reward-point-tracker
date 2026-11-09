@@ -6,7 +6,7 @@ import { VINTED_REFERENCE as ref } from './reference';
 import { validateForApproval, type DraftItem } from './validate';
 
 export const MAX_ITEMS = 25;
-export const MAX_PARALLEL_ANALYSIS = 2;
+export const MAX_PARALLEL_ANALYSIS = 1;
 export const PAUSE_BETWEEN_MS = 15_000;
 export const SAVE_TIMEOUT_MS = 120_000;
 
