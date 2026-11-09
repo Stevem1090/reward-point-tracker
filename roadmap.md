@@ -1,5 +1,10 @@
 # Roadmap
 
+## Direct Gemini
+- [ ] Switch all seven AI edge functions to the saved Google key, preserving feature behaviour
+- [ ] Pace Vinted analysis starts and preserve Google quota/error messages
+- [ ] Run tests, deploy and verify the Google connection
+
 ## Vinted drafts
 - [x] Replace AI writing rules and add soft review warnings
 - [x] Add description-only regeneration preserving other edits

@@ -5,6 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { WRITING_RULES } from './writing';
 import writingExamples from './writing-examples.txt?raw';
 import { validatePlan, type PhotoPlanEntry } from './photos';
+import { queueAnalysis } from './analysisQueue';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 
 type Confidence = 'low' | 'medium' | 'high';
 export type BrandStatus = 'identified' | 'none_visible' | 'not_in_list';
@@ -131,6 +133,10 @@ const num = (v: unknown) => (v == null || v === '' ? null : Number(v));
 export type AnalyseInput = { notes?: string; hints?: string; descriptionOnly?: { title: string; description: string; conditionId: number | null }; recentOpeners?: string[] };
 
 export async function analysePhotos(images: { base64: string }[], input: AnalyseInput = {}): Promise<Analysis> {
+  return queueAnalysis(() => requestAnalysis(images, input));
+}
+
+async function requestAnalysis(images: { base64: string }[], input: AnalyseInput): Promise<Analysis> {
   const { data, error } = await supabase.functions.invoke('vinted-analyse', {
     body: {
       images: images.map((i) => i.base64),
@@ -143,7 +149,10 @@ export async function analysePhotos(images: { base64: string }[], input: Analyse
       recentOpeners: input.recentOpeners?.slice(-10),
     },
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    const body = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null;
+    throw new Error(body?.error || error.message);
+  }
   if (data?.error) throw new Error(data.error);
   return normaliseAnalysis(data.result, images.length);
 }
