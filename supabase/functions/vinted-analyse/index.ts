@@ -13,7 +13,10 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return json({ error: "Missing auth" }, 401);
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !anonKey) throw new Error("Supabase is not configured");
+    const sb = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: auth } } });
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "Unauthorized" }, 401);
 

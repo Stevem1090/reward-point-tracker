@@ -1,9 +1,10 @@
 # Roadmap
 
 ## Direct Gemini
-- [ ] Switch all seven AI edge functions to the saved Google key, preserving feature behaviour
-- [ ] Pace Vinted analysis starts and preserve Google quota/error messages
-- [ ] Run tests, deploy and verify the Google connection
+- [x] Switch all seven AI edge functions to the saved Google key, preserving feature behaviour
+- [x] Pace Vinted analysis starts and preserve Google quota/error messages
+- [x] Run focused tests and deploy all seven functions
+- [ ] Verify live Google responses — blocked by Google returning HTTP 404 from its documented Gemini endpoint; authenticated app checks are unavailable for this external Supabase project
 
 ## Vinted drafts
 - [x] Replace AI writing rules and add soft review warnings
