@@ -1,4 +1,4 @@
-import { GEMINI_CHAT_URL, requireGeminiResponse, geminiErrorResponse } from "../_shared/gemini.ts";
+import { geminiJson, geminiErrorResponse, GEMINI_LITE_MODEL } from "../_shared/gemini.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCaller } from "../_shared/auth.ts";
 
@@ -61,73 +61,29 @@ serve(async (req) => {
 
     const textPrompt = `Extract the recipe from ${images.length > 1 ? `these ${images.length} cookbook page photos (they are all the same recipe — merge information across them)` : 'this cookbook page photo'}.${cookbookTitle ? ` Cookbook: "${cookbookTitle}".` : ''}${recipeName ? ` Recipe name hint: "${recipeName}".` : ''}`;
 
-    const response = await fetch(GEMINI_CHAT_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GEMINI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gemini-2.5-flash",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: textPrompt },
-              ...images.map((url) => ({ type: "image_url", image_url: { url } })),
-            ]
-          },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "format_recipe",
-              description: "Return the formatted recipe",
-              parameters: {
+    const recipe = await geminiJson({
+      system: SYSTEM_PROMPT,
+      user: [{ text: textPrompt }, ...images.map((url: string) => ({ image: url }))],
+      schema: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            description: { type: "string" },
+            servings: { type: "number" },
+            estimated_cook_minutes: { type: "number" },
+            ingredients: {
+              type: "array",
+              items: {
                 type: "object",
-                properties: {
-                  name: { type: "string" },
-                  description: { type: "string" },
-                  servings: { type: "number" },
-                  estimated_cook_minutes: { type: "number" },
-                  ingredients: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        quantity: { type: "string" },
-                        unit: { type: "string" },
-                        name: { type: "string" },
-                      },
-                      required: ["quantity", "unit", "name"],
-                    },
-                  },
-                  steps: {
-                    type: "array",
-                    items: { type: "string" },
-                  },
-                },
-                required: ["name", "description", "servings", "ingredients", "steps"],
+                properties: { quantity: { type: "string" }, unit: { type: "string" }, name: { type: "string" } },
+                required: ["quantity", "unit", "name"],
               },
             },
+            steps: { type: "array", items: { type: "string" } },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "format_recipe" } },
-      }),
+          required: ["name", "description", "servings", "ingredients", "steps"],
+        },
     });
-
-    await requireGeminiResponse(response);
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
-    if (!toolCall?.function?.arguments) {
-      throw new Error("Invalid response from AI");
-    }
-
-    const recipe = JSON.parse(toolCall.function.arguments);
 
     return new Response(
       JSON.stringify({ recipe, cookbookTitle }),
