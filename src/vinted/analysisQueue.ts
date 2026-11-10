@@ -1,5 +1,5 @@
 /** Shared by batch analysis and manual regeneration in this browser. Not a project-wide quota guarantee. */
-export const ANALYSIS_START_GAP_MS = 5_000;
+export const ANALYSIS_START_GAP_MS = 13_000; // Google free tier allows 5 requests/minute for this model
 
 export function createAnalysisQueue(
   gap = ANALYSIS_START_GAP_MS,

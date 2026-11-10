@@ -2,7 +2,7 @@
 import { expect, it } from 'bun:test';
 import { ANALYSIS_START_GAP_MS, createAnalysisQueue } from './analysisQueue';
 
-it('spaces even instant analyses by five seconds', async () => {
+it('spaces even instant analyses by the start gap', async () => {
   let clock = 0;
   const starts: number[] = [];
   const queue = createAnalysisQueue(ANALYSIS_START_GAP_MS, () => clock, async (ms) => { clock += ms; });
