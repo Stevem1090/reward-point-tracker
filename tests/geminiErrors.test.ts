@@ -1,9 +1,14 @@
 // @ts-nocheck -- run with bun test
 import { expect, it } from 'bun:test';
-import { GEMINI_CHAT_URL, geminiErrorResponse, requireGeminiResponse } from '../supabase/functions/_shared/gemini';
+import { GEMINI_MODEL, geminiUrl, geminiErrorResponse, requireGeminiResponse } from '../supabase/functions/_shared/gemini';
 
-it('uses Google directly, not the Lovable gateway', () => {
-  expect(GEMINI_CHAT_URL).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+it("uses Google's native generateContent endpoint, not the Lovable gateway or OpenAI bridge", () => {
+  expect(geminiUrl('gemini-3.6-flash')).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent');
+  expect(geminiUrl('gemini-3.6-flash', true)).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse');
+});
+
+it('does not request the retired 2.5 models that return 404', () => {
+  expect(GEMINI_MODEL.startsWith('gemini-2.5')).toBe(false);
 });
 
 for (const status of [402, 403, 429]) {

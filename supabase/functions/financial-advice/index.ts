@@ -1,4 +1,4 @@
-import { GEMINI_CHAT_URL, requireGeminiResponse, geminiErrorResponse } from "../_shared/gemini.ts";
+import { geminiStream, geminiErrorResponse } from '../_shared/gemini.ts';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { getCaller } from '../_shared/auth.ts';
 
@@ -94,60 +94,7 @@ Deno.serve(async (req) => {
       2
     )}\n\n[ADDITIONAL CONTEXT FROM ME]\n${contextNote || 'None provided.'}`;
 
-    const upstream = await fetch(GEMINI_CHAT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gemini-2.5-flash',
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMessage }],
-        stream: true,
-      }),
-    });
-
-    await requireGeminiResponse(upstream);
-    const upstreamBody = upstream.body;
-    if (!upstreamBody) throw new Error('Google returned no advice stream');
-
-    // Re-emit only the answer text deltas as a plain text stream.
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = upstreamBody.getReader();
-        const decoder = new TextDecoder();
-        const encoder = new TextEncoder();
-        let buffer = '';
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() ?? '';
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed.startsWith('data:')) continue;
-              const payload = trimmed.slice(5).trim();
-              if (!payload || payload === '[DONE]') continue;
-              try {
-                const event = JSON.parse(payload);
-                const delta = event.choices?.[0]?.delta?.content;
-                if (typeof delta === 'string') {
-                  controller.enqueue(encoder.encode(delta));
-                }
-              } catch (_) {
-                // ignore non-JSON keepalives
-              }
-            }
-          }
-          controller.close();
-        } catch (error) {
-          console.error('Stream error', error);
-          controller.error(error);
-        }
-      },
-    });
+    const stream = await geminiStream({ system: SYSTEM_PROMPT, user: userMessage });
 
     return new Response(stream, {
       headers: {

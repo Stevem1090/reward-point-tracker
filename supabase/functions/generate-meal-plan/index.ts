@@ -1,4 +1,4 @@
-import { GEMINI_CHAT_URL, requireGeminiResponse, geminiErrorResponse } from "../_shared/gemini.ts";
+import { geminiJson, geminiErrorResponse } from "../_shared/gemini.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { getCaller } from "../_shared/auth.ts";
@@ -623,28 +623,11 @@ Remember: Focus on practical, family-friendly meals. NEVER duplicate current_wee
       savedRecipesCount: savedRecipes.length
     });
 
-    const response = await fetch(GEMINI_CHAT_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GEMINI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gemini-2.5-flash",
-        temperature: 1.0,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.3,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "suggest_meals",
-              description: "Return the meal suggestions for the specified slots",
-              parameters: {
+    const aiMeals: MealSuggestion[] = (await geminiJson<{ meals: MealSuggestion[] }>({
+      system: SYSTEM_PROMPT,
+      user: userPrompt,
+      temperature: 1.0,
+      schema: {
                 type: "object",
                 properties: {
                   meals: {
@@ -671,23 +654,7 @@ Remember: Focus on practical, family-friendly meals. NEVER duplicate current_wee
                 },
                 required: ["meals"],
               },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "suggest_meals" } },
-      }),
-    });
-
-    await requireGeminiResponse(response);
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
-    if (!toolCall?.function?.arguments) {
-      throw new Error("Invalid response from AI");
-    }
-
-    const aiMeals: MealSuggestion[] = JSON.parse(toolCall.function.arguments).meals;
+    })).meals;
 
     const validation = validateMealPlan(aiMeals);
     if (!validation.valid) {

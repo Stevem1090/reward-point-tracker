@@ -1,4 +1,4 @@
-import { GEMINI_CHAT_URL, requireGeminiResponse, geminiErrorResponse } from "../_shared/gemini.ts";
+import { geminiJson, geminiErrorResponse, GEMINI_LITE_MODEL } from "../_shared/gemini.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
@@ -65,65 +65,19 @@ ${ingredientsList}
 
 Estimate the calories per single serving. Be a sensible UK home-cooking average. Round to the nearest 10.`;
 
-    const aiRequestBody = JSON.stringify({
-      model: "gemini-2.5-flash-lite",
-      messages: [
-        {
-          role: "system",
-          content: "You are a nutrition estimator. Given an ingredient list and serving count, return a realistic estimated calories per single serving as an integer. Be sensible and pragmatic — avoid extremes.",
+    const parsed = await geminiJson<{ calories_per_serving: number; confidence: string }>({
+      model: GEMINI_LITE_MODEL,
+      system: "You are a nutrition estimator. Given an ingredient list and serving count, return a realistic estimated calories per single serving as an integer. Be sensible and pragmatic — avoid extremes.",
+      user: prompt,
+      schema: {
+        type: "object",
+        properties: {
+          calories_per_serving: { type: "number", description: "Estimated kcal per single serving, rounded to nearest 10." },
+          confidence: { type: "string", enum: ["low", "medium", "high"] },
         },
-        { role: "user", content: prompt },
-      ],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "estimate_calories",
-            description: "Return the estimated calories per single serving.",
-            parameters: {
-              type: "object",
-              properties: {
-                calories_per_serving: {
-                  type: "number",
-                  description: "Estimated kcal per single serving, rounded to nearest 10.",
-                },
-                confidence: {
-                  type: "string",
-                  enum: ["low", "medium", "high"],
-                },
-              },
-              required: ["calories_per_serving", "confidence"],
-            },
-          },
-        },
-      ],
-      tool_choice: { type: "function", function: { name: "estimate_calories" } },
+        required: ["calories_per_serving", "confidence"],
+      },
     });
-
-    const RETRY_DELAYS_MS = [500, 1500];
-    let aiResp: Response | null = null;
-    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-      aiResp = await fetch(GEMINI_CHAT_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${GEMINI_API_KEY}`, "Content-Type": "application/json" },
-        body: aiRequestBody,
-      });
-      if (aiResp.status >= 500 && attempt < RETRY_DELAYS_MS.length) {
-        await aiResp.body?.cancel();
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
-        continue;
-      }
-      await requireGeminiResponse(aiResp);
-      break;
-    }
-    if (!aiResp) throw new Error("Google Gemini returned no response");
-
-    const data = await aiResp.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall?.function?.arguments) {
-      throw new Error("Invalid AI response");
-    }
-    const parsed = JSON.parse(toolCall.function.arguments);
     const calories = Math.round((parsed.calories_per_serving || 0) / 10) * 10;
 
     // If a recipeCardId was provided, update the row server-side (RLS via user JWT)
