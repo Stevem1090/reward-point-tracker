@@ -1,4 +1,4 @@
-import { GEMINI_CHAT_URL, requireGeminiResponse, geminiErrorResponse } from "../_shared/gemini.ts";
+import { geminiJson, geminiErrorResponse } from "../_shared/gemini.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -106,25 +106,10 @@ serve(async (req) => {
 
     const userPrompt = `Create a consolidated shopping list from these meal ingredients:\n\n${ingredientsList}`;
 
-    const response = await fetch(GEMINI_CHAT_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GEMINI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gemini-2.5-flash",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "create_shopping_list",
-              description: "Return the consolidated shopping list",
-              parameters: {
+    const { items } = await geminiJson<{ items: any[] }>({
+      system: SYSTEM_PROMPT,
+      user: userPrompt,
+      schema: {
                 type: "object",
                 properties: {
                   items: {
@@ -152,23 +137,8 @@ serve(async (req) => {
                 },
                 required: ["items"],
               },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "create_shopping_list" } },
-      }),
+            ,
     });
-
-    await requireGeminiResponse(response);
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
-    if (!toolCall?.function?.arguments) {
-      throw new Error("Invalid response from AI");
-    }
-
-    const { items } = JSON.parse(toolCall.function.arguments);
 
     // Defensive cleanup: even with strict prompting, models occasionally emit
     // the unit inside the quantity ("500g" or "500 g" + unit "g"), which would
