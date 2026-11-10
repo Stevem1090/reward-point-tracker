@@ -1,4 +1,4 @@
-import { GEMINI_CHAT_URL, requireGeminiResponse, geminiErrorResponse } from "../_shared/gemini.ts";
+import { geminiJson, geminiErrorResponse } from "../_shared/gemini.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const cors = {
@@ -29,49 +29,15 @@ Deno.serve(async (req) => {
     if (!Array.isArray(images) || images.length === 0 || images.length > 10) return json({ error: "Send 1-10 photos" }, 400);
     if (!schema || typeof rules !== "string" || typeof reference !== "string") return json({ error: "Bad request" }, 400);
 
-    const key = Deno.env.get("GEMINI_API_KEY");
-    if (!key) throw new Error("GEMINI_API_KEY not configured");
-
-    const res = await fetch(GEMINI_CHAT_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "gemini-2.5-flash",
-        stream: true,
-        messages: [{ role: "system", content: `${rules}\n\nREFERENCE:\n${reference}` }, {
-          role: "user",
-          content: [
-            { type: "text", text: `These ${images.length} photos show ONE item. Analyse them and return the listing as JSON.\n\nSELLER NOTES: ${sellerNotes || "(none)"}\nSELLER HINTS: ${sellerHints || "(none)"}\n${writingContext}\nRecent batch openers (vary yours): ${openers || "(none yet)"}` },
-            ...images.flatMap((b64: string, i: number) => [{ type: "text", text: `Photo ${i + 1}` }, { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } }]),
-          ],
-        }],
-        response_format: { type: "json_schema", json_schema: { name: "listing", schema, strict: true } },
-      }),
+    const result = await geminiJson({
+      system: `${rules}\n\nREFERENCE:\n${reference}`,
+      user: [
+        { text: `These ${images.length} photos show ONE item. Analyse them and return the listing as JSON.\n\nSELLER NOTES: ${sellerNotes || "(none)"}\nSELLER HINTS: ${sellerHints || "(none)"}\n${writingContext}\nRecent batch openers (vary yours): ${openers || "(none yet)"}` },
+        ...images.flatMap((b64: string, i: number) => [{ text: `Photo ${i + 1}` }, { image: b64 }]),
+      ],
+      schema,
     });
-    await requireGeminiResponse(res);
-    if (!res.body) throw new Error("Google returned no analysis stream");
-    let args = "", buf = "", failed = "";
-    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += value;
-      let i;
-      while ((i = buf.indexOf("\n")) >= 0) {
-        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
-        if (!line.startsWith("data:")) continue;
-        const d = line.slice(5).trim();
-        if (!d || d === "[DONE]") continue;
-        try {
-          const ev = JSON.parse(d);
-          args += ev.choices?.[0]?.delta?.content ?? "";
-          if (ev.type === "response.failed" || ev.type === "error") failed = JSON.stringify(ev).slice(0, 300);
-        } catch { /* partial */ }
-      }
-    }
-    if (failed) { console.error("ai failed", failed); return json({ error: "AI analysis failed" }, 500); }
-    if (!args) return json({ error: "AI returned no listing" }, 500);
-    return json({ result: JSON.parse(args) });
+    return json({ result });
   } catch (e) {
     console.error(e);
     return geminiErrorResponse(e, cors);

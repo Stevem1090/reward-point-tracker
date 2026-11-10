@@ -654,7 +654,6 @@ Remember: Focus on practical, family-friendly meals. NEVER duplicate current_wee
                 },
                 required: ["meals"],
               },
-            ,
     })).meals;
 
     const validation = validateMealPlan(aiMeals);

@@ -137,7 +137,6 @@ serve(async (req) => {
                 },
                 required: ["items"],
               },
-            ,
     });
 
     // Defensive cleanup: even with strict prompting, models occasionally emit
